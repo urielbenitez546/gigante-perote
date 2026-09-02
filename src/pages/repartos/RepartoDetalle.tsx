@@ -84,13 +84,20 @@ export default function RepartoDetalle() {
     [itemsForThisTrip]
   );
 
-  // Sugiere el monto a cobrar (el total de este viaje) sin pisar lo que
-  // el chofer ya haya escrito a mano.
+  // Lo que Caja YA cobró de esta venta al momento de venderla (puede
+  // ser el total, una parte, o nada). Lo que falta es lo que le toca
+  // cobrar al chofer al entregar.
+  const salePendingAmount = delivery
+    ? Math.max(delivery.sale.total - delivery.sale.amount_paid, 0)
+    : 0;
+
+  // Sugiere el monto a cobrar (lo pendiente de la venta, no el precio
+  // de los productos) sin pisar lo que el chofer ya haya escrito a mano.
   useEffect(() => {
-    if (delivery && delivery.status !== "entregado" && !amountTouched && tripTotal > 0) {
-      setAmountCollected(tripTotal.toFixed(2));
+    if (delivery && delivery.status !== "entregado" && !amountTouched) {
+      setAmountCollected(salePendingAmount.toFixed(2));
     }
-  }, [delivery, tripTotal, amountTouched]);
+  }, [delivery, salePendingAmount, amountTouched]);
 
   const remainingDomicilio = delivery ? pendingLinesFor(delivery.sale, "domicilio") : [];
   const willMarkAsEntregado = !!delivery && delivery.status !== "entregado" && status === "entregado";
@@ -478,8 +485,12 @@ export default function RepartoDetalle() {
                     className="w-full rounded-lg border border-gigante-border px-3 py-2.5 text-sm"
                   />
                   <p className="text-xs text-gigante-muted mt-1">
-                    Sugerido según el total de este viaje: $
-                    {tripTotal.toLocaleString("es-MX", { minimumFractionDigits: 2 })}
+                    {salePendingAmount > 0
+                      ? `Pendiente de cobro de esta venta (después de lo pagado en caja): $${salePendingAmount.toLocaleString(
+                          "es-MX",
+                          { minimumFractionDigits: 2 }
+                        )}`
+                      : "El cliente ya pagó todo en caja — no hay nada que cobrar en este viaje."}
                   </p>
                 </div>
 
