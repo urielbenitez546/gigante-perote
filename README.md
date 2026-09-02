@@ -522,7 +522,37 @@ que las dos variables de entorno del Paso 2 estén bien escritas (sin espacios, 
 3. Netlify detecta el push y vuelve a publicar solo — no hay que tocar nada en Netlify de nuevo,
    salvo que el cambio necesite una variable de entorno nueva.
 
-## 20. Próximas etapas (no implementadas todavía)
+## 20. Corrección extra — Notificaciones (campanita funcional)
+
+La campanita del encabezado ya funciona de verdad:
+
+- Cuando un reparto se marca como **"Incidencia"**, se crea automáticamente una notificación
+  visible para **todos los roles**, con un link directo a ese reparto para poder atenderlo rápido.
+- Cualquier persona puede usar el botón **"Reportar"** (junto a la campanita) para avisar un
+  problema a mano (por ejemplo, "se cayó el internet en caja") — también le llega a todos.
+- Cada usuario ve su propio contador de "no leídas": si tú ya la abriste, a un compañero le sigue
+  apareciendo como nueva hasta que él también la vea. Hay un botón "Marcar todas" para limpiar tu
+  contador de una vez.
+- Se revisa cada ~25 segundos si hay notificaciones nuevas (sin necesitar recargar la página).
+
+Ver `supabase/migrations/0014_notificaciones.sql`.
+
+### Para aplicar esta corrección en tu Supabase
+
+1. Ve a **SQL Editor > New query**.
+2. Copia y pega todo el contenido de `supabase/migrations/0014_notificaciones.sql`.
+3. Dale **Run**.
+
+### Cómo probarlo
+
+1. Con `reparto.demo`, marca un reparto como "Incidencia" (desde el desplegable "Cambiar estado a")
+   y escribe algo en "Notas". Guarda.
+2. Entra con cualquier otro usuario DEMO — debe verse un número rojo en la campanita. Ábrela: debe
+   aparecer la incidencia, y al darle clic te debe llevar directo a ese reparto.
+3. Prueba también el botón "Reportar" con cualquier usuario, escribe un mensaje de prueba, y
+   confirma que le llega a los demás.
+
+## 21. Próximas etapas (no implementadas todavía)
 
 La Calculadora la construirá tu compañero por separado, y el Asistente de Consulta actual se
 reemplazará más adelante por el suyo cuando esté listo. Falta la conexión a GitHub y la publicación

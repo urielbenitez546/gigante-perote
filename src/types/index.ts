@@ -253,3 +253,20 @@ export interface FaqEntry {
   created_by: string | null;
   created_at: string;
 }
+
+// ============================================================
+// Notificaciones (campanita)
+// ============================================================
+export type NotificationType = "general" | "manual" | "reparto_incidencia";
+
+export interface AppNotification {
+  id: string;
+  type: NotificationType;
+  title: string;
+  message: string | null;
+  target_roles: AppRole[] | null;
+  link_path: string | null;
+  related_delivery_id: string | null;
+  created_by: string | null;
+  created_at: string;
+}
