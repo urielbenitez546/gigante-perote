@@ -90,7 +90,8 @@ export default function EvidenciasCobros() {
               : "Todavía no se ha confirmado ningún cobro."}
           </p>
         ) : (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[760px]">
             <thead className="bg-gigante-bg text-gigante-muted text-xs">
               <tr>
                 <th className="text-left font-medium px-4 py-3">Entregado</th>
@@ -158,6 +159,7 @@ export default function EvidenciasCobros() {
               })}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 

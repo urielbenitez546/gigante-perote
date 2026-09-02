@@ -88,7 +88,8 @@ export default function Administracion() {
         ) : filtered.length === 0 ? (
           <p className="p-6 text-sm text-gigante-muted">No se encontraron empleados.</p>
         ) : (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[600px]">
             <thead className="bg-gigante-bg text-gigante-muted text-xs">
               <tr>
                 <th className="text-left font-medium px-4 py-3">Nombre</th>
@@ -130,6 +131,7 @@ export default function Administracion() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 
