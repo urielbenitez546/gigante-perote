@@ -178,6 +178,9 @@ export default function RepartoDetalle() {
   }
 
   const sale = delivery.sale;
+  if (!sale) {
+    return <p className="text-sm text-gigante-muted">No se pudo cargar la venta de este reparto.</p>;
+  }
   const yaEntregado = delivery.status === "entregado";
   const signatureUrl = publicPhotoUrl("repartos-firmas", delivery.signature_path);
   const photoUrls = (delivery.photo_paths ?? []).map((p) => publicPhotoUrl("repartos-evidencia", p));
@@ -316,9 +319,20 @@ export default function RepartoDetalle() {
         )}
 
         <div className="mt-5 border-t border-gigante-border pt-4">
-          <p className="text-sm font-semibold text-gigante-navy mb-3">
-            Estado actual: <span className="font-normal">{DELIVERY_STATUS_LABELS[delivery.status]}</span>
-          </p>
+          <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+            <p className="text-sm font-semibold text-gigante-navy">
+              Estado actual: <span className="font-normal">{DELIVERY_STATUS_LABELS[delivery.status]}</span>
+            </p>
+            {!yaEntregado && status !== "entregado" && (
+              <button
+                type="button"
+                onClick={() => setStatus("entregado")}
+                className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg px-3 py-2"
+              >
+                <CheckCircle2 size={14} /> Marcar como entregado (subir firma y fotos)
+              </button>
+            )}
+          </div>
 
           <div className="grid sm:grid-cols-2 gap-3">
             <div>

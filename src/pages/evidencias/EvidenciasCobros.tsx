@@ -112,8 +112,8 @@ export default function EvidenciasCobros() {
                     <td className="px-4 py-3 text-gigante-muted whitespace-nowrap">
                       {d.delivered_at ? new Date(d.delivered_at).toLocaleString("es-MX") : "—"}
                     </td>
-                    <td className="px-4 py-3 font-medium text-gigante-navy">{d.sale.folio}</td>
-                    <td className="px-4 py-3 text-gigante-navy">{d.sale.customer_name}</td>
+                    <td className="px-4 py-3 font-medium text-gigante-navy">{d.sale?.folio ?? "—"}</td>
+                    <td className="px-4 py-3 text-gigante-navy">{d.sale?.customer_name ?? "—"}</td>
                     <td className="px-4 py-3 text-gigante-muted">{d.driver_name || "—"}</td>
                     <td className="px-4 py-3 text-right text-gigante-navy font-semibold">
                       ${(d.amount_collected ?? 0).toLocaleString("es-MX", { minimumFractionDigits: 2 })}

@@ -37,7 +37,7 @@ export default function ConfirmarCobroModal({ delivery, onClose, onSuccess }: Pr
         </div>
 
         <p className="text-sm text-gigante-navy">
-          Folio <strong>{delivery.sale.folio}</strong> — {delivery.sale.customer_name}
+          Folio <strong>{delivery.sale?.folio ?? "—"}</strong> — {delivery.sale?.customer_name ?? "cliente"}
         </p>
         <p className="text-sm text-gigante-navy mt-1">
           Chofer reportó:{" "}
