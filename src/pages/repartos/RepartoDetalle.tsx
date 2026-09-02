@@ -103,6 +103,7 @@ export default function RepartoDetalle() {
   }, [delivery, salePendingAmount, amountTouched]);
 
   const remainingDomicilio = delivery ? pendingLinesFor(delivery.sale, "domicilio") : [];
+  const canEdit = profile?.role === "gerencia" || profile?.role === "reparto";
   const willMarkAsEntregado = !!delivery && delivery.status !== "entregado" && status === "entregado";
 
   function handlePhotoFiles(files: FileList | null) {
@@ -328,6 +329,7 @@ export default function RepartoDetalle() {
           </div>
         )}
 
+        {canEdit ? (
         <div className="mt-5 border-t border-gigante-border pt-4">
           <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
             <p className="text-sm font-semibold text-gigante-navy">
@@ -545,6 +547,30 @@ export default function RepartoDetalle() {
             {saving ? "Guardando..." : "Guardar cambios"}
           </button>
         </div>
+        ) : (
+          <div className="mt-5 border-t border-gigante-border pt-4">
+            <p className="text-sm font-semibold text-gigante-navy mb-2">
+              Estado actual: <span className="font-normal">{DELIVERY_STATUS_LABELS[delivery.status]}</span>
+            </p>
+            <div className="grid sm:grid-cols-2 gap-3 text-sm">
+              <p className="text-gigante-muted">
+                Chofer: <span className="text-gigante-navy">{delivery.driver_name || "—"}</span>
+              </p>
+              <p className="text-gigante-muted">
+                Vehículo: <span className="text-gigante-navy">{delivery.vehicle || "—"}</span>
+              </p>
+            </div>
+            {delivery.notes && (
+              <p className="text-sm text-gigante-muted mt-2">
+                Notas: <span className="text-gigante-navy">{delivery.notes}</span>
+              </p>
+            )}
+            <p className="text-xs text-gigante-muted mt-3">
+              Solo Gerencia y Reparto pueden editar este reparto. Si necesitas corregir algo, usa el
+              botón "Reportar" de arriba.
+            </p>
+          </div>
+        )}
       </div>
 
       <Link to="/repartos" className="inline-block mt-4 text-xs text-gigante-muted">

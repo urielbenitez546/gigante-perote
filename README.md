@@ -584,7 +584,29 @@ Ver `supabase/migrations/0015_cobro_en_caja.sql`.
 4. Debe verse "Pagado en caja: $700" y "Pendiente de cobro: $300" dentro del detalle, y en la lista
    general debe decir "Faltan $300.00".
 
-## 23. Próximas etapas (no implementadas todavía)
+## 24. Corrección extra — La campanita solo avisa problemas
+
+A petición tuya: se quitó la notificación automática de "nueva venta" (agregada en la Etapa 22),
+porque en un día con muchas ventas iba a inundar la campanita y le quitaría valor a lo que de
+verdad importa. La campanita queda reservada solo para:
+
+- Incidencias marcadas en un reparto (automático).
+- Reportes manuales con el botón "Reportar" (cualquiera puede usarlo).
+
+Caja sigue viendo el estado de cobro de cada venta (Pagada / Faltan $X) directo en la lista de
+"Ventas y Entregas", sin necesidad de una notificación aparte — normalmente el cliente llega al
+mostrador con su folio justo después de que Ventas registra la orden.
+
+Ver `supabase/migrations/0016_notificaciones_solo_incidencias.sql` (no requiere cambios de código,
+solo esta migración).
+
+### Para aplicar esta corrección en tu Supabase
+
+1. Ve a **SQL Editor > New query**.
+2. Copia y pega todo el contenido de `supabase/migrations/0016_notificaciones_solo_incidencias.sql`.
+3. Dale **Run**.
+
+## 25. Próximas etapas (no implementadas todavía)
 
 La Calculadora la construirá tu compañero por separado, y el Asistente de Consulta actual se
 reemplazará más adelante por el suyo cuando esté listo. Falta la conexión a GitHub y la publicación

@@ -61,7 +61,7 @@ export default function App() {
             <Route
               path="/repartos"
               element={
-                <ProtectedRoute allowedRoles={["gerencia", "reparto"]}>
+                <ProtectedRoute allowedRoles={["gerencia", "reparto", "caja", "ventas", "almacen"]}>
                   <Repartos />
                 </ProtectedRoute>
               }
@@ -69,7 +69,7 @@ export default function App() {
             <Route
               path="/repartos/:id"
               element={
-                <ProtectedRoute allowedRoles={["gerencia", "reparto"]}>
+                <ProtectedRoute allowedRoles={["gerencia", "reparto", "caja", "ventas", "almacen"]}>
                   <RepartoDetalle />
                 </ProtectedRoute>
               }
