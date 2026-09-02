@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, Phone, Plus, Upload, X, CheckCircle2, Clock } from "lucide-react";
 import { useDeliveries, updateDelivery, createAdditionalDelivery } from "../../hooks/useDeliveries";
 import { useAuth } from "../../context/AuthContext";
+import { useProfileNames } from "../../hooks/useProfileNames";
 import {
   DELIVERY_STATUS_LABELS,
   PAYMENT_METHOD_LABELS,
@@ -21,6 +22,7 @@ export default function RepartoDetalle() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { profile } = useAuth();
+  const { nameFor } = useProfileNames();
   const { deliveries, loading, reload } = useDeliveries();
   const delivery = deliveries.find((d) => d.id === id);
   const amountIsLocked = profile?.role === "reparto";
@@ -43,16 +45,18 @@ export default function RepartoDetalle() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | "">("");
   const [amountTouched, setAmountTouched] = useState(false);
 
+  const isReparto = profile?.role === "reparto";
+
   useEffect(() => {
     if (delivery && !initialized) {
-      setDriverName(delivery.driver_name ?? "");
+      setDriverName(delivery.driver_name ?? (isReparto ? profile?.full_name ?? "" : ""));
       setVehicle(delivery.vehicle ?? "");
       setInitialKm(delivery.initial_km != null ? String(delivery.initial_km) : "");
       setCurrentKm(delivery.current_km != null ? String(delivery.current_km) : "");
       setNotes(delivery.notes ?? "");
       setInitialized(true);
     }
-  }, [delivery, initialized]);
+  }, [delivery, initialized, isReparto, profile]);
 
   const itemsForThisTrip = useMemo(() => {
     if (!delivery) return [];
@@ -162,7 +166,7 @@ export default function RepartoDetalle() {
 
     const { error: err } = await updateDelivery(delivery.id, {
       status: status || undefined,
-      driverName: driverName || undefined,
+      driverName: (isReparto ? profile?.full_name : driverName) || undefined,
       vehicle: vehicle || undefined,
       initialKm: initialKm ? Number(initialKm) : undefined,
       currentKm: currentKm ? Number(currentKm) : undefined,
@@ -304,7 +308,8 @@ export default function RepartoDetalle() {
                 </p>
                 {delivery.payment_confirmed_at && (
                   <p className="text-xs text-gigante-muted mt-1">
-                    Confirmado el {new Date(delivery.payment_confirmed_at).toLocaleString("es-MX")}
+                    Confirmado el {new Date(delivery.payment_confirmed_at).toLocaleString("es-MX")} por{" "}
+                    {nameFor(delivery.payment_confirmed_by)}
                   </p>
                 )}
               </div>
@@ -366,10 +371,19 @@ export default function RepartoDetalle() {
               <label className="block text-sm font-medium text-gigante-navy mb-1">Chofer</label>
               <input
                 value={driverName}
-                onChange={(e) => setDriverName(e.target.value)}
-                placeholder="Nombre del chofer (DEMO)"
-                className="w-full rounded-lg border border-gigante-border px-3 py-2.5 text-sm"
+                onChange={(e) => !isReparto && setDriverName(e.target.value)}
+                readOnly={isReparto}
+                disabled={isReparto}
+                placeholder="Nombre del chofer"
+                className={`w-full rounded-lg border border-gigante-border px-3 py-2.5 text-sm ${
+                  isReparto ? "bg-gigante-bg text-gigante-muted" : ""
+                }`}
               />
+              {isReparto && (
+                <p className="text-[11px] text-gigante-muted mt-1">
+                  Se toma de tu sesión — no se puede poner el nombre de otro compañero.
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gigante-navy mb-1">Vehículo</label>

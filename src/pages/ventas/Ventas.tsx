@@ -3,6 +3,7 @@ import { ShoppingCart, Plus } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useProducts } from "../../hooks/useInventory";
 import { useSales } from "../../hooks/useSales";
+import { useProfileNames } from "../../hooks/useProfileNames";
 import { DELIVERY_TYPE_LABELS, SALE_STATUS_LABELS } from "../../types";
 import NuevaVentaModal from "../../components/ventas/NuevaVentaModal";
 import DetalleVentaModal from "../../components/ventas/DetalleVentaModal";
@@ -18,6 +19,7 @@ export default function Ventas() {
   const { profile } = useAuth();
   const { products } = useProducts();
   const { sales, loading, error, reload } = useSales();
+  const { nameFor } = useProfileNames();
   const [showModal, setShowModal] = useState(false);
   const [successFolio, setSuccessFolio] = useState<string | null>(null);
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
@@ -74,6 +76,7 @@ export default function Ventas() {
                 <tr>
                   <th className="text-left font-medium px-4 py-3">Folio</th>
                   <th className="text-left font-medium px-4 py-3">Cliente</th>
+                  <th className="text-left font-medium px-4 py-3">Vendedor</th>
                   <th className="text-left font-medium px-4 py-3">Tipo de entrega</th>
                   <th className="text-left font-medium px-4 py-3">Estado</th>
                   <th className="text-right font-medium px-4 py-3">Total</th>
@@ -95,6 +98,7 @@ export default function Ventas() {
                       </button>
                     </td>
                     <td className="px-4 py-3 text-gigante-navy">{s.customer_name}</td>
+                    <td className="px-4 py-3 text-gigante-muted">{nameFor(s.created_by)}</td>
                     <td className="px-4 py-3 text-gigante-muted">{DELIVERY_TYPE_LABELS[s.delivery_type]}</td>
                     <td className="px-4 py-3">
                       <span className={`text-xs rounded-full px-2 py-1 ${STATUS_BADGE[s.status]}`}>
@@ -139,7 +143,9 @@ export default function Ventas() {
                     </span>
                   </div>
                   <p className="text-sm text-gigante-navy mt-1">{s.customer_name}</p>
-                  <p className="text-xs text-gigante-muted">{DELIVERY_TYPE_LABELS[s.delivery_type]}</p>
+                  <p className="text-xs text-gigante-muted">
+                    {DELIVERY_TYPE_LABELS[s.delivery_type]} · Vendedor: {nameFor(s.created_by)}
+                  </p>
                   <div className="flex items-center justify-between mt-1">
                     <p className="text-sm font-semibold text-gigante-navy">
                       ${s.total.toLocaleString("es-MX", { minimumFractionDigits: 2 })}

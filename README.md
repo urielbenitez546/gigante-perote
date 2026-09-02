@@ -606,7 +606,29 @@ solo esta migración).
 2. Copia y pega todo el contenido de `supabase/migrations/0016_notificaciones_solo_incidencias.sql`.
 3. Dale **Run**.
 
-## 25. Próximas etapas (no implementadas todavía)
+## 26. Corrección extra — Ver quién hizo cada cosa
+
+A petición tuya: el sistema **ya guardaba** quién registró cada venta, cada movimiento de
+inventario, cada factura, cada merma y cada cobro — pero nadie lo podía ver en pantalla, porque
+antes de esta corrección cada quien solo podía consultar su propio perfil (o Gerencia, el de
+todos). Ahora cualquier usuario con sesión puede ver el nombre de sus compañeros (no su contraseña
+ni nada sensible, solo nombre/correo), y se muestra en:
+
+- **Ventas y Entregas**: columna "Vendedor" en la lista, y en el detalle de cada venta quién la
+  registró y quién confirmó el cobro en caja.
+- **Inventario**: columna "Registrado por" en Movimientos, Facturas de proveedores y Merma.
+- **Evidencias y Cobros** y el detalle de cada **reparto**: quién confirmó el cobro, además de
+  cuándo.
+
+Ver `supabase/migrations/0017_ver_nombres_companeros.sql`.
+
+### Para aplicar esta corrección en tu Supabase
+
+1. Ve a **SQL Editor > New query**.
+2. Copia y pega todo el contenido de `supabase/migrations/0017_ver_nombres_companeros.sql`.
+3. Dale **Run**.
+
+## 27. Próximas etapas (no implementadas todavía)
 
 La Calculadora la construirá tu compañero por separado, y el Asistente de Consulta actual se
 reemplazará más adelante por el suyo cuando esté listo. Falta la conexión a GitHub y la publicación

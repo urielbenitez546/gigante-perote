@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Camera, CheckCircle2, Clock } from "lucide-react";
 import { useDeliveries } from "../../hooks/useDeliveries";
 import { publicPhotoUrl } from "../../lib/storage";
+import { useProfileNames } from "../../hooks/useProfileNames";
 import { PAYMENT_METHOD_LABELS, type Delivery } from "../../types";
 import ConfirmarCobroModal from "../../components/repartos/ConfirmarCobroModal";
 
@@ -9,6 +10,7 @@ type Tab = "pendientes" | "confirmados";
 
 export default function EvidenciasCobros() {
   const { deliveries, loading, error, reload } = useDeliveries();
+  const { nameFor } = useProfileNames();
   const [tab, setTab] = useState<Tab>("pendientes");
   const [activeDelivery, setActiveDelivery] = useState<Delivery | null>(null);
 
@@ -149,7 +151,9 @@ export default function EvidenciasCobros() {
                       ) : (
                         <span className="text-xs text-emerald-700 whitespace-nowrap">
                           {d.payment_confirmed_at
-                            ? new Date(d.payment_confirmed_at).toLocaleDateString("es-MX")
+                            ? `${new Date(d.payment_confirmed_at).toLocaleDateString("es-MX")} — ${nameFor(
+                                d.payment_confirmed_by
+                              )}`
                             : ""}
                         </span>
                       )}

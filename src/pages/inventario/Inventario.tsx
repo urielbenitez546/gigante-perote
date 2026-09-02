@@ -3,6 +3,7 @@ import { Search, Plus, Package, Boxes, ShoppingCart, CheckCircle2, FileText, Ale
 import { useAuth } from "../../context/AuthContext";
 import { useProducts, useInventoryMovements } from "../../hooks/useInventory";
 import { usePurchaseInvoices, useWriteOffs } from "../../hooks/usePurchases";
+import { useProfileNames } from "../../hooks/useProfileNames";
 import RegistrarEntradaModal from "../../components/inventario/RegistrarEntradaModal";
 import RegistrarFacturaModal from "../../components/inventario/RegistrarFacturaModal";
 import RegistrarMermaModal from "../../components/inventario/RegistrarMermaModal";
@@ -30,6 +31,7 @@ export default function Inventario() {
   const { movements, loading: loadingMovements, reload: reloadMovements } = useInventoryMovements();
   const { invoices, loading: loadingInvoices, reload: reloadInvoices } = usePurchaseInvoices();
   const { writeOffs, loading: loadingWriteOffs, reload: reloadWriteOffs } = useWriteOffs();
+  const { nameFor } = useProfileNames();
 
   const [tab, setTab] = useState<TabKey>("productos");
   const [search, setSearch] = useState("");
@@ -314,6 +316,7 @@ export default function Inventario() {
                   <th className="text-left font-medium px-4 py-3">Tipo</th>
                   <th className="text-left font-medium px-4 py-3">Producto</th>
                   <th className="text-left font-medium px-4 py-3">Referencia</th>
+                  <th className="text-left font-medium px-4 py-3">Registrado por</th>
                   <th className="text-right font-medium px-4 py-3">Cantidad</th>
                 </tr>
               </thead>
@@ -330,6 +333,7 @@ export default function Inventario() {
                         {m.product ? `${m.product.code} — ${m.product.name}` : "—"}
                       </td>
                       <td className="px-4 py-3 text-gigante-muted">{m.reference ?? "—"}</td>
+                      <td className="px-4 py-3 text-gigante-muted">{nameFor(m.created_by)}</td>
                       <td
                         className={`px-4 py-3 text-right font-medium ${
                           positive ? "text-emerald-700" : "text-gigante-red"
@@ -365,6 +369,7 @@ export default function Inventario() {
                     <th className="text-left font-medium px-4 py-3">Factura</th>
                     <th className="text-left font-medium px-4 py-3">Proveedor</th>
                     <th className="text-left font-medium px-4 py-3">Productos</th>
+                    <th className="text-left font-medium px-4 py-3">Registrado por</th>
                     <th className="text-left font-medium px-4 py-3">Evidencia</th>
                   </tr>
                 </thead>
@@ -383,6 +388,7 @@ export default function Inventario() {
                             .map((it) => `${it.product?.code} (${it.quantity} ${it.product?.unit})`)
                             .join(", ")}
                         </td>
+                        <td className="px-4 py-3 text-gigante-muted">{nameFor(inv.created_by)}</td>
                         <td className="px-4 py-3">
                           {url ? (
                             <a href={url} target="_blank" rel="noreferrer" className="text-gigante-red text-xs underline">
@@ -416,6 +422,7 @@ export default function Inventario() {
                   <th className="text-left font-medium px-4 py-3">Producto</th>
                   <th className="text-right font-medium px-4 py-3">Cantidad</th>
                   <th className="text-left font-medium px-4 py-3">Motivo</th>
+                  <th className="text-left font-medium px-4 py-3">Registrado por</th>
                   <th className="text-left font-medium px-4 py-3">Evidencia</th>
                 </tr>
               </thead>
@@ -434,6 +441,7 @@ export default function Inventario() {
                         -{w.quantity} {w.product?.unit}
                       </td>
                       <td className="px-4 py-3 text-gigante-muted">{w.reason}</td>
+                      <td className="px-4 py-3 text-gigante-muted">{nameFor(w.created_by)}</td>
                       <td className="px-4 py-3">
                         {url ? (
                           <a href={url} target="_blank" rel="noreferrer" className="text-gigante-red text-xs underline">

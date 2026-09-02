@@ -3,6 +3,7 @@ import { X, CheckCircle2 } from "lucide-react";
 import type { SaleWithItems } from "../../types";
 import { DELIVERY_TYPE_LABELS, SALE_STATUS_LABELS } from "../../types";
 import { useAuth } from "../../context/AuthContext";
+import { useProfileNames } from "../../hooks/useProfileNames";
 import { registerSalePayment } from "../../hooks/useSales";
 
 interface Props {
@@ -13,6 +14,7 @@ interface Props {
 
 export default function DetalleVentaModal({ sale, onClose, onUpdated }: Props) {
   const { profile } = useAuth();
+  const { nameFor } = useProfileNames();
   const canRegisterPayment = profile?.role === "gerencia" || profile?.role === "caja";
   const pendingAmount = Math.max(sale.total - sale.amount_paid, 0);
 
@@ -52,8 +54,11 @@ export default function DetalleVentaModal({ sale, onClose, onUpdated }: Props) {
             <X size={20} />
           </button>
         </div>
-        <p className="text-sm text-gigante-muted mb-4">
+        <p className="text-sm text-gigante-muted mb-1">
           {sale.customer_name} · {SALE_STATUS_LABELS[sale.status]}
+        </p>
+        <p className="text-xs text-gigante-muted mb-4">
+          Vendedor: <span className="text-gigante-navy font-medium">{nameFor(sale.created_by)}</span>
         </p>
 
         <div className="space-y-2">
@@ -117,7 +122,7 @@ export default function DetalleVentaModal({ sale, onClose, onUpdated }: Props) {
               </div>
               {sale.payment_confirmed_at && !editing && (
                 <span className="flex items-center gap-1 text-[11px] text-emerald-700">
-                  <CheckCircle2 size={13} /> Registrado
+                  <CheckCircle2 size={13} /> Registrado por {nameFor(sale.payment_confirmed_by)}
                 </span>
               )}
             </div>
