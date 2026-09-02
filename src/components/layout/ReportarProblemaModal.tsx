@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { reportIssue } from "../../hooks/useNotifications";
 
@@ -32,7 +33,7 @@ export default function ReportarProblemaModal({ onClose, onSuccess }: Props) {
     onSuccess();
   }
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl w-full max-w-md p-5">
         <div className="flex items-center justify-between mb-2">
@@ -78,6 +79,7 @@ export default function ReportarProblemaModal({ onClose, onSuccess }: Props) {
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
