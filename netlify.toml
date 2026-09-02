@@ -1,0 +1,25 @@
+# ============================================================
+# Configuración de Netlify
+# ============================================================
+# Netlify lee este archivo automáticamente al conectar el repo.
+# No necesitas tocar nada aquí salvo que cambies el gestor de
+# paquetes o la carpeta de salida del build.
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# IMPORTANTE: esta regla es la que hace que la app funcione con
+# React Router. Sin ella, entrar directo a una URL como
+# "tusitio.netlify.app/repartos" (o refrescar esa página) te daría
+# un error 404 de Netlify, porque esa ruta no existe como archivo
+# físico — solo existe dentro de la app de React. Esta regla le dice
+# a Netlify: "para cualquier ruta que no sea un archivo real, sirve
+# index.html y deja que React Router decida qué mostrar".
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
