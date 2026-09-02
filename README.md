@@ -552,7 +552,39 @@ Ver `supabase/migrations/0014_notificaciones.sql`.
 3. Prueba también el botón "Reportar" con cualquier usuario, escribe un mensaje de prueba, y
    confirma que le llega a los demás.
 
-## 21. Próximas etapas (no implementadas todavía)
+## 22. Corrección extra — Cobro en caja al momento de la venta
+
+Retoma el proceso real que confirmaste: cuando Ventas registra una venta, a **Caja y Gerencia** les
+llega de inmediato una notificación (con la campanita que ya construimos). Al entrar al detalle de
+esa venta, Caja puede anotar **cuánto le pagó el cliente en el mostrador** — puede ser el total
+completo, o solo una parte.
+
+Ejemplo real: una venta de $12,000 — el cliente deja pagados $9,000 en caja, y quedan $3,000
+pendientes; esos $3,000 los cobra después el chofer al entregar a domicilio (eso ya se lleva por
+separado en "Evidencias y Cobros", que construimos en la Etapa 6).
+
+La lista de "Ventas y Entregas" ahora muestra, además del total, si esa venta ya quedó **Pagada** o
+si **Faltan $X** por cobrar, para que cualquiera lo vea de un vistazo.
+
+Ver `supabase/migrations/0015_cobro_en_caja.sql`.
+
+### Para aplicar esta corrección en tu Supabase
+
+1. Ve a **SQL Editor > New query**.
+2. Copia y pega todo el contenido de `supabase/migrations/0015_cobro_en_caja.sql`.
+3. Dale **Run**.
+
+### Cómo probarlo
+
+1. Con `ventas.demo` (o `gerencia.demo`), registra una venta nueva.
+2. Entra con `caja.demo` — debe llegarle una notificación en la campanita avisando de la venta
+   nueva, con link directo a "Ventas y Entregas".
+3. Abre esa venta desde la lista (dale clic al folio) y da clic en "Registrar cobro en caja". Anota
+   un monto MENOR al total (por ejemplo, si el total es $1,000, anota $700) y guarda.
+4. Debe verse "Pagado en caja: $700" y "Pendiente de cobro: $300" dentro del detalle, y en la lista
+   general debe decir "Faltan $300.00".
+
+## 23. Próximas etapas (no implementadas todavía)
 
 La Calculadora la construirá tu compañero por separado, y el Asistente de Consulta actual se
 reemplazará más adelante por el suyo cuando esté listo. Falta la conexión a GitHub y la publicación

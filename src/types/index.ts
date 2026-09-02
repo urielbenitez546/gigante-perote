@@ -104,6 +104,9 @@ export interface Sale {
   delivery_type: DeliveryType;
   status: SaleStatus;
   total: number;
+  amount_paid: number;
+  payment_confirmed_by: string | null;
+  payment_confirmed_at: string | null;
   created_by: string | null;
   created_at: string;
   delivered_at: string | null;

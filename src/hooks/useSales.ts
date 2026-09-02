@@ -73,3 +73,14 @@ export async function registerRetiro(saleId: string, items?: RetiroItemInput[]) 
   });
   return { error: error?.message ?? null };
 }
+
+/** Caja (o Gerencia) registra cuánto pagó el cliente en el mostrador
+ * al momento de la venta. Puede ser el total o solo una parte, si el
+ * resto se cobra después en la entrega a domicilio. */
+export async function registerSalePayment(saleId: string, amount: number) {
+  const { error } = await supabase.rpc("register_sale_payment", {
+    p_sale_id: saleId,
+    p_amount: amount,
+  });
+  return { error: error?.message ?? null };
+}

@@ -3,7 +3,7 @@ import { ShoppingCart, Plus } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useProducts } from "../../hooks/useInventory";
 import { useSales } from "../../hooks/useSales";
-import { DELIVERY_TYPE_LABELS, SALE_STATUS_LABELS, type SaleWithItems } from "../../types";
+import { DELIVERY_TYPE_LABELS, SALE_STATUS_LABELS } from "../../types";
 import NuevaVentaModal from "../../components/ventas/NuevaVentaModal";
 import DetalleVentaModal from "../../components/ventas/DetalleVentaModal";
 
@@ -20,7 +20,8 @@ export default function Ventas() {
   const { sales, loading, error, reload } = useSales();
   const [showModal, setShowModal] = useState(false);
   const [successFolio, setSuccessFolio] = useState<string | null>(null);
-  const [selectedSale, setSelectedSale] = useState<SaleWithItems | null>(null);
+  const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
+  const selectedSale = selectedSaleId ? sales.find((s) => s.id === selectedSaleId) ?? null : null;
 
   const canRegisterSale = profile?.role === "gerencia" || profile?.role === "ventas";
 
@@ -76,15 +77,18 @@ export default function Ventas() {
                   <th className="text-left font-medium px-4 py-3">Tipo de entrega</th>
                   <th className="text-left font-medium px-4 py-3">Estado</th>
                   <th className="text-right font-medium px-4 py-3">Total</th>
+                  <th className="text-right font-medium px-4 py-3">Cobro</th>
                   <th className="text-left font-medium px-4 py-3">Fecha</th>
                 </tr>
               </thead>
               <tbody>
-                {sales.map((s) => (
+                {sales.map((s) => {
+                  const pending = Math.max(s.total - s.amount_paid, 0);
+                  return (
                   <tr key={s.id} className="border-t border-gigante-border">
                     <td className="px-4 py-3 font-medium">
                       <button
-                        onClick={() => setSelectedSale(s)}
+                        onClick={() => setSelectedSaleId(s.id)}
                         className="text-gigante-red hover:underline"
                       >
                         {s.folio}
@@ -100,20 +104,32 @@ export default function Ventas() {
                     <td className="px-4 py-3 text-right text-gigante-navy">
                       ${s.total.toLocaleString("es-MX", { minimumFractionDigits: 2 })}
                     </td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                      {pending > 0 ? (
+                        <span className="text-xs text-gigante-red">
+                          Faltan ${pending.toLocaleString("es-MX")}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-emerald-700">Pagado</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-gigante-muted whitespace-nowrap">
                       {new Date(s.created_at).toLocaleString("es-MX")}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
 
             <div className="md:hidden divide-y divide-gigante-border">
-              {sales.map((s) => (
+              {sales.map((s) => {
+                const pending = Math.max(s.total - s.amount_paid, 0);
+                return (
                 <div key={s.id} className="p-4">
                   <div className="flex items-center justify-between">
                     <button
-                      onClick={() => setSelectedSale(s)}
+                      onClick={() => setSelectedSaleId(s.id)}
                       className="text-sm font-semibold text-gigante-red hover:underline"
                     >
                       {s.folio}
@@ -124,11 +140,19 @@ export default function Ventas() {
                   </div>
                   <p className="text-sm text-gigante-navy mt-1">{s.customer_name}</p>
                   <p className="text-xs text-gigante-muted">{DELIVERY_TYPE_LABELS[s.delivery_type]}</p>
-                  <p className="text-sm font-semibold text-gigante-navy mt-1">
-                    ${s.total.toLocaleString("es-MX", { minimumFractionDigits: 2 })}
-                  </p>
+                  <div className="flex items-center justify-between mt-1">
+                    <p className="text-sm font-semibold text-gigante-navy">
+                      ${s.total.toLocaleString("es-MX", { minimumFractionDigits: 2 })}
+                    </p>
+                    {pending > 0 ? (
+                      <span className="text-xs text-gigante-red">Faltan ${pending.toLocaleString("es-MX")}</span>
+                    ) : (
+                      <span className="text-xs text-emerald-700">Pagado</span>
+                    )}
+                  </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </>
         )}
@@ -137,7 +161,9 @@ export default function Ventas() {
       {showModal && (
         <NuevaVentaModal products={products} onClose={() => setShowModal(false)} onSuccess={handleSuccess} />
       )}
-      {selectedSale && <DetalleVentaModal sale={selectedSale} onClose={() => setSelectedSale(null)} />}
+      {selectedSale && (
+        <DetalleVentaModal sale={selectedSale} onClose={() => setSelectedSaleId(null)} onUpdated={reload} />
+      )}
     </div>
   );
 }
