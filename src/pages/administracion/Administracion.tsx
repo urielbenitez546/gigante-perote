@@ -25,6 +25,7 @@ export default function Administracion() {
       (p) =>
         p.full_name.toLowerCase().includes(term) ||
         (p.email ?? "").toLowerCase().includes(term) ||
+        (p.puesto ?? "").toLowerCase().includes(term) ||
         ROLE_LABELS[p.role].toLowerCase().includes(term)
     );
   }, [profiles, search]);
@@ -89,10 +90,11 @@ export default function Administracion() {
           <p className="p-6 text-sm text-gigante-muted">No se encontraron empleados.</p>
         ) : (
           <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[600px]">
+          <table className="w-full text-sm min-w-[680px]">
             <thead className="bg-gigante-bg text-gigante-muted text-xs">
               <tr>
                 <th className="text-left font-medium px-4 py-3">Nombre</th>
+                <th className="text-left font-medium px-4 py-3">Puesto</th>
                 <th className="text-left font-medium px-4 py-3">Correo</th>
                 <th className="text-left font-medium px-4 py-3">Rol</th>
                 <th className="text-left font-medium px-4 py-3">Estado</th>
@@ -108,6 +110,7 @@ export default function Administracion() {
                       <span className="ml-1.5 text-[10px] text-gigante-muted">(tú)</span>
                     )}
                   </td>
+                  <td className="px-4 py-3 text-gigante-muted">{p.puesto || "—"}</td>
                   <td className="px-4 py-3 text-gigante-muted">{p.email ?? "—"}</td>
                   <td className="px-4 py-3 text-gigante-navy">{ROLE_LABELS[p.role]}</td>
                   <td className="px-4 py-3">

@@ -628,7 +628,64 @@ Ver `supabase/migrations/0017_ver_nombres_companeros.sql`.
 2. Copia y pega todo el contenido de `supabase/migrations/0017_ver_nombres_companeros.sql`.
 3. Dale **Run**.
 
-## 27. Próximas etapas (no implementadas todavía)
+## 28. Corrección extra — Puesto real del empleado
+
+Se agregó un campo de "Puesto" (opcional, informativo), distinto del **rol del sistema**: el rol
+(gerencia/ventas/caja/almacen/reparto) sigue siendo lo único que controla permisos, pero dos
+personas con el mismo rol pueden tener puestos distintos — por ejemplo, "Jefe de Almacén" y
+"Auxiliar de Inventario", ambos con rol "Almacén". Gerencia lo llena desde **Administración**, y a
+partir de ahí se muestra junto al nombre en todo el sistema automáticamente (Ventas, Inventario,
+Evidencias y Cobros, etc.) — no hay que tocar nada más en cada pantalla.
+
+Ver `supabase/migrations/0018_puesto_empleado.sql`.
+
+### Para aplicar esta corrección en tu Supabase
+
+1. Ve a **SQL Editor > New query**.
+2. Copia y pega todo el contenido de `supabase/migrations/0018_puesto_empleado.sql`.
+3. Dale **Run**.
+
+### Cómo probarlo
+
+1. Con `gerencia.demo`, entra a Administración, edita a `almacen.demo` y ponle un puesto (ej. "Jefe
+   de Almacén"). Guarda.
+2. Ve a Inventario → Movimientos (o Facturas/Merma) registrados por ese usuario — ahora debe decir
+   "Mauricio (Jefe de Almacén)" en vez de solo "Mauricio".
+
+## 30. Etapa 8 — Calculadora de metros y cajas
+
+A petición tuya (en vez de esperar a que la construyera tu compañero, la hice yo): resuelve dos
+casos reales que confirmaste.
+
+**Modo Ventas** — "¿cuántas cajas necesito para X metros?": el vendedor mete cuántos m² necesita
+cubrir el cliente, y le dice cuántas cajas completas comprar, cuánto le sobra, y la alternativa en
+piezas sueltas si el cliente prefiere comprar exacto.
+
+**Modo Almacén** — verificación de inventario físico: cuando el sistema pide que haya cierta
+cantidad de metros de un producto, Almacén cuenta las cajas cerradas (que ya sabe cuántos m² trae
+cada una) y las piezas sueltas que quedaron de cajas abiertas, y la calculadora le dice el total real
+y si cuadra, sobra o falta contra lo que se esperaba.
+
+**Decisión tomada sin preguntar (avísame si prefieres otra cosa):** es una calculadora
+independiente — no está conectada al catálogo de productos de Inventario, así que hay que teclear
+los datos del producto (m² por caja, piezas por caja) cada vez, tomándolos de la etiqueta de la
+tarima. Esto la hace simple y rápida de usar sin necesitar internet ni depender de que el producto
+ya esté dado de alta en el sistema — pero si más adelante quieres que jale esos datos
+automáticamente del catálogo (agregándole esos dos campos a cada producto), es una mejora futura
+razonable, y puedo hacerla cuando gustes.
+
+### Cómo probarlo
+
+**Ventas**: en Calculadora, pestaña "Ventas", pon 1.50 m² por caja, 6 piezas por caja, y que el
+cliente necesita 32 m². Debe decirte cuántas cajas completas comprar y cuánto le sobra.
+
+**Almacén**: pestaña "Almacén", mismos datos de producto, pon cuántas cajas cerradas y piezas
+sueltas contaste, y opcionalmente cuántos metros pide el sistema (ej. 110) — te dice si cuadra,
+sobra o falta.
+
+No requiere ningún cambio en Supabase, solo el código nuevo.
+
+## 31. Próximas etapas (no implementadas todavía)
 
 La Calculadora la construirá tu compañero por separado, y el Asistente de Consulta actual se
 reemplazará más adelante por el suyo cuando esté listo. Falta la conexión a GitHub y la publicación

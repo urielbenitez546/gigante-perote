@@ -4,7 +4,6 @@ import ProtectedRoute from "./routes/ProtectedRoute";
 import AppLayout from "./components/layout/AppLayout";
 import Login from "./pages/auth/Login";
 import Inicio from "./pages/Inicio";
-import ComingSoon from "./pages/ComingSoon";
 import Inventario from "./pages/inventario/Inventario";
 import Ventas from "./pages/ventas/Ventas";
 import Retiros from "./pages/retiros/Retiros";
@@ -14,6 +13,7 @@ import EvidenciasCobros from "./pages/evidencias/EvidenciasCobros";
 import Manuales from "./pages/manuales/Manuales";
 import Asistente from "./pages/asistente/Asistente";
 import Administracion from "./pages/administracion/Administracion";
+import Calculadora from "./pages/calculadora/Calculadora";
 
 export default function App() {
   return (
@@ -84,7 +84,7 @@ export default function App() {
             />
             <Route path="/manuales" element={<Manuales />} />
             <Route path="/asistente" element={<Asistente />} />
-            <Route path="/calculadora" element={<ComingSoon title="Calculadora" stage="Etapa 8" />} />
+            <Route path="/calculadora" element={<Calculadora />} />
             <Route
               path="/administracion"
               element={

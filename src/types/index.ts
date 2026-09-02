@@ -9,6 +9,9 @@ export interface Profile {
   full_name: string;
   email: string | null;
   role: AppRole;
+  // Puesto real de la persona (ej. "Jefe de Almacén"), distinto del
+  // rol del sistema — solo es informativo, no afecta permisos.
+  puesto: string | null;
   active: boolean;
   created_at: string;
 }

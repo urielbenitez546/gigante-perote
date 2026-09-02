@@ -14,6 +14,7 @@ const ALL_ROLES: AppRole[] = ["gerencia", "ventas", "caja", "almacen", "reparto"
 
 export default function EditarPerfilModal({ profile, isSelf, onClose, onSuccess }: Props) {
   const [fullName, setFullName] = useState(profile.full_name);
+  const [puesto, setPuesto] = useState(profile.puesto ?? "");
   const [role, setRole] = useState<AppRole>(profile.role);
   const [active, setActive] = useState(profile.active);
   const [submitting, setSubmitting] = useState(false);
@@ -31,6 +32,7 @@ export default function EditarPerfilModal({ profile, isSelf, onClose, onSuccess 
     setSubmitting(true);
     const { error: err } = await updateProfile(profile.id, {
       fullName: fullName.trim(),
+      puesto: puesto.trim() || null,
       role: isSelf ? undefined : role,
       active: isSelf ? undefined : active,
     });
@@ -64,6 +66,22 @@ export default function EditarPerfilModal({ profile, isSelf, onClose, onSuccess 
               onChange={(e) => setFullName(e.target.value)}
               className="w-full rounded-lg border border-gigante-border px-3 py-2.5 text-sm"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gigante-navy mb-1">
+              Puesto (opcional)
+            </label>
+            <input
+              value={puesto}
+              onChange={(e) => setPuesto(e.target.value)}
+              placeholder="Ej. Jefe de Almacén, Auxiliar de Inventario..."
+              className="w-full rounded-lg border border-gigante-border px-3 py-2.5 text-sm"
+            />
+            <p className="text-xs text-gigante-muted mt-1">
+              Es solo informativo — se muestra junto a su nombre en el sistema. El rol de abajo es
+              el que de verdad controla a qué puede entrar.
+            </p>
           </div>
 
           <div>

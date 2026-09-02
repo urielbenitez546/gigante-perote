@@ -32,6 +32,7 @@ export function useProfiles() {
 
 export interface UpdateProfileInput {
   fullName?: string;
+  puesto?: string | null;
   role?: AppRole;
   active?: boolean;
 }
@@ -39,6 +40,7 @@ export interface UpdateProfileInput {
 export async function updateProfile(profileId: string, input: UpdateProfileInput) {
   const patch: Record<string, unknown> = {};
   if (input.fullName !== undefined) patch.full_name = input.fullName;
+  if (input.puesto !== undefined) patch.puesto = input.puesto;
   if (input.role !== undefined) patch.role = input.role;
   if (input.active !== undefined) patch.active = input.active;
 
