@@ -15,10 +15,11 @@ function fmt(n: number, decimals = 2): string {
 export default function Calculadora() {
   const [mode, setMode] = useState<Mode>("ventas");
 
-  // Datos del producto (comunes a ambos modos) — se capturan de la
-  // etiqueta de la tarima/caja (m² por caja y piezas por caja).
+  // Datos del producto (comunes a ambos modos) — se toman DIRECTO de
+  // la etiqueta de la tarima: "M2 POR CAJA" y "PIEZA" (m² que cubre
+  // una sola pieza). No hace falta contar piezas por caja a mano.
   const [m2PerBoxStr, setM2PerBoxStr] = useState("");
-  const [piecesPerBoxStr, setPiecesPerBoxStr] = useState("");
+  const [m2PerPieceStr, setM2PerPieceStr] = useState("");
 
   // Modo Ventas
   const [m2NeededStr, setM2NeededStr] = useState("");
@@ -29,9 +30,9 @@ export default function Calculadora() {
   const [targetM2Str, setTargetM2Str] = useState("");
 
   const m2PerBox = toNumber(m2PerBoxStr);
-  const piecesPerBox = toNumber(piecesPerBoxStr);
-  const m2PerPiece = piecesPerBox > 0 ? m2PerBox / piecesPerBox : 0;
-  const hasBaseData = m2PerBox > 0 && piecesPerBox > 0;
+  const m2PerPiece = toNumber(m2PerPieceStr);
+  const piecesPerBox = m2PerPiece > 0 ? m2PerBox / m2PerPiece : 0;
+  const hasBaseData = m2PerBox > 0 && m2PerPiece > 0;
 
   const ventasResult = useMemo(() => {
     const m2Needed = toNumber(m2NeededStr);
@@ -40,7 +41,7 @@ export default function Calculadora() {
     const boxesRounded = Math.ceil(boxesExact - 1e-9);
     const m2Covered = boxesRounded * m2PerBox;
     const surplus = m2Covered - m2Needed;
-    const piecesExact = m2PerPiece > 0 ? Math.ceil(m2Needed / m2PerPiece - 1e-9) : 0;
+    const piecesExact = Math.ceil(m2Needed / m2PerPiece - 1e-9);
     return { m2Needed, boxesExact, boxesRounded, m2Covered, surplus, piecesExact };
   }, [m2NeededStr, m2PerBox, m2PerPiece, hasBaseData]);
 
@@ -88,12 +89,13 @@ export default function Calculadora() {
       <div className="bg-white border border-gigante-border rounded-xl p-5 mt-4">
         <p className="text-sm font-semibold text-gigante-navy mb-1">Datos del producto</p>
         <p className="text-xs text-gigante-muted mb-3">
-          Tómalos de la etiqueta de la tarima o de la caja (m² que cubre una caja y cuántas piezas
-          trae).
+          Tómalos directo de la etiqueta de la tarima: los renglones "M2 POR CAJA" y "PIEZA".
         </p>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-medium text-gigante-navy mb-1">m² por caja</label>
+            <label className="block text-xs font-medium text-gigante-navy mb-1">
+              M² por caja (etiqueta: "M2 POR CAJA")
+            </label>
             <input
               type="number"
               min="0"
@@ -105,21 +107,23 @@ export default function Calculadora() {
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gigante-navy mb-1">Piezas por caja</label>
+            <label className="block text-xs font-medium text-gigante-navy mb-1">
+              M² por pieza (etiqueta: "PIEZA")
+            </label>
             <input
               type="number"
               min="0"
-              step="1"
-              value={piecesPerBoxStr}
-              onChange={(e) => setPiecesPerBoxStr(e.target.value)}
-              placeholder="Ej. 6"
+              step="0.001"
+              value={m2PerPieceStr}
+              onChange={(e) => setM2PerPieceStr(e.target.value)}
+              placeholder="Ej. 0.10"
               className="w-full rounded-lg border border-gigante-border px-3 py-2.5 text-sm"
             />
           </div>
         </div>
         {hasBaseData && (
           <p className="text-xs text-gigante-muted mt-2">
-            Eso equivale a <strong>{fmt(m2PerPiece, 4)} m²</strong> por pieza suelta.
+            Eso equivale a <strong>{fmt(piecesPerBox, 1)} piezas</strong> por caja.
           </p>
         )}
       </div>
