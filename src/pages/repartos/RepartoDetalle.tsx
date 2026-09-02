@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, Phone, Plus, Upload, X, CheckCircle2, Clock } from "lucide-react";
 import { useDeliveries, updateDelivery, createAdditionalDelivery } from "../../hooks/useDeliveries";
+import { useAuth } from "../../context/AuthContext";
 import {
   DELIVERY_STATUS_LABELS,
   PAYMENT_METHOD_LABELS,
@@ -19,8 +20,10 @@ const PAYMENT_METHODS: PaymentMethod[] = ["efectivo", "transferencia", "tarjeta"
 export default function RepartoDetalle() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { profile } = useAuth();
   const { deliveries, loading, reload } = useDeliveries();
   const delivery = deliveries.find((d) => d.id === id);
+  const amountIsLocked = profile?.role === "reparto";
 
   const [status, setStatus] = useState<DeliveryStatus | "">("");
   const [driverName, setDriverName] = useState("");
@@ -478,12 +481,23 @@ export default function RepartoDetalle() {
                     min="0"
                     step="0.01"
                     value={amountCollected}
+                    readOnly={amountIsLocked}
+                    disabled={amountIsLocked}
                     onChange={(e) => {
+                      if (amountIsLocked) return;
                       setAmountCollected(e.target.value);
                       setAmountTouched(true);
                     }}
-                    className="w-full rounded-lg border border-gigante-border px-3 py-2.5 text-sm"
+                    className={`w-full rounded-lg border border-gigante-border px-3 py-2.5 text-sm ${
+                      amountIsLocked ? "bg-gigante-bg text-gigante-muted" : ""
+                    }`}
                   />
+                  {amountIsLocked && (
+                    <p className="text-[11px] text-gigante-muted mt-1">
+                      Este monto lo calcula el sistema según la venta — no se puede modificar. Si hay
+                      un error, repórtalo con el botón "Reportar" de arriba.
+                    </p>
+                  )}
                   <p className="text-xs text-gigante-muted mt-1">
                     {salePendingAmount > 0
                       ? `Pendiente de cobro de esta venta (después de lo pagado en caja): $${salePendingAmount.toLocaleString(
