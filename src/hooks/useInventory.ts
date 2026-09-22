@@ -72,3 +72,21 @@ export async function registerInventoryEntry(
   });
   return { error: error?.message ?? null };
 }
+
+/** Actualiza el precio y/o la rotación de un producto (Gerencia y Almacén). */
+export async function updateProductComercial(
+  productId: string,
+  data: { unit_price?: number; rotacion?: string }
+) {
+  const { error } = await supabase.from("products").update(data).eq("id", productId);
+  return { error: error?.message ?? null };
+}
+
+/** Actualiza únicamente el % de descuento de un producto (Gerencia y Ventas). */
+export async function updateProductDescuento(productId: string, descuento: number) {
+  const { error } = await supabase.rpc("update_product_descuento", {
+    p_product_id: productId,
+    p_descuento: descuento,
+  });
+  return { error: error?.message ?? null };
+}

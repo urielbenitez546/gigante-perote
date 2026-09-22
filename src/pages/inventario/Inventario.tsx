@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Search, Plus, Package, Boxes, ShoppingCart, CheckCircle2, FileText, AlertTriangle } from "lucide-react";
+import { Search, Plus, Package, Boxes, ShoppingCart, CheckCircle2, FileText, AlertTriangle, Pencil, QrCode } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useProducts, useInventoryMovements } from "../../hooks/useInventory";
 import { usePurchaseInvoices, useWriteOffs } from "../../hooks/usePurchases";
@@ -7,7 +7,21 @@ import { useProfileNames } from "../../hooks/useProfileNames";
 import RegistrarEntradaModal from "../../components/inventario/RegistrarEntradaModal";
 import RegistrarFacturaModal from "../../components/inventario/RegistrarFacturaModal";
 import RegistrarMermaModal from "../../components/inventario/RegistrarMermaModal";
+import EditarProductoComercialModal from "../../components/inventario/EditarProductoComercialModal";
+import CodigoQrModal from "../../components/inventario/CodigoQrModal";
 import { publicPhotoUrl } from "../../lib/storage";
+import { ROTACION_LABELS, type Product, type ProductRotacion } from "../../types";
+
+const ROTACION_BADGE: Record<ProductRotacion, string> = {
+  rapida: "bg-emerald-100 text-emerald-700",
+  media: "bg-blue-100 text-blue-700",
+  lenta: "bg-amber-100 text-amber-700",
+  obsoleta: "bg-red-100 text-red-700",
+};
+
+function precioConDescuento(p: Product): number {
+  return p.unit_price * (1 - (p.descuento_porcentaje ?? 0) / 100);
+}
 
 const MOVEMENT_LABELS: Record<string, string> = {
   entrada: "Entrada de mercancía",
@@ -40,8 +54,12 @@ export default function Inventario() {
   const [showEntradaModal, setShowEntradaModal] = useState(false);
   const [showFacturaModal, setShowFacturaModal] = useState(false);
   const [showMermaModal, setShowMermaModal] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [qrProduct, setQrProduct] = useState<Product | null>(null);
 
   const canManage = profile?.role === "gerencia" || profile?.role === "almacen";
+  const canEditProduct =
+    profile?.role === "gerencia" || profile?.role === "almacen" || profile?.role === "ventas";
 
   const categories = useMemo(
     () => ["Todas", ...Array.from(new Set(products.map((p) => p.category)))],
@@ -247,6 +265,10 @@ export default function Inventario() {
                       <th className="text-right font-medium px-4 py-3">Existencia física</th>
                       <th className="text-right font-medium px-4 py-3">Vendidos pendientes</th>
                       <th className="text-right font-medium px-4 py-3">Disponibles</th>
+                      <th className="text-right font-medium px-4 py-3">Precio</th>
+                      <th className="text-left font-medium px-4 py-3">Rotación</th>
+                      <th className="px-4 py-3"></th>
+                      {canEditProduct && <th className="px-4 py-3"></th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -265,6 +287,45 @@ export default function Inventario() {
                         <td className="px-4 py-3 text-right font-semibold text-gigante-navy">
                           {(p.physical_stock - p.sold_pending).toLocaleString()} {p.unit}
                         </td>
+                        <td className="px-4 py-3 text-right text-gigante-navy">
+                          {p.descuento_porcentaje > 0 ? (
+                            <>
+                              <span className="line-through text-gigante-muted text-xs mr-1">
+                                ${p.unit_price.toLocaleString("es-MX")}
+                              </span>
+                              <span className="font-semibold text-emerald-700">
+                                ${precioConDescuento(p).toLocaleString("es-MX", { minimumFractionDigits: 2 })}
+                              </span>
+                            </>
+                          ) : (
+                            <>${p.unit_price.toLocaleString("es-MX", { minimumFractionDigits: 2 })}</>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`text-xs rounded-full px-2 py-1 ${ROTACION_BADGE[p.rotacion]}`}>
+                            {ROTACION_LABELS[p.rotacion]}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            onClick={() => setQrProduct(p)}
+                            aria-label="Ver código QR"
+                            className="text-gigante-muted hover:text-gigante-navy"
+                          >
+                            <QrCode size={15} />
+                          </button>
+                        </td>
+                        {canEditProduct && (
+                          <td className="px-4 py-3 text-right">
+                            <button
+                              onClick={() => setEditingProduct(p)}
+                              aria-label="Editar precio y rotación"
+                              className="text-gigante-muted hover:text-gigante-navy"
+                            >
+                              <Pencil size={15} />
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
@@ -273,10 +334,51 @@ export default function Inventario() {
                 <div className="md:hidden divide-y divide-gigante-border">
                   {filteredProducts.map((p) => (
                     <div key={p.id} className="p-4">
-                      <p className="text-sm font-medium text-gigante-navy">{p.name}</p>
-                      <p className="text-xs text-gigante-muted">
-                        {p.code} · {p.brand}
-                      </p>
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-medium text-gigante-navy">{p.name}</p>
+                          <p className="text-xs text-gigante-muted">
+                            {p.code} · {p.brand}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                          {canEditProduct && (
+                            <button
+                              onClick={() => setEditingProduct(p)}
+                              aria-label="Editar precio y rotación"
+                              className="text-gigante-muted hover:text-gigante-navy"
+                            >
+                              <Pencil size={15} />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => setQrProduct(p)}
+                            aria-label="Ver código QR"
+                            className="text-gigante-muted hover:text-gigante-navy"
+                          >
+                            <QrCode size={15} />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <span className={`text-xs rounded-full px-2 py-0.5 ${ROTACION_BADGE[p.rotacion]}`}>
+                          {ROTACION_LABELS[p.rotacion]}
+                        </span>
+                        {p.descuento_porcentaje > 0 ? (
+                          <span className="text-xs">
+                            <span className="line-through text-gigante-muted mr-1">
+                              ${p.unit_price.toLocaleString("es-MX")}
+                            </span>
+                            <span className="font-semibold text-emerald-700">
+                              ${precioConDescuento(p).toLocaleString("es-MX", { minimumFractionDigits: 2 })}
+                            </span>
+                          </span>
+                        ) : (
+                          <span className="text-xs font-semibold text-gigante-navy">
+                            ${p.unit_price.toLocaleString("es-MX", { minimumFractionDigits: 2 })}
+                          </span>
+                        )}
+                      </div>
                       <div className="grid grid-cols-3 gap-2 mt-2 text-center">
                         <div>
                           <p className="text-xs text-gigante-muted">Física</p>
@@ -481,6 +583,17 @@ export default function Inventario() {
           onSuccess={handleMermaSuccess}
         />
       )}
+      {editingProduct && (
+        <EditarProductoComercialModal
+          product={editingProduct}
+          onClose={() => setEditingProduct(null)}
+          onSuccess={() => {
+            setEditingProduct(null);
+            reload();
+          }}
+        />
+      )}
+      {qrProduct && <CodigoQrModal product={qrProduct} onClose={() => setQrProduct(null)} />}
     </div>
   );
 }

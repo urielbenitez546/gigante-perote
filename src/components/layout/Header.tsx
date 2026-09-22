@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, ChevronDown, LogOut, MessageSquareWarning, CheckCheck } from "lucide-react";
+import { Bell, ChevronDown, LogOut, MessageSquareWarning, CheckCheck, ScanLine } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useNotifications } from "../../hooks/useNotifications";
 import { ROLE_LABELS } from "../../types";
 import ReportarProblemaModal from "./ReportarProblemaModal";
+import EscanearQrModal from "./EscanearQrModal";
 
 function timeAgo(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -24,6 +25,7 @@ export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
+  const [showScanModal, setShowScanModal] = useState(false);
 
   if (!profile) return null;
 
@@ -43,6 +45,15 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-20 bg-gigante-bg/95 backdrop-blur border-b border-gigante-border">
       <div className="flex items-center justify-end gap-3 px-4 md:px-6 h-14">
+        <button
+          onClick={() => setShowScanModal(true)}
+          className="flex items-center gap-1 text-xs font-medium text-gigante-muted hover:text-gigante-navy border border-gigante-border rounded-lg px-2.5 py-1.5"
+          title="Escanear código QR de un producto"
+        >
+          <ScanLine size={15} />
+          <span className="hidden sm:inline">Escanear</span>
+        </button>
+
         <button
           onClick={() => setShowReportModal(true)}
           className="flex items-center gap-1 text-xs font-medium text-gigante-muted hover:text-gigante-navy border border-gigante-border rounded-lg px-2.5 py-1.5"
@@ -154,6 +165,7 @@ export default function Header() {
           }}
         />
       )}
+      {showScanModal && <EscanearQrModal onClose={() => setShowScanModal(false)} />}
     </header>
   );
 }

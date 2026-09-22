@@ -52,15 +52,6 @@ export const NAV_MODULES: NavModule[] = [
 // ============================================================
 export type ProductUnit = "caja" | "pieza" | "bolsa" | "rollo";
 
-export type ProductRotacion = "rapida" | "media" | "lenta" | "obsoleta";
-
-export const ROTACION_LABELS: Record<ProductRotacion, string> = {
-  rapida: "Rápida",
-  media: "Media",
-  lenta: "Lenta",
-  obsoleta: "Obsoleta",
-};
-
 export interface Product {
   id: string;
   code: string;
@@ -71,8 +62,6 @@ export interface Product {
   physical_stock: number;
   sold_pending: number;
   unit_price: number;
-  rotacion: ProductRotacion;
-  descuento_porcentaje: number;
   active: boolean;
   created_at: string;
 }

@@ -15,7 +15,6 @@ import Asistente from "./pages/asistente/Asistente";
 import Administracion from "./pages/administracion/Administracion";
 import Calculadora from "./pages/calculadora/Calculadora";
 import Etiquetas from "./pages/etiquetas/Etiquetas";
-import ProductoDetalle from "./pages/productos/ProductoDetalle";
 
 export default function App() {
   return (
@@ -32,7 +31,6 @@ export default function App() {
             }
           >
             <Route path="/" element={<Inicio />} />
-            <Route path="/producto/:id" element={<ProductoDetalle />} />
 
             {/* Módulos pendientes de construir en etapas posteriores.
                 Cada uno queda como placeholder para que la navegación
