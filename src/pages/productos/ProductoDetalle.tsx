@@ -2,13 +2,15 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Package, ArrowLeft } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
-import { ROTACION_LABELS, type Product } from "../../types";
+import { ROTACION_LABELS, PRODUCT_UNIT_LABELS, type Product } from "../../types";
 
 const ROTACION_BADGE: Record<string, string> = {
-  rapida: "bg-emerald-100 text-emerald-700",
-  media: "bg-blue-100 text-blue-700",
-  lenta: "bg-amber-100 text-amber-700",
-  obsoleta: "bg-red-100 text-red-700",
+  rapido: "bg-emerald-100 text-emerald-700",
+  medio: "bg-blue-100 text-blue-700",
+  lento: "bg-amber-100 text-amber-700",
+  muy_lento: "bg-orange-100 text-orange-700",
+  obsoleto: "bg-red-100 text-red-700",
+  incorporacion: "bg-purple-100 text-purple-700",
 };
 
 export default function ProductoDetalle() {
@@ -86,7 +88,7 @@ export default function ProductoDetalle() {
               ${product.unit_price.toLocaleString("es-MX", { minimumFractionDigits: 2 })}
             </span>
           )}
-          <span className="text-sm text-gigante-muted ml-1">por {product.unit}</span>
+          <span className="text-sm text-gigante-muted ml-1">por {PRODUCT_UNIT_LABELS[product.unit]}</span>
         </div>
 
         <div className="mt-4">

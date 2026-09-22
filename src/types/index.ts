@@ -50,15 +50,25 @@ export const NAV_MODULES: NavModule[] = [
 // ============================================================
 // Inventario (Etapa 3)
 // ============================================================
-export type ProductUnit = "caja" | "pieza" | "bolsa" | "rollo";
+export type ProductUnit = "caja" | "pieza" | "bolsa" | "rollo" | "m2";
 
-export type ProductRotacion = "rapida" | "media" | "lenta" | "obsoleta";
+export const PRODUCT_UNIT_LABELS: Record<ProductUnit, string> = {
+  caja: "caja",
+  pieza: "pieza",
+  bolsa: "bolsa",
+  rollo: "rollo",
+  m2: "m²",
+};
+
+export type ProductRotacion = "incorporacion" | "muy_lento" | "lento" | "medio" | "rapido" | "obsoleto";
 
 export const ROTACION_LABELS: Record<ProductRotacion, string> = {
-  rapida: "Rápida",
-  media: "Media",
-  lenta: "Lenta",
-  obsoleta: "Obsoleta",
+  incorporacion: "Incorporación",
+  muy_lento: "Muy lento",
+  lento: "Lento",
+  medio: "Medio",
+  rapido: "Rápido",
+  obsoleto: "Obsoleto",
 };
 
 export interface Product {
@@ -73,6 +83,11 @@ export interface Product {
   unit_price: number;
   rotacion: ProductRotacion;
   descuento_porcentaje: number;
+  color: string | null;
+  medida: string | null;
+  tipo: string | null;
+  calidad: string | null;
+  medida_caja: string | null;
   active: boolean;
   created_at: string;
 }

@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { X } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { updateProductComercial, updateProductDescuento } from "../../hooks/useInventory";
-import { ROTACION_LABELS, type Product, type ProductRotacion } from "../../types";
+import { ROTACION_LABELS, PRODUCT_UNIT_LABELS, type Product, type ProductRotacion } from "../../types";
 
 interface Props {
   product: Product;
@@ -10,18 +10,23 @@ interface Props {
   onSuccess: () => void;
 }
 
-const ROTACIONES: ProductRotacion[] = ["rapida", "media", "lenta", "obsoleta"];
+const ROTACIONES: ProductRotacion[] = ["rapido", "medio", "lento", "muy_lento", "obsoleto", "incorporacion"];
 
 export default function EditarProductoComercialModal({ product, onClose, onSuccess }: Props) {
   const { profile } = useAuth();
-  // Precio y Rotación: Gerencia y Almacén (quien ve el movimiento físico).
-  // % de Descuento: Gerencia y Ventas (quien decide cómo mover lo que gira lento).
+  // Precio, Rotación y datos de etiqueta: Gerencia y Almacén.
+  // % de Descuento: Gerencia y Ventas.
   const canEditPrecioRotacion = profile?.role === "gerencia" || profile?.role === "almacen";
   const canEditDescuento = profile?.role === "gerencia" || profile?.role === "ventas";
 
   const [precio, setPrecio] = useState(String(product.unit_price));
   const [rotacion, setRotacion] = useState<ProductRotacion>(product.rotacion);
   const [descuento, setDescuento] = useState(String(product.descuento_porcentaje));
+  const [color, setColor] = useState(product.color ?? "");
+  const [medida, setMedida] = useState(product.medida ?? "");
+  const [tipo, setTipo] = useState(product.tipo ?? "");
+  const [calidad, setCalidad] = useState(product.calidad ?? "");
+  const [medidaCaja, setMedidaCaja] = useState(product.medida_caja ?? "");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,6 +54,11 @@ export default function EditarProductoComercialModal({ product, onClose, onSucce
       const { error: err } = await updateProductComercial(product.id, {
         unit_price: precioNum,
         rotacion,
+        color: color.trim() || null,
+        medida: medida.trim() || null,
+        tipo: tipo.trim() || null,
+        calidad: calidad.trim() || null,
+        medida_caja: medidaCaja.trim() || null,
       });
       if (err) {
         setSubmitting(false);
@@ -71,14 +81,14 @@ export default function EditarProductoComercialModal({ product, onClose, onSucce
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl w-full max-w-md p-5">
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl w-full max-w-md p-5 my-8">
         <div className="flex items-center justify-between mb-1">
           <h2 className="text-lg font-bold text-gigante-navy">
             {canEditPrecioRotacion && canEditDescuento
-              ? "Editar precio, rotación y descuento"
+              ? "Editar producto"
               : canEditPrecioRotacion
-              ? "Editar precio y rotación"
+              ? "Editar producto"
               : "Editar descuento"}
           </h2>
           <button onClick={onClose} aria-label="Cerrar" className="text-gigante-muted">
@@ -93,7 +103,7 @@ export default function EditarProductoComercialModal({ product, onClose, onSucce
           {canEditPrecioRotacion ? (
             <div>
               <label className="block text-sm font-medium text-gigante-navy mb-1">
-                Precio por {product.unit}
+                Precio por {PRODUCT_UNIT_LABELS[product.unit]}
               </label>
               <input
                 type="number"
@@ -136,6 +146,64 @@ export default function EditarProductoComercialModal({ product, onClose, onSucce
               Rotación actual: <strong>{ROTACION_LABELS[product.rotacion]}</strong>{" "}
               <span className="text-xs text-gigante-muted">(solo Gerencia y Almacén pueden cambiarla)</span>
             </p>
+          )}
+
+          {canEditPrecioRotacion && (
+            <div>
+              <p className="text-sm font-medium text-gigante-navy mb-1">
+                Datos para el Generador de Etiquetas (opcionales)
+              </p>
+              <p className="text-xs text-gigante-muted mb-2">
+                Al llenar esto, cuando busquen este producto por su código en el Generador de
+                Etiquetas, la etiqueta se llena sola con estos datos — y se puede seguir editando
+                a mano ahí si algo cambia.
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gigante-navy mb-1">Color</label>
+                  <input
+                    value={color}
+                    onChange={(e) => setColor(e.target.value)}
+                    className="w-full rounded-lg border border-gigante-border px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gigante-navy mb-1">Medida</label>
+                  <input
+                    value={medida}
+                    onChange={(e) => setMedida(e.target.value)}
+                    placeholder="Ej. 30x60"
+                    className="w-full rounded-lg border border-gigante-border px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gigante-navy mb-1">Tipo</label>
+                  <input
+                    value={tipo}
+                    onChange={(e) => setTipo(e.target.value)}
+                    className="w-full rounded-lg border border-gigante-border px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gigante-navy mb-1">Calidad</label>
+                  <input
+                    value={calidad}
+                    onChange={(e) => setCalidad(e.target.value)}
+                    placeholder="Ej. 1A"
+                    className="w-full rounded-lg border border-gigante-border px-3 py-2 text-sm"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-gigante-navy mb-1">Medida de caja</label>
+                  <input
+                    value={medidaCaja}
+                    onChange={(e) => setMedidaCaja(e.target.value)}
+                    placeholder="Ej. 1.50 m²"
+                    className="w-full rounded-lg border border-gigante-border px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+            </div>
           )}
 
           {canEditDescuento ? (

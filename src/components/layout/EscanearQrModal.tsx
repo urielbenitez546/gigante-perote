@@ -103,13 +103,22 @@ export default function EscanearQrModal({ onClose }: Props) {
   }, []);
 
   return (
-    <div
-      className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 overflow-y-auto"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div className="bg-white rounded-2xl w-full max-w-sm p-5 my-auto max-h-[92vh] overflow-y-auto">
+    <>
+      <div
+        className="fixed inset-0 bg-black/70 z-40"
+        onClick={onClose}
+      />
+      <div
+        className="fixed z-50 bg-white rounded-2xl p-5 overflow-y-auto"
+        style={{
+          top: "16px",
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: "92vw",
+          maxWidth: "24rem",
+          maxHeight: "calc(100vh - 32px)",
+        }}
+      >
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-bold text-gigante-navy flex items-center gap-2">
             <ScanLine size={20} /> Escanear código QR
@@ -138,7 +147,7 @@ export default function EscanearQrModal({ onClose }: Props) {
           </div>
         ) : (
           <>
-            <div className="relative bg-black rounded-xl overflow-hidden aspect-square">
+            <div className="relative bg-black rounded-xl overflow-hidden aspect-square max-h-[55vh] mx-auto">
               <video ref={videoRef} className="w-full h-full object-cover" muted playsInline />
               <canvas ref={canvasRef} className="hidden" />
               {estado === "escaneando" && (
@@ -171,6 +180,6 @@ export default function EscanearQrModal({ onClose }: Props) {
           </>
         )}
       </div>
-    </div>
+    </>
   );
 }

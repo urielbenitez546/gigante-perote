@@ -1,42 +1,53 @@
+import { useMemo } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { NAV_MODULES, ROLE_LABELS } from "../types";
 import { MODULE_ICONS } from "../components/layout/navIcons";
 import StatCard from "../components/dashboard/StatCard";
 import InventoryDonut from "../components/dashboard/InventoryDonut";
-import { Link } from "react-router-dom";
+import { useSales } from "../hooks/useSales";
+import { useDeliveries } from "../hooks/useDeliveries";
+import { useProducts } from "../hooks/useInventory";
 import {
   Truck,
   Package,
   DollarSign,
   ShoppingCart,
-  ShoppingCartIcon,
-  CircleDot,
   ChevronRight,
 } from "lucide-react";
-import {
-  demoStats,
-  demoInventory,
-  demoActivity,
-  demoUpcomingDeliveries,
-  DEMO_DATE_LABEL,
-} from "../data/demoData";
 
-const ACTIVITY_ICONS: Record<string, typeof CircleDot> = {
-  venta: ShoppingCartIcon,
-  reparto: Truck,
-  cobro: DollarSign,
-  entrada: Package,
-};
+// Umbral de "bajo stock" usado solo aquí, en lo que se construye el
+// semáforo de inventario por producto que se platicó — de momento es
+// un número fijo, igual para todos los productos.
+const UMBRAL_BAJO_STOCK = 20;
+
+function isToday(iso: string, ref: Date): boolean {
+  const d = new Date(iso);
+  return d.getFullYear() === ref.getFullYear() && d.getMonth() === ref.getMonth() && d.getDate() === ref.getDate();
+}
+
+function timeAgo(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return "justo ahora";
+  if (mins < 60) return `hace ${mins} min`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `hace ${hours} h`;
+  const days = Math.floor(hours / 24);
+  return `hace ${days} d`;
+}
 
 export default function Inicio() {
   const { profile } = useAuth();
-  if (!profile) return null;
+  const { sales } = useSales();
+  const { deliveries } = useDeliveries();
+  const { products } = useProducts();
 
   const can = (moduleKey: string) =>
-    NAV_MODULES.find((m) => m.key === moduleKey)?.roles.includes(profile.role) ?? false;
+    NAV_MODULES.find((m) => m.key === moduleKey)?.roles.includes(profile?.role ?? "") ?? false;
 
   const quickAccessModules = NAV_MODULES.filter(
-    (m) => m.key !== "inicio" && m.roles.includes(profile.role)
+    (m) => m.key !== "inicio" && m.roles.includes(profile?.role ?? "")
   );
 
   const showRepartos = can("repartos");
@@ -44,8 +55,68 @@ export default function Inicio() {
   const showCobros = can("evidencias");
   const showVentas = can("ventas");
   const showInventario = can("inventario");
-  const showActividad = profile.role === "gerencia";
+  const showActividad = profile?.role === "gerencia";
   const showProximosRepartos = showRepartos;
+
+  const stats = useMemo(() => {
+    const hoy = new Date();
+    const ventasHoy = sales
+      .filter((s) => isToday(s.created_at, hoy))
+      .reduce((sum, s) => sum + s.total, 0);
+
+    const repartosHoy = deliveries.filter((d) => d.status === "pendiente" || d.status === "en_camino").length;
+
+    const porRecogerSucursal = sales.filter((s) =>
+      s.sale_items.some((it) => it.delivery_type === "retiro_sucursal" && it.delivered_quantity < it.quantity)
+    ).length;
+
+    const cobrosPendientes = deliveries.filter((d) => d.status === "entregado" && !d.payment_confirmed_at).length;
+
+    return { ventasHoy, repartosHoy, porRecogerSucursal, cobrosPendientes };
+  }, [sales, deliveries]);
+
+  const inventario = useMemo(() => {
+    let disponibles = 0;
+    let bajoStock = 0;
+    let sinExistencia = 0;
+    for (const p of products) {
+      const disponible = p.physical_stock - p.sold_pending;
+      if (disponible <= 0) sinExistencia++;
+      else if (disponible <= UMBRAL_BAJO_STOCK) bajoStock++;
+      else disponibles++;
+    }
+    return { total: products.length, disponibles, bajoStock, sinExistencia };
+  }, [products]);
+
+  const actividadReciente = useMemo(() => {
+    const deVentas = sales.slice(0, 5).map((s) => ({
+      id: `venta-${s.id}`,
+      title: `Venta ${s.folio} — ${s.customer_name}`,
+      subtitle: `$${s.total.toLocaleString("es-MX")}`,
+      created_at: s.created_at,
+      icon: ShoppingCart,
+    }));
+    const deEntregas = deliveries
+      .filter((d) => d.status === "entregado" && d.delivered_at)
+      .slice(0, 5)
+      .map((d) => ({
+        id: `entrega-${d.id}`,
+        title: `Entrega a ${d.sale.customer_name}`,
+        subtitle: d.sale.folio,
+        created_at: d.delivered_at as string,
+        icon: Truck,
+      }));
+    return [...deVentas, ...deEntregas]
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, 5);
+  }, [sales, deliveries]);
+
+  const proximosRepartos = useMemo(
+    () => deliveries.filter((d) => d.status === "pendiente" || d.status === "en_camino").slice(0, 5),
+    [deliveries]
+  );
+
+  if (!profile) return null;
 
   return (
     <div className="max-w-6xl">
@@ -57,13 +128,8 @@ export default function Inicio() {
           <p className="text-sm text-gigante-muted mt-1">Resumen general de la sucursal Perote</p>
         </div>
         <span className="text-xs text-gigante-muted bg-white border border-gigante-border rounded-full px-3 py-1">
-          {DEMO_DATE_LABEL}
+          {new Date().toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
         </span>
-      </div>
-
-      <div className="mt-4 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-lg px-3 py-2">
-        Los números de este panel son datos de <strong>DEMOSTRACIÓN</strong>. Se conectarán a información
-        real conforme se construyan los módulos de Inventario, Ventas, Repartos y Retiros.
       </div>
 
       {(showRepartos || showRetiros || showCobros || showVentas) && (
@@ -72,8 +138,8 @@ export default function Inicio() {
             <StatCard
               icon={Truck}
               iconColorClass="bg-gigante-navy"
-              label="Repartos hoy"
-              value={String(demoStats.repartosHoy)}
+              label="Repartos pendientes"
+              value={String(stats.repartosHoy)}
               linkTo="/repartos"
             />
           )}
@@ -82,7 +148,7 @@ export default function Inicio() {
               icon={Package}
               iconColorClass="bg-gigante-red"
               label="Por recoger en sucursal"
-              value={String(demoStats.porRecogerSucursal)}
+              value={String(stats.porRecogerSucursal)}
               linkTo="/retiros"
             />
           )}
@@ -91,7 +157,7 @@ export default function Inicio() {
               icon={DollarSign}
               iconColorClass="bg-gigante-navy"
               label="Cobros pendientes por aplicar"
-              value={String(demoStats.cobrosPendientes)}
+              value={String(stats.cobrosPendientes)}
               linkTo="/evidencias-cobros"
             />
           )}
@@ -100,7 +166,7 @@ export default function Inicio() {
               icon={ShoppingCart}
               iconColorClass="bg-gigante-red"
               label="Ventas hoy"
-              value={`$${demoStats.ventasHoy.toLocaleString()}`}
+              value={`$${stats.ventasHoy.toLocaleString("es-MX")}`}
               linkTo="/ventas"
             />
           )}
@@ -131,10 +197,10 @@ export default function Inicio() {
           <div className="bg-white border border-gigante-border rounded-xl p-4">
             <p className="text-sm font-semibold text-gigante-navy mb-3">Inventario general</p>
             <InventoryDonut
-              total={demoInventory.total}
-              disponibles={demoInventory.disponibles}
-              bajoStock={demoInventory.bajoStock}
-              sinExistencia={demoInventory.sinExistencia}
+              total={inventario.total}
+              disponibles={inventario.disponibles}
+              bajoStock={inventario.bajoStock}
+              sinExistencia={inventario.sinExistencia}
             />
           </div>
         )}
@@ -144,23 +210,27 @@ export default function Inicio() {
         {showActividad && (
           <div className="bg-white border border-gigante-border rounded-xl p-4">
             <p className="text-sm font-semibold text-gigante-navy mb-3">Actividad reciente</p>
-            <ul className="space-y-3">
-              {demoActivity.map((item) => {
-                const Icon = ACTIVITY_ICONS[item.icon] ?? CircleDot;
-                return (
-                  <li key={item.id} className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-gigante-bg flex items-center justify-center text-gigante-navy shrink-0">
-                      <Icon size={16} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-gigante-navy truncate">{item.title}</p>
-                      <p className="text-xs text-gigante-muted">{item.subtitle}</p>
-                    </div>
-                    <span className="text-xs text-gigante-muted whitespace-nowrap">{item.time}</span>
-                  </li>
-                );
-              })}
-            </ul>
+            {actividadReciente.length === 0 ? (
+              <p className="text-xs text-gigante-muted">Todavía no hay actividad registrada.</p>
+            ) : (
+              <ul className="space-y-3">
+                {actividadReciente.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <li key={item.id} className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-gigante-bg flex items-center justify-center text-gigante-navy shrink-0">
+                        <Icon size={16} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-gigante-navy truncate">{item.title}</p>
+                        <p className="text-xs text-gigante-muted">{item.subtitle}</p>
+                      </div>
+                      <span className="text-xs text-gigante-muted whitespace-nowrap">{timeAgo(item.created_at)}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </div>
         )}
 
@@ -172,19 +242,23 @@ export default function Inicio() {
                 Ver todos <ChevronRight size={14} />
               </Link>
             </div>
-            <ul className="space-y-3">
-              {demoUpcomingDeliveries.map((d) => (
-                <li key={d.id} className="flex items-center justify-between text-sm">
-                  <div>
-                    <p className="text-gigante-navy">{d.cliente}</p>
-                    <p className="text-xs text-gigante-muted">{d.direccion}</p>
-                  </div>
-                  <span className="text-xs bg-gigante-bg text-gigante-navy rounded-full px-2 py-1">
-                    {d.hora}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            {proximosRepartos.length === 0 ? (
+              <p className="text-xs text-gigante-muted">No hay repartos pendientes ahorita.</p>
+            ) : (
+              <ul className="space-y-3">
+                {proximosRepartos.map((d) => (
+                  <li key={d.id} className="flex items-center justify-between text-sm">
+                    <div className="min-w-0">
+                      <p className="text-gigante-navy truncate">{d.sale.customer_name}</p>
+                      <p className="text-xs text-gigante-muted truncate">{d.sale.customer_address}</p>
+                    </div>
+                    <span className="text-xs bg-gigante-bg text-gigante-navy rounded-full px-2 py-1 shrink-0 ml-2">
+                      {d.status === "en_camino" ? "En camino" : "Pendiente"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
       </div>

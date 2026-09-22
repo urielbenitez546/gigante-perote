@@ -10,13 +10,15 @@ import RegistrarMermaModal from "../../components/inventario/RegistrarMermaModal
 import EditarProductoComercialModal from "../../components/inventario/EditarProductoComercialModal";
 import CodigoQrModal from "../../components/inventario/CodigoQrModal";
 import { publicPhotoUrl } from "../../lib/storage";
-import { ROTACION_LABELS, type Product, type ProductRotacion } from "../../types";
+import { ROTACION_LABELS, PRODUCT_UNIT_LABELS, type Product, type ProductRotacion } from "../../types";
 
 const ROTACION_BADGE: Record<ProductRotacion, string> = {
-  rapida: "bg-emerald-100 text-emerald-700",
-  media: "bg-blue-100 text-blue-700",
-  lenta: "bg-amber-100 text-amber-700",
-  obsoleta: "bg-red-100 text-red-700",
+  rapido: "bg-emerald-100 text-emerald-700",
+  medio: "bg-blue-100 text-blue-700",
+  lento: "bg-amber-100 text-amber-700",
+  muy_lento: "bg-orange-100 text-orange-700",
+  obsoleto: "bg-red-100 text-red-700",
+  incorporacion: "bg-purple-100 text-purple-700",
 };
 
 function precioConDescuento(p: Product): number {
@@ -279,13 +281,13 @@ export default function Inventario() {
                         <td className="px-4 py-3 text-gigante-muted">{p.brand}</td>
                         <td className="px-4 py-3 text-gigante-muted">{p.category}</td>
                         <td className="px-4 py-3 text-right text-gigante-navy">
-                          {p.physical_stock.toLocaleString()} {p.unit}
+                          {p.physical_stock.toLocaleString()} {PRODUCT_UNIT_LABELS[p.unit]}
                         </td>
                         <td className="px-4 py-3 text-right text-gigante-red">
-                          {p.sold_pending.toLocaleString()} {p.unit}
+                          {p.sold_pending.toLocaleString()} {PRODUCT_UNIT_LABELS[p.unit]}
                         </td>
                         <td className="px-4 py-3 text-right font-semibold text-gigante-navy">
-                          {(p.physical_stock - p.sold_pending).toLocaleString()} {p.unit}
+                          {(p.physical_stock - p.sold_pending).toLocaleString()} {PRODUCT_UNIT_LABELS[p.unit]}
                         </td>
                         <td className="px-4 py-3 text-right text-gigante-navy">
                           {p.descuento_porcentaje > 0 ? (

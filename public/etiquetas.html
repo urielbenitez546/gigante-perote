@@ -368,6 +368,8 @@
 <style id="pageStyle">
   @page{ size: letter; margin: 0; }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 </head>
 <body>
 <div class="wrap">
@@ -377,6 +379,31 @@
   <div class="grid">
     <div class="card">
       <p class="title"><span id="formTitle">Agregar producto</span></p>
+
+      <div class="field" style="position:relative;">
+        <label>Buscar en tu Inventario (opcional)</label>
+        <div style="display:flex; gap:8px;">
+          <input id="buscarProducto" placeholder="Escribe el código o nombre del producto..." style="flex:1;">
+          <button type="button" id="btnEscanearProducto" style="flex-shrink:0; white-space:nowrap; padding:0 14px; border-radius:8px; border:1px solid #0E1E42; background:#fff; color:#0E1E42; font-weight:600; font-size:13px; cursor:pointer;">📷 Escanear</button>
+        </div>
+        <div id="resultadosBusqueda" style="display:none; position:absolute; z-index:20; background:#fff; border:1px solid #ddd; border-radius:8px; margin-top:4px; max-height:220px; overflow-y:auto; width:100%; box-shadow:0 4px 12px rgba(0,0,0,.10);"></div>
+        <p class="hint" id="buscarHint" style="margin-top:4px;">Si lo encuentras aquí (o lo escaneas), se llenan solos el nombre, ID, marca y precio — los demás campos (color, medida, etc.) los sigues llenando a mano.</p>
+      </div>
+
+      <div id="escanerOverlay" style="display:none; position:fixed; inset:0; z-index:100;">
+        <div style="position:fixed; inset:0; background:rgba(0,0,0,.7);" onclick="cerrarEscanerProducto()"></div>
+        <div style="position:fixed; top:16px; left:50%; transform:translateX(-50%); width:92vw; max-width:24rem; max-height:calc(100vh - 32px); overflow-y:auto; background:#fff; border-radius:16px; padding:20px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+            <p style="font-weight:700; color:#0E1E42; font-size:16px;">📷 Escanear producto</p>
+            <button type="button" onclick="cerrarEscanerProducto()" style="border:none; background:none; font-size:20px; cursor:pointer; color:#6b7280;">✕</button>
+          </div>
+          <div style="position:relative; background:#000; border-radius:12px; overflow:hidden; aspect-ratio:1/1; max-height:55vh; margin:0 auto;">
+            <video id="escanerVideo" muted playsinline style="width:100%; height:100%; object-fit:cover;"></video>
+            <canvas id="escanerCanvas" style="display:none;"></canvas>
+          </div>
+          <p id="escanerMensaje" style="font-size:12px; color:#6b7280; margin-top:10px; text-align:center;">Apunta la cámara al código QR de un producto.</p>
+        </div>
+      </div>
 
       <div class="field">
         <label>Nombre del producto</label>
@@ -582,6 +609,7 @@
     cents: 0.115,
     unidad: 0.034,
     id: 0.032,
+    qr: 0.300,
     footerPadV: 0.016,
     footerPadH: 0.028,
     footer: 0.026,
@@ -592,6 +620,222 @@
   function propIn(heightIn, key){
     return (heightIn * PROP[key]).toFixed(3) + "in";
   }
+
+  // ============================================================
+  // Conexión con tu Inventario real (Supabase) — para autocompletar
+  // ============================================================
+  // La llave de aquí abajo es la llave pública "anon" de tu proyecto:
+  // es segura de tener aquí, igual que ya está expuesta en el resto de
+  // tu sitio — la seguridad real la pone Supabase con sus reglas de
+  // quién puede ver qué (RLS), no el que esta llave esté oculta.
+  const SUPABASE_URL = "https://gakhkserwolhivjdnmfb.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_IfE4OkCLK0KOubb1hXo1ig_-SWuzdJW";
+
+  const UNIDAD_POR_UNIT = { caja: "Por caja", pieza: "Por pieza", bolsa: "Por bolsa", rollo: "Por rollo" };
+  const qrCache = {};
+  let selectedProductId = null; // uuid del producto real, si se eligió del Inventario
+  let searchDebounce = null;
+
+  // Esta página vive dentro de tu sitio (mismo dominio), así que puede
+  // leer la sesión que ya inició el usuario ahí mismo, guardada por
+  // Supabase en localStorage — sin pedirle que inicie sesión otra vez.
+  function getSupabaseAccessToken(){
+    try {
+      for (let i = 0; i < localStorage.length; i++){
+        const k = localStorage.key(i);
+        if (k && k.indexOf("sb-") === 0 && k.indexOf("-auth-token") !== -1){
+          const raw = localStorage.getItem(k);
+          if (!raw) continue;
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.access_token) return parsed.access_token;
+        }
+      }
+    } catch(e){ /* si algo falla aquí, simplemente no hay autocompletado */ }
+    return null;
+  }
+
+  async function buscarEnInventario(query){
+    const token = getSupabaseAccessToken();
+    const hint = document.getElementById("buscarHint");
+    const box = document.getElementById("resultadosBusqueda");
+    if (!token){
+      hint.textContent = "Inicia sesión en el sitio (en otra pestaña) para buscar en tu inventario. Mientras tanto, puedes llenar todo a mano.";
+      box.style.display = "none";
+      return;
+    }
+    if (!query || query.trim().length < 2){
+      hint.textContent = "Si lo encuentras aquí, se llenan solos el nombre, ID, marca y precio — los demás campos (color, medida, etc.) los sigues llenando a mano.";
+      box.style.display = "none";
+      return;
+    }
+    hint.textContent = "Buscando...";
+    const q = encodeURIComponent(`*${query.trim()}*`);
+    const url = `${SUPABASE_URL}/rest/v1/products?select=id,code,name,brand,unit,unit_price,descuento_porcentaje&or=(code.ilike.${q},name.ilike.${q})&limit=8`;
+    try {
+      const res = await fetch(url, {
+        headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error("No se pudo consultar el inventario.");
+      const data = await res.json();
+      hint.textContent = "";
+      if (!data.length){
+        box.innerHTML = `<div style="padding:10px 12px; font-size:13px; color:#6b7280;">Sin resultados para "${escapeHtml(query)}".</div>`;
+        box.style.display = "block";
+        return;
+      }
+      box.innerHTML = data.map(p => `
+        <div class="resultado-item" data-id="${p.id}" style="padding:10px 12px; font-size:13px; cursor:pointer; border-bottom:1px solid #f0f0f0;">
+          <strong>${escapeHtml(p.code)}</strong> — ${escapeHtml(p.name)}
+        </div>
+      `).join("");
+      box.style.display = "block";
+      Array.from(box.querySelectorAll(".resultado-item")).forEach(el => {
+        el.addEventListener("mouseenter", () => { el.style.background = "#f4f5f7"; });
+        el.addEventListener("mouseleave", () => { el.style.background = "#fff"; });
+        el.addEventListener("click", () => {
+          const producto = data.find(p => p.id === el.getAttribute("data-id"));
+          if (producto) seleccionarProductoInventario(producto);
+          box.style.display = "none";
+        });
+      });
+    } catch(e){
+      hint.textContent = "No se pudo conectar con tu inventario ahorita. Puedes seguir llenando todo a mano.";
+      box.style.display = "none";
+    }
+  }
+
+  async function seleccionarProductoInventario(producto){
+    selectedProductId = producto.id;
+    document.getElementById("nombre").value = producto.name;
+    document.getElementById("idProd").value = producto.code;
+    document.getElementById("marca").value = producto.brand || "PORCELANITE";
+    const precioFinal = producto.unit_price * (1 - (producto.descuento_porcentaje || 0) / 100);
+    document.getElementById("precio").value = precioFinal.toFixed(2);
+    document.getElementById("unidadPrecio").value = UNIDAD_POR_UNIT[producto.unit] || "";
+    document.getElementById("buscarProducto").value = `${producto.code} — ${producto.name}`;
+    await ensureQrForProduct(producto.id);
+  }
+
+  // ============================================================
+  // Escanear un producto con la cámara (en vez de buscarlo escrito)
+  // ============================================================
+  let escanerStream = null;
+  let escanerFrame = null;
+  let escanerCancelado = false;
+
+  async function buscarProductoPorId(id){
+    const token = getSupabaseAccessToken();
+    if (!token) return null;
+    const url = `${SUPABASE_URL}/rest/v1/products?select=id,code,name,brand,unit,unit_price,descuento_porcentaje&id=eq.${encodeURIComponent(id)}&limit=1`;
+    try {
+      const res = await fetch(url, { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${token}` } });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data[0] || null;
+    } catch(e){
+      return null;
+    }
+  }
+
+  async function abrirEscanerProducto(){
+    escanerCancelado = false;
+    document.getElementById("escanerOverlay").style.display = "block";
+    document.getElementById("escanerMensaje").textContent = "Apunta la cámara al código QR de un producto.";
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      document.getElementById("escanerMensaje").textContent = "Tu navegador no permite usar la cámara aquí. Usa la cámara de tu celular directamente.";
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      if (escanerCancelado){ stream.getTracks().forEach(t => t.stop()); return; }
+      escanerStream = stream;
+      const video = document.getElementById("escanerVideo");
+      video.srcObject = stream;
+      await video.play();
+      escanerTick();
+    } catch(e){
+      document.getElementById("escanerMensaje").textContent = "No se pudo acceder a la cámara. Revisa que le hayas dado permiso a este sitio.";
+    }
+  }
+
+  function escanerTick(){
+    if (escanerCancelado) return;
+    const video = document.getElementById("escanerVideo");
+    const canvas = document.getElementById("escanerCanvas");
+    if (!video || video.readyState !== video.HAVE_ENOUGH_DATA){
+      escanerFrame = requestAnimationFrame(escanerTick);
+      return;
+    }
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
+    if (code && code.data){
+      manejarCodigoEscaneado(code.data);
+      return;
+    }
+    escanerFrame = requestAnimationFrame(escanerTick);
+  }
+
+  async function manejarCodigoEscaneado(texto){
+    const marcador = `${window.location.origin}/producto/`;
+    if (!texto.startsWith(marcador)){
+      document.getElementById("escanerMensaje").textContent = "Ese código no es de un producto de tu sistema. Sigue intentando o ciérralo y llena la etiqueta a mano.";
+      escanerFrame = requestAnimationFrame(escanerTick);
+      return;
+    }
+    const id = texto.slice(marcador.length).split(/[/?#]/)[0];
+    document.getElementById("escanerMensaje").textContent = "Producto encontrado, llenando etiqueta...";
+    const producto = await buscarProductoPorId(id);
+    cerrarEscanerProducto();
+    if (producto) {
+      await seleccionarProductoInventario(producto);
+    } else {
+      const hint = document.getElementById("buscarHint");
+      hint.textContent = "Se escaneó el código, pero no se encontró ese producto en tu Inventario ahorita.";
+    }
+  }
+
+  function cerrarEscanerProducto(){
+    escanerCancelado = true;
+    if (escanerFrame) cancelAnimationFrame(escanerFrame);
+    if (escanerStream) escanerStream.getTracks().forEach(t => t.stop());
+    escanerStream = null;
+    document.getElementById("escanerOverlay").style.display = "none";
+  }
+
+  document.getElementById("btnEscanearProducto").addEventListener("click", abrirEscanerProducto);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") cerrarEscanerProducto();
+  });
+
+  function ensureQrForProduct(productId){
+    if (!productId) return Promise.resolve(null);
+    if (qrCache[productId]) return Promise.resolve(qrCache[productId]);
+    const url = `${window.location.origin}/producto/${productId}`;
+    return new Promise((resolve) => {
+      if (typeof QRCode === "undefined"){ resolve(null); return; }
+      QRCode.toDataURL(url, { width: 240, margin: 1 }, (err, dataUrl) => {
+        if (err){ resolve(null); return; }
+        qrCache[productId] = dataUrl;
+        resolve(dataUrl);
+      });
+    });
+  }
+
+  document.getElementById("buscarProducto").addEventListener("input", (e) => {
+    selectedProductId = null; // si vuelve a escribir, ya no corresponde a lo que había seleccionado
+    clearTimeout(searchDebounce);
+    const value = e.target.value;
+    searchDebounce = setTimeout(() => buscarEnInventario(value), 300);
+  });
+  document.addEventListener("click", (e) => {
+    const box = document.getElementById("resultadosBusqueda");
+    const input = document.getElementById("buscarProducto");
+    if (box && e.target !== input && !box.contains(e.target)) box.style.display = "none";
+  });
 
   // Dada la etiqueta (widthIn x heightIn), calcula cuántas caben por
   // hoja Carta. Si no caben en orientación normal (vertical, tamaño
@@ -632,7 +876,7 @@
     return {
       nombre:"", color:"", medida:"", tipo:"", usoRecomendado:"",
       calidad:"", medidaCaja:"", id:"", precio:"", unidadPrecio:"",
-      marca:"PORCELANITE", headerColor:"navy", cantidad:1, promo:false
+      marca:"PORCELANITE", headerColor:"navy", cantidad:1, promo:false, productId:null
     };
   }
 
@@ -646,6 +890,7 @@
     f.cantidad = Math.max(1, parseInt(f.cantidad || "1", 10) || 1);
     f.headerColor = headerColorForm;
     f.promo = document.getElementById("esPromo").checked;
+    f.productId = selectedProductId;
     return f;
   }
 
@@ -656,6 +901,9 @@
     });
     setHeaderColorForm(data.headerColor || "navy");
     document.getElementById("esPromo").checked = !!data.promo;
+    selectedProductId = data.productId || null;
+    document.getElementById("buscarProducto").value = "";
+    document.getElementById("buscarHint").textContent = "Si lo encuentras aquí, se llenan solos el nombre, ID, marca y precio — los demás campos (color, medida, etc.) los sigues llenando a mano.";
   }
 
   function setHeaderColorForm(c){
@@ -684,11 +932,14 @@
     e.target.value = v;
   });
 
-  document.getElementById("btnAdd").addEventListener("click", () => {
+  document.getElementById("btnAdd").addEventListener("click", async () => {
     const data = readForm();
     if(!data.nombre.trim()){
       alert("Ponle al menos el nombre del producto antes de agregarlo a la lista.");
       return;
+    }
+    if(data.productId){
+      await ensureQrForProduct(data.productId);
     }
     if(editIndex !== null){
       productos[editIndex] = data;
@@ -909,7 +1160,10 @@
               ${data.unidadPrecio ? `<div class="unidad" style="font-size:${p('unidad')}; color:${bg};">${escapeHtml(data.unidadPrecio)}</div>` : ""}
             </div>
           </div>
-          <div class="idrow" style="font-size:${p('id')};">ID: <span>${escapeHtml(data.id)}</span></div>
+          <div class="idrow" style="font-size:${p('id')}; display:flex; align-items:flex-end; justify-content:space-between; gap:${p('bodyPadH')};">
+            <div>ID: <span>${escapeHtml(data.id)}</span></div>
+            ${data.productId && qrCache[data.productId] ? `<img src="${qrCache[data.productId]}" alt="Código QR" style="width:${p('qr')}; height:${p('qr')}; flex-shrink:0;">` : ""}
+          </div>
         </div>
         <div class="footer" style="background:${bg}; padding:${p('footerPadV')} ${p('footerPadH')}; font-size:${p('footer')}; gap:${p('footerPadH')};">
           <span class="marca">${escapeHtml(data.marca || "PORCELANITE")}</span>
