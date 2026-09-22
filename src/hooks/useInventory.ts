@@ -73,10 +73,19 @@ export async function registerInventoryEntry(
   return { error: error?.message ?? null };
 }
 
-/** Actualiza el precio y/o la rotación de un producto (Gerencia y Almacén). */
+/** Actualiza el precio, la rotación y/o los datos de etiqueta de un
+ * producto (Gerencia y Almacén). */
 export async function updateProductComercial(
   productId: string,
-  data: { unit_price?: number; rotacion?: string }
+  data: {
+    unit_price?: number;
+    rotacion?: string;
+    color?: string | null;
+    medida?: string | null;
+    tipo?: string | null;
+    calidad?: string | null;
+    medida_caja?: string | null;
+  }
 ) {
   const { error } = await supabase.from("products").update(data).eq("id", productId);
   return { error: error?.message ?? null };

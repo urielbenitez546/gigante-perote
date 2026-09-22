@@ -44,11 +44,11 @@ export default function Inicio() {
   const { products } = useProducts();
 
   const can = (moduleKey: string) =>
-    NAV_MODULES.find((m) => m.key === moduleKey)?.roles.includes(profile?.role ?? "") ?? false;
+    !!profile && (NAV_MODULES.find((m) => m.key === moduleKey)?.roles.includes(profile.role) ?? false);
 
-  const quickAccessModules = NAV_MODULES.filter(
-    (m) => m.key !== "inicio" && m.roles.includes(profile?.role ?? "")
-  );
+  const quickAccessModules = profile
+    ? NAV_MODULES.filter((m) => m.key !== "inicio" && m.roles.includes(profile.role))
+    : [];
 
   const showRepartos = can("repartos");
   const showRetiros = can("retiros");
