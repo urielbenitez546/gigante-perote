@@ -282,7 +282,18 @@
     flex-shrink:0;
     box-sizing:border-box;
   }
-  .etiqueta .brandtext{line-height:1.12;}
+  .etiqueta .brandtext{line-height:1.12; min-width:0; overflow:hidden;}
+  /* QR en la esquina superior derecha del encabezado, mismo alto que el logo */
+  .etiqueta .qr-header{
+    margin-left:auto;
+    background:#fff;
+    flex-shrink:0;
+    box-sizing:border-box;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .etiqueta .qr-header img{width:100%; height:100%; display:block; image-rendering:pixelated;}
   .etiqueta .brandtext .l1{font-weight:800; letter-spacing:0.02em; white-space:nowrap;}
   .etiqueta .brandtext .l2{font-weight:600; white-space:nowrap;}
   .etiqueta .body{
@@ -621,7 +632,6 @@ Minimum version required to store current data is: `+i+`.
     cents: 0.115,
     unidad: 0.034,
     id: 0.032,
-    qr: 0.300,
     footerPadV: 0.016,
     footerPadH: 0.028,
     footer: 0.026,
@@ -836,7 +846,7 @@ Minimum version required to store current data is: `+i+`.
         resolve(null);
         return;
       }
-      QRCode.toDataURL(url, { width: 240, margin: 1 }, (err, dataUrl) => {
+      QRCode.toDataURL(url, { width: 400, margin: 1, errorCorrectionLevel: "L" }, (err, dataUrl) => {
         if (err){
           console.error("[QR] Error al generar el QR:", err);
           resolve(null);
@@ -1132,7 +1142,16 @@ Minimum version required to store current data is: `+i+`.
     const promoHtml = data.promo
       ? `<div class="promo-banner" style="font-size:${p('promo')}; padding:${p('promoPadV')} 0;">PROMOCIÓN</div>`
       : "";
-    const logoSize = p("logo");
+    // El encabezado (logo + texto + QR) se escala con el lado más chico
+    // para que en etiquetas verticales (angostas) no se salga el QR.
+    const headerBase = Math.min(heightIn, widthIn * 0.75);
+    const ph = (key) => propIn(headerBase, key);
+    const logoSize = ph("logo");
+    // QR del producto: va arriba a la derecha, del mismo tamaño que el logo,
+    // para que no le quite espacio al nombre ni al precio.
+    const qrHtml = data.productId && qrCache[data.productId]
+      ? `<div class="qr-header" style="width:${logoSize}; height:${logoSize}; border-radius:calc(${logoSize} * 0.08); padding:calc(${logoSize} * 0.06);"><img src="${qrCache[data.productId]}" alt="Código QR"></div>`
+      : "";
 
     const fieldRows = [
       ["COLOR:", data.color],
@@ -1164,14 +1183,15 @@ Minimum version required to store current data is: `+i+`.
     return `
       <div class="etiqueta" style="width:${widthIn}in; height:${heightIn}in;">
         ${promoHtml}
-        <div class="header" style="background:${bg}; padding:${p('headerPadV')} ${p('headerPadH')}; gap:${p('headerGap')};">
+        <div class="header" style="background:${bg}; padding:${ph('headerPadV')} ${ph('headerPadH')}; gap:${ph('headerGap')};">
           <div class="logo" style="width:${logoSize}; height:${logoSize}; border-radius:calc(${logoSize} * 0.15); padding:calc(${logoSize} * 0.08);">
             ${diamondLogoSVG()}
           </div>
           <div class="brandtext">
-            <div class="l1" style="font-size:${p('brandL1')};">EL GIGANTE</div>
-            <div class="l2" style="font-size:${p('brandL2')};">DE LOS AZULEJOS Y MÁRMOLES</div>
+            <div class="l1" style="font-size:${ph('brandL1')};">EL GIGANTE</div>
+            <div class="l2" style="font-size:${ph('brandL2')};">DE LOS AZULEJOS Y MÁRMOLES</div>
           </div>
+          ${qrHtml}
         </div>
         <div class="body" style="padding:${p('bodyPadV')} ${p('bodyPadH')};">
           <div class="nombre" style="font-size:${p('nombre')}; margin-bottom:${p('bodyPadV')};">
@@ -1184,9 +1204,8 @@ Minimum version required to store current data is: `+i+`.
               ${data.unidadPrecio ? `<div class="unidad" style="font-size:${p('unidad')}; color:${bg};">${escapeHtml(data.unidadPrecio)}</div>` : ""}
             </div>
           </div>
-          <div class="idrow" style="font-size:${p('id')}; display:flex; align-items:flex-end; justify-content:space-between; gap:${p('bodyPadH')};">
+          <div class="idrow" style="font-size:${p('id')};">
             <div>ID: <span>${escapeHtml(data.id)}</span></div>
-            ${data.productId && qrCache[data.productId] ? `<img src="${qrCache[data.productId]}" alt="Código QR" style="width:${p('qr')}; height:${p('qr')}; flex-shrink:0;">` : ""}
           </div>
         </div>
         <div class="footer" style="background:${bg}; padding:${p('footerPadV')} ${p('footerPadH')}; font-size:${p('footer')}; gap:${p('footerPadH')};">
