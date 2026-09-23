@@ -21,6 +21,7 @@ export default function EditarProductoComercialModal({ product, onClose, onSucce
 
   const [precio, setPrecio] = useState(String(product.unit_price));
   const [rotacion, setRotacion] = useState<ProductRotacion>(product.rotacion);
+  const [stockMinimo, setStockMinimo] = useState(String(product.stock_minimo));
   const [descuento, setDescuento] = useState(String(product.descuento_porcentaje));
   const [color, setColor] = useState(product.color ?? "");
   const [medida, setMedida] = useState(product.medida ?? "");
@@ -39,8 +40,13 @@ export default function EditarProductoComercialModal({ product, onClose, onSucce
 
     const precioNum = Number(precio);
     const descuentoNum = Number(descuento);
+    const stockMinimoNum = Number(stockMinimo);
     if (canEditPrecioRotacion && !(precioNum >= 0)) {
       setError("El precio debe ser un número válido.");
+      return;
+    }
+    if (canEditPrecioRotacion && !(stockMinimoNum >= 0)) {
+      setError("El mínimo de existencia debe ser un número válido.");
       return;
     }
     if (canEditDescuento && !(descuentoNum >= 0 && descuentoNum <= 100)) {
@@ -54,6 +60,7 @@ export default function EditarProductoComercialModal({ product, onClose, onSucce
       const { error: err } = await updateProductComercial(product.id, {
         unit_price: precioNum,
         rotacion,
+        stock_minimo: stockMinimoNum,
         color: color.trim() || null,
         medida: medida.trim() || null,
         tipo: tipo.trim() || null,
@@ -117,6 +124,31 @@ export default function EditarProductoComercialModal({ product, onClose, onSucce
           ) : (
             <p className="text-sm text-gigante-navy">
               Precio actual: <strong>${product.unit_price.toLocaleString("es-MX", { minimumFractionDigits: 2 })}</strong>{" "}
+              <span className="text-xs text-gigante-muted">(solo Gerencia y Almacén pueden cambiarlo)</span>
+            </p>
+          )}
+
+          {canEditPrecioRotacion ? (
+            <div>
+              <label className="block text-sm font-medium text-gigante-navy mb-1">
+                Mínimo de existencia (para el semáforo)
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={stockMinimo}
+                onChange={(e) => setStockMinimo(e.target.value)}
+                className="w-full rounded-lg border border-gigante-border px-3 py-2.5 text-sm"
+              />
+              <p className="text-xs text-gigante-muted mt-1">
+                Cuando lo disponible caiga a este número o menos, el producto se marca en amarillo
+                para Ventas y Almacén.
+              </p>
+            </div>
+          ) : (
+            <p className="text-sm text-gigante-navy">
+              Mínimo actual: <strong>{product.stock_minimo}</strong>{" "}
               <span className="text-xs text-gigante-muted">(solo Gerencia y Almacén pueden cambiarlo)</span>
             </p>
           )}

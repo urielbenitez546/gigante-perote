@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { NAV_MODULES, ROLE_LABELS } from "../types";
+import { NAV_MODULES, ROLE_LABELS, calcularSemaforo, SEMAFORO_LABELS, type SemaforoStatus } from "../types";
 import { MODULE_ICONS } from "../components/layout/navIcons";
 import StatCard from "../components/dashboard/StatCard";
 import InventoryDonut from "../components/dashboard/InventoryDonut";
@@ -15,11 +15,6 @@ import {
   ShoppingCart,
   ChevronRight,
 } from "lucide-react";
-
-// Umbral de "bajo stock" usado solo aquí, en lo que se construye el
-// semáforo de inventario por producto que se platicó — de momento es
-// un número fijo, igual para todos los productos.
-const UMBRAL_BAJO_STOCK = 20;
 
 function isToday(iso: string, ref: Date): boolean {
   const d = new Date(iso);
@@ -80,12 +75,21 @@ export default function Inicio() {
     let bajoStock = 0;
     let sinExistencia = 0;
     for (const p of products) {
-      const disponible = p.physical_stock - p.sold_pending;
-      if (disponible <= 0) sinExistencia++;
-      else if (disponible <= UMBRAL_BAJO_STOCK) bajoStock++;
+      const estado = calcularSemaforo(p);
+      if (estado === "rojo") sinExistencia++;
+      else if (estado === "amarillo") bajoStock++;
       else disponibles++;
     }
     return { total: products.length, disponibles, bajoStock, sinExistencia };
+  }, [products]);
+
+  const SEMAFORO_ORDEN: Record<SemaforoStatus, number> = { rojo: 0, amarillo: 1, verde: 2 };
+  const productosEnAlerta = useMemo(() => {
+    return products
+      .map((p) => ({ p, estado: calcularSemaforo(p) }))
+      .filter((x) => x.estado !== "verde")
+      .sort((a, b) => SEMAFORO_ORDEN[a.estado] - SEMAFORO_ORDEN[b.estado])
+      .slice(0, 8);
   }, [products]);
 
   const actividadReciente = useMemo(() => {
@@ -205,6 +209,36 @@ export default function Inicio() {
           </div>
         )}
       </div>
+
+      {showInventario && productosEnAlerta.length > 0 && (
+        <div className="bg-white border border-gigante-border rounded-xl p-4 mt-5">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm font-semibold text-gigante-navy">
+              Antes de vender, checa esto — se está acabando o ya no hay
+            </p>
+            <Link to="/inventario" className="text-xs text-gigante-red flex items-center gap-0.5">
+              Ver Inventario <ChevronRight size={14} />
+            </Link>
+          </div>
+          <ul className="divide-y divide-gigante-border">
+            {productosEnAlerta.map(({ p, estado }) => (
+              <li key={p.id} className="flex items-center justify-between py-2 text-sm">
+                <div className="min-w-0">
+                  <p className="text-gigante-navy truncate">{p.name}</p>
+                  <p className="text-xs text-gigante-muted">{p.code}</p>
+                </div>
+                <span
+                  className={`text-xs rounded-full px-2 py-1 shrink-0 ml-2 ${
+                    estado === "rojo" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"
+                  }`}
+                >
+                  {SEMAFORO_LABELS[estado]}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="grid md:grid-cols-2 gap-5 mt-5">
         {showActividad && (

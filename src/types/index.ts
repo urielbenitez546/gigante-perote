@@ -83,13 +83,33 @@ export interface Product {
   unit_price: number;
   rotacion: ProductRotacion;
   descuento_porcentaje: number;
+  stock_minimo: number;
   color: string | null;
   medida: string | null;
   tipo: string | null;
   calidad: string | null;
   medida_caja: string | null;
+  external_id: string | null;
   active: boolean;
   created_at: string;
+}
+
+export type SemaforoStatus = "verde" | "amarillo" | "rojo";
+
+export const SEMAFORO_LABELS: Record<SemaforoStatus, string> = {
+  verde: "Hay suficiente",
+  amarillo: "Se está acabando",
+  rojo: "Se acabó",
+};
+
+/** Calcula el semáforo de un producto: verde si hay de sobra sobre su
+ * mínimo, amarillo si ya llegó al mínimo (pero todavía queda algo),
+ * rojo si ya no queda nada disponible para vender. */
+export function calcularSemaforo(product: Product): SemaforoStatus {
+  const disponible = product.physical_stock - product.sold_pending;
+  if (disponible <= 0) return "rojo";
+  if (disponible <= product.stock_minimo) return "amarillo";
+  return "verde";
 }
 
 export type MovementType = "entrada" | "salida" | "ajuste" | "merma";

@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { X, CheckCircle2 } from "lucide-react";
+import { X, CheckCircle2, Trash2 } from "lucide-react";
 import type { SaleWithItems } from "../../types";
 import { DELIVERY_TYPE_LABELS, SALE_STATUS_LABELS } from "../../types";
 import { useAuth } from "../../context/AuthContext";
 import { useProfileNames } from "../../hooks/useProfileNames";
-import { registerSalePayment } from "../../hooks/useSales";
+import { registerSalePayment, deleteSale } from "../../hooks/useSales";
 
 interface Props {
   sale: SaleWithItems;
@@ -16,12 +16,30 @@ export default function DetalleVentaModal({ sale, onClose, onUpdated }: Props) {
   const { profile } = useAuth();
   const { nameFor } = useProfileNames();
   const canRegisterPayment = profile?.role === "gerencia" || profile?.role === "caja";
+  const canDelete = profile?.role === "gerencia";
+  const hasDeliveredItems = sale.sale_items.some((i) => i.delivered_quantity > 0);
   const pendingAmount = Math.max(sale.total - sale.amount_paid, 0);
 
   const [amountInput, setAmountInput] = useState(String(sale.total));
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  async function handleDelete() {
+    setDeleting(true);
+    setDeleteError(null);
+    const { error: err } = await deleteSale(sale.id);
+    setDeleting(false);
+    if (err) {
+      setDeleteError(err);
+      return;
+    }
+    onUpdated?.();
+    onClose();
+  }
 
   async function handleSavePayment() {
     setError(null);
@@ -187,6 +205,45 @@ export default function DetalleVentaModal({ sale, onClose, onUpdated }: Props) {
         >
           Cerrar
         </button>
+
+        {canDelete && (
+          <div className="mt-3 pt-3 border-t border-gigante-border">
+            {hasDeliveredItems ? (
+              <p className="text-xs text-gigante-muted text-center">
+                Esta venta ya tiene material entregado, así que no se puede eliminar.
+              </p>
+            ) : confirmingDelete ? (
+              <div>
+                <p className="text-xs text-gigante-red text-center mb-2">
+                  ¿Seguro? Esto borra la venta por completo y no se puede deshacer.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setConfirmingDelete(false)}
+                    className="flex-1 border border-gigante-border text-gigante-navy rounded-lg py-2 text-xs font-medium"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleDelete}
+                    disabled={deleting}
+                    className="flex-1 bg-gigante-red hover:bg-gigante-redDark disabled:opacity-60 text-white rounded-lg py-2 text-xs font-semibold"
+                  >
+                    {deleting ? "Eliminando..." : "Sí, eliminar"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmingDelete(true)}
+                className="flex items-center justify-center gap-1.5 w-full text-xs text-gigante-red hover:underline"
+              >
+                <Trash2 size={13} /> Eliminar esta venta (solo pruebas)
+              </button>
+            )}
+            {deleteError && <p className="text-xs text-gigante-red mt-2 text-center">{deleteError}</p>}
+          </div>
+        )}
       </div>
     </div>
   );

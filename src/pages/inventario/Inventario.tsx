@@ -10,7 +10,21 @@ import RegistrarMermaModal from "../../components/inventario/RegistrarMermaModal
 import EditarProductoComercialModal from "../../components/inventario/EditarProductoComercialModal";
 import CodigoQrModal from "../../components/inventario/CodigoQrModal";
 import { publicPhotoUrl } from "../../lib/storage";
-import { ROTACION_LABELS, PRODUCT_UNIT_LABELS, type Product, type ProductRotacion } from "../../types";
+import {
+  ROTACION_LABELS,
+  PRODUCT_UNIT_LABELS,
+  SEMAFORO_LABELS,
+  calcularSemaforo,
+  type Product,
+  type ProductRotacion,
+  type SemaforoStatus,
+} from "../../types";
+
+const SEMAFORO_DOT: Record<SemaforoStatus, string> = {
+  verde: "bg-emerald-500",
+  amarillo: "bg-amber-500",
+  rojo: "bg-red-500",
+};
 
 const ROTACION_BADGE: Record<ProductRotacion, string> = {
   rapido: "bg-emerald-100 text-emerald-700",
@@ -53,6 +67,7 @@ export default function Inventario() {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("Todas");
   const [brandFilter, setBrandFilter] = useState("Todas");
+  const [semaforoFilter, setSemaforoFilter] = useState<"Todos" | SemaforoStatus>("Todos");
   const [showEntradaModal, setShowEntradaModal] = useState(false);
   const [showFacturaModal, setShowFacturaModal] = useState(false);
   const [showMermaModal, setShowMermaModal] = useState(false);
@@ -81,9 +96,10 @@ export default function Inventario() {
         p.brand.toLowerCase().includes(search.toLowerCase());
       const matchesCategory = categoryFilter === "Todas" || p.category === categoryFilter;
       const matchesBrand = brandFilter === "Todas" || p.brand === brandFilter;
-      return matchesSearch && matchesCategory && matchesBrand;
+      const matchesSemaforo = semaforoFilter === "Todos" || calcularSemaforo(p) === semaforoFilter;
+      return matchesSearch && matchesCategory && matchesBrand && matchesSemaforo;
     });
-  }, [products, search, categoryFilter, brandFilter]);
+  }, [products, search, categoryFilter, brandFilter, semaforoFilter]);
 
   const stats = useMemo(() => {
     const totalProductos = products.length;
@@ -248,6 +264,16 @@ export default function Inventario() {
                 </option>
               ))}
             </select>
+            <select
+              value={semaforoFilter}
+              onChange={(e) => setSemaforoFilter(e.target.value as "Todos" | SemaforoStatus)}
+              className="rounded-lg border border-gigante-border px-3 py-2.5 text-sm"
+            >
+              <option value="Todos">Semáforo: Todos</option>
+              <option value="verde">🟢 Hay suficiente</option>
+              <option value="amarillo">🟡 Se está acabando</option>
+              <option value="rojo">🔴 Se acabó</option>
+            </select>
           </div>
 
           <div className="mt-4 bg-white border border-gigante-border rounded-xl overflow-hidden">
@@ -287,7 +313,13 @@ export default function Inventario() {
                           {p.sold_pending.toLocaleString()} {PRODUCT_UNIT_LABELS[p.unit]}
                         </td>
                         <td className="px-4 py-3 text-right font-semibold text-gigante-navy">
-                          {(p.physical_stock - p.sold_pending).toLocaleString()} {PRODUCT_UNIT_LABELS[p.unit]}
+                          <span className="inline-flex items-center gap-1.5">
+                            <span
+                              className={`w-2.5 h-2.5 rounded-full shrink-0 ${SEMAFORO_DOT[calcularSemaforo(p)]}`}
+                              title={SEMAFORO_LABELS[calcularSemaforo(p)]}
+                            />
+                            {(p.physical_stock - p.sold_pending).toLocaleString()} {PRODUCT_UNIT_LABELS[p.unit]}
+                          </span>
                         </td>
                         <td className="px-4 py-3 text-right text-gigante-navy">
                           {p.descuento_porcentaje > 0 ? (
@@ -392,7 +424,8 @@ export default function Inventario() {
                         </div>
                         <div>
                           <p className="text-xs text-gigante-muted">Disponible</p>
-                          <p className="text-sm font-semibold text-gigante-navy">
+                          <p className="text-sm font-semibold text-gigante-navy flex items-center justify-center gap-1">
+                            <span className={`w-2 h-2 rounded-full ${SEMAFORO_DOT[calcularSemaforo(p)]}`} />
                             {p.physical_stock - p.sold_pending}
                           </p>
                         </div>

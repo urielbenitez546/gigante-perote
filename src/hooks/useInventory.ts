@@ -80,6 +80,7 @@ export async function updateProductComercial(
   data: {
     unit_price?: number;
     rotacion?: string;
+    stock_minimo?: number;
     color?: string | null;
     medida?: string | null;
     tipo?: string | null;
