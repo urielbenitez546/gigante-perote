@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Search, Plus, Package, Boxes, ShoppingCart, CheckCircle2, FileText, AlertTriangle, Pencil, QrCode } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useProducts, useInventoryMovements } from "../../hooks/useInventory";
@@ -68,6 +69,24 @@ export default function Inventario() {
   const [categoryFilter, setCategoryFilter] = useState("Todas");
   const [brandFilter, setBrandFilter] = useState("Todas");
   const [semaforoFilter, setSemaforoFilter] = useState<"Todos" | SemaforoStatus>("Todos");
+  // Cuando se llega desde una alerta de la campanita
+  // (/inventario?semaforo=amarillo&producto=<id>), se muestra directo ese producto.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [productoAlerta, setProductoAlerta] = useState<string | null>(null);
+
+  useEffect(() => {
+    const sem = searchParams.get("semaforo");
+    const prod = searchParams.get("producto");
+    if (sem === "verde" || sem === "amarillo" || sem === "rojo") setSemaforoFilter(sem);
+    setProductoAlerta(prod);
+    if (sem || prod) setTab("productos");
+  }, [searchParams]);
+
+  function quitarFiltroAlerta() {
+    setProductoAlerta(null);
+    setSemaforoFilter("Todos");
+    setSearchParams({});
+  }
   const [showEntradaModal, setShowEntradaModal] = useState(false);
   const [showFacturaModal, setShowFacturaModal] = useState(false);
   const [showMermaModal, setShowMermaModal] = useState(false);
@@ -88,6 +107,8 @@ export default function Inventario() {
   );
 
   const filteredProducts = useMemo(() => {
+    // Desde una alerta: solo ese producto (aunque ya haya cambiado de color).
+    if (productoAlerta) return products.filter((p) => p.id === productoAlerta);
     return products.filter((p) => {
       const matchesSearch =
         search.trim() === "" ||
@@ -99,7 +120,7 @@ export default function Inventario() {
       const matchesSemaforo = semaforoFilter === "Todos" || calcularSemaforo(p) === semaforoFilter;
       return matchesSearch && matchesCategory && matchesBrand && matchesSemaforo;
     });
-  }, [products, search, categoryFilter, brandFilter, semaforoFilter]);
+  }, [products, search, categoryFilter, brandFilter, semaforoFilter, productoAlerta]);
 
   const stats = useMemo(() => {
     const totalProductos = products.length;
@@ -275,6 +296,15 @@ export default function Inventario() {
               <option value="rojo">🔴 Se acabó</option>
             </select>
           </div>
+
+          {productoAlerta && (
+            <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              <span>Mostrando el producto de la alerta de la campanita.</span>
+              <button onClick={quitarFiltroAlerta} className="text-xs font-semibold text-gigante-red hover:underline shrink-0">
+                Ver todos los productos
+              </button>
+            </div>
+          )}
 
           <div className="mt-4 bg-white border border-gigante-border rounded-xl overflow-hidden">
             {loading ? (

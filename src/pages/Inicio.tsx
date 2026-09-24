@@ -222,7 +222,11 @@ export default function Inicio() {
           </div>
           <ul className="divide-y divide-gigante-border">
             {productosEnAlerta.map(({ p, estado }) => (
-              <li key={p.id} className="flex items-center justify-between py-2 text-sm">
+              <li key={p.id}>
+                <Link
+                  to={`/inventario?semaforo=${estado}&producto=${p.id}`}
+                  className="flex items-center justify-between py-2 text-sm hover:bg-gigante-bg rounded-md px-1 -mx-1"
+                >
                 <div className="min-w-0">
                   <p className="text-gigante-navy truncate">{p.name}</p>
                   <p className="text-xs text-gigante-muted">{p.code}</p>
@@ -234,6 +238,7 @@ export default function Inicio() {
                 >
                   {SEMAFORO_LABELS[estado]}
                 </span>
+                </Link>
               </li>
             ))}
           </ul>

@@ -310,7 +310,13 @@ export interface FaqEntry {
 // ============================================================
 // Notificaciones (campanita)
 // ============================================================
-export type NotificationType = "general" | "manual" | "reparto_incidencia";
+export type NotificationType =
+  | "general"
+  | "manual"
+  | "reparto_incidencia"
+  | "stock_bajo"
+  | "stock_agotado"
+  | "venta_eliminada";
 
 export interface AppNotification {
   id: string;
@@ -320,6 +326,7 @@ export interface AppNotification {
   target_roles: AppRole[] | null;
   link_path: string | null;
   related_delivery_id: string | null;
+  related_product_id: string | null;
   created_by: string | null;
   created_at: string;
 }

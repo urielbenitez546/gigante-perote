@@ -86,9 +86,9 @@ export async function registerSalePayment(saleId: string, amount: number) {
 }
 
 /** Elimina una venta por completo (solo Gerencia, y solo si todavía
- * no se le ha entregado nada). Devuelve a "disponible" lo que esa
- * venta tenía reservado. */
-export async function deleteSale(saleId: string) {
-  const { error } = await supabase.rpc("delete_sale", { p_sale_id: saleId });
+ * no se le ha entregado ni cobrado nada). Devuelve a "disponible" lo
+ * que esa venta tenía apartado y deja aviso en la campanita. */
+export async function deleteSale(saleId: string, motivo: string) {
+  const { error } = await supabase.rpc("delete_sale", { p_sale_id: saleId, p_motivo: motivo });
   return { error: error?.message ?? null };
 }

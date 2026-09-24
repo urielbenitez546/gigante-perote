@@ -18,6 +18,7 @@ export default function DetalleVentaModal({ sale, onClose, onUpdated }: Props) {
   const canRegisterPayment = profile?.role === "gerencia" || profile?.role === "caja";
   const canDelete = profile?.role === "gerencia";
   const hasDeliveredItems = sale.sale_items.some((i) => i.delivered_quantity > 0);
+  const hasPayment = sale.amount_paid > 0;
   const pendingAmount = Math.max(sale.total - sale.amount_paid, 0);
 
   const [amountInput, setAmountInput] = useState(String(sale.total));
@@ -25,13 +26,18 @@ export default function DetalleVentaModal({ sale, onClose, onUpdated }: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [motivo, setMotivo] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   async function handleDelete() {
+    if (!motivo.trim()) {
+      setDeleteError("Escribe el motivo por el que se elimina la venta.");
+      return;
+    }
     setDeleting(true);
     setDeleteError(null);
-    const { error: err } = await deleteSale(sale.id);
+    const { error: err } = await deleteSale(sale.id, motivo.trim());
     setDeleting(false);
     if (err) {
       setDeleteError(err);
@@ -212,21 +218,37 @@ export default function DetalleVentaModal({ sale, onClose, onUpdated }: Props) {
               <p className="text-xs text-gigante-muted text-center">
                 Esta venta ya tiene material entregado, así que no se puede eliminar.
               </p>
+            ) : hasPayment ? (
+              <p className="text-xs text-gigante-muted text-center">
+                Esta venta ya tiene un cobro en caja. Para eliminarla, primero corrige el cobro a $0 y
+                regresa el dinero al cliente.
+              </p>
             ) : confirmingDelete ? (
               <div>
                 <p className="text-xs text-gigante-red text-center mb-2">
-                  ¿Seguro? Esto borra la venta por completo y no se puede deshacer.
+                  ¿Seguro? Esto borra la venta por completo y no se puede deshacer. Lo apartado regresa a
+                  disponible y se avisa a Gerencia y Caja.
                 </p>
+                <input
+                  value={motivo}
+                  onChange={(e) => setMotivo(e.target.value)}
+                  placeholder="Motivo (ej. error de captura, el cliente canceló)"
+                  className="w-full rounded-lg border border-gigante-border px-3 py-2 text-xs mb-2"
+                />
                 <div className="flex gap-2">
                   <button
-                    onClick={() => setConfirmingDelete(false)}
+                    onClick={() => {
+                      setConfirmingDelete(false);
+                      setMotivo("");
+                      setDeleteError(null);
+                    }}
                     className="flex-1 border border-gigante-border text-gigante-navy rounded-lg py-2 text-xs font-medium"
                   >
                     Cancelar
                   </button>
                   <button
                     onClick={handleDelete}
-                    disabled={deleting}
+                    disabled={deleting || !motivo.trim()}
                     className="flex-1 bg-gigante-red hover:bg-gigante-redDark disabled:opacity-60 text-white rounded-lg py-2 text-xs font-semibold"
                   >
                     {deleting ? "Eliminando..." : "Sí, eliminar"}
@@ -238,7 +260,7 @@ export default function DetalleVentaModal({ sale, onClose, onUpdated }: Props) {
                 onClick={() => setConfirmingDelete(true)}
                 className="flex items-center justify-center gap-1.5 w-full text-xs text-gigante-red hover:underline"
               >
-                <Trash2 size={13} /> Eliminar esta venta (solo pruebas)
+                <Trash2 size={13} /> Eliminar esta venta
               </button>
             )}
             {deleteError && <p className="text-xs text-gigante-red mt-2 text-center">{deleteError}</p>}
