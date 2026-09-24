@@ -442,3 +442,21 @@ export interface TrainingProgress {
   lesson_key: string;
   completed_at: string;
 }
+
+export interface TrainingVideo {
+  id: string;
+  title: string;
+  description: string | null;
+  responsabilidades: string[];
+  roles: AppRole[] | null;
+  video_path: string | null;
+  video_url: string | null;
+  duration_seconds: number | null;
+  orden: number;
+  active: boolean;
+  created_by: string | null;
+  created_at: string;
+}
+
+/** Clave con la que se guarda en training_progress que un video ya se vio. */
+export const videoLessonKey = (videoId: string) => `video:${videoId}`;
