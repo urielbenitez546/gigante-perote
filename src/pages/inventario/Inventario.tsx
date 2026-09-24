@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Search, Plus, Package, Boxes, ShoppingCart, CheckCircle2, FileText, AlertTriangle, Pencil, QrCode } from "lucide-react";
+import { Search, Plus, Package, Boxes, ShoppingCart, CheckCircle2, FileText, AlertTriangle, Pencil, QrCode, Store, ClipboardCheck, Undo2 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
-import { useProducts, useInventoryMovements } from "../../hooks/useInventory";
+import { useProducts, useInventoryMovements, useDisplayMovements, useInventoryCounts } from "../../hooks/useInventory";
 import { usePurchaseInvoices, useWriteOffs } from "../../hooks/usePurchases";
 import { useProfileNames } from "../../hooks/useProfileNames";
 import RegistrarEntradaModal from "../../components/inventario/RegistrarEntradaModal";
@@ -10,6 +10,8 @@ import RegistrarFacturaModal from "../../components/inventario/RegistrarFacturaM
 import RegistrarMermaModal from "../../components/inventario/RegistrarMermaModal";
 import EditarProductoComercialModal from "../../components/inventario/EditarProductoComercialModal";
 import CodigoQrModal from "../../components/inventario/CodigoQrModal";
+import ExhibicionModal from "../../components/inventario/ExhibicionModal";
+import ConteoFisicoModal from "../../components/inventario/ConteoFisicoModal";
 import { publicPhotoUrl } from "../../lib/storage";
 import {
   ROTACION_LABELS,
@@ -45,6 +47,9 @@ const MOVEMENT_LABELS: Record<string, string> = {
   salida: "Salida",
   ajuste: "Ajuste de inventario",
   merma: "Merma (material dañado)",
+  exhibicion: "A exhibición (tienda)",
+  regreso_exhibicion: "Regresa de exhibición",
+  conteo: "Ajuste por conteo físico",
 };
 
 const MOVEMENT_IS_POSITIVE: Record<string, boolean> = {
@@ -52,9 +57,26 @@ const MOVEMENT_IS_POSITIVE: Record<string, boolean> = {
   salida: false,
   ajuste: true,
   merma: false,
+  exhibicion: false,
+  regreso_exhibicion: true,
 };
 
-type TabKey = "productos" | "movimientos" | "facturas" | "merma";
+/** El conteo puede sumar o restar: el signo va en la referencia ("Conteo físico: +3 ..."). */
+function isPositiveMovement(type: string, reference: string | null): boolean {
+  if (type === "conteo") return (reference ?? "").includes(": +");
+  return MOVEMENT_IS_POSITIVE[type] ?? true;
+}
+
+const ROTACION_PRIORIDAD: Record<ProductRotacion, number> = {
+  rapido: 4,
+  medio: 3,
+  incorporacion: 2,
+  lento: 1,
+  muy_lento: 0,
+  obsoleto: 0,
+};
+
+type TabKey = "productos" | "movimientos" | "facturas" | "merma" | "exhibicion" | "conteos";
 
 export default function Inventario() {
   const { profile } = useAuth();
@@ -63,6 +85,10 @@ export default function Inventario() {
   const { invoices, loading: loadingInvoices, reload: reloadInvoices } = usePurchaseInvoices();
   const { writeOffs, loading: loadingWriteOffs, reload: reloadWriteOffs } = useWriteOffs();
   const { nameFor } = useProfileNames();
+  const { displayMovements, loading: loadingDisplay, reload: reloadDisplay } = useDisplayMovements();
+  const { counts, loading: loadingCounts, reload: reloadCounts } = useInventoryCounts();
+  const [exhibicionModal, setExhibicionModal] = useState<{ mode: "sale" | "regresa"; productId?: string } | null>(null);
+  const [conteoModal, setConteoModal] = useState<{ productId?: string } | null>(null);
 
   const [tab, setTab] = useState<TabKey>("productos");
   const [search, setSearch] = useState("");
@@ -80,6 +106,8 @@ export default function Inventario() {
     if (sem === "verde" || sem === "amarillo" || sem === "rojo") setSemaforoFilter(sem);
     setProductoAlerta(prod);
     if (sem || prod) setTab("productos");
+    const t = searchParams.get("tab");
+    if (t === "conteos" || t === "exhibicion" || t === "movimientos" || t === "facturas" || t === "merma") setTab(t);
   }, [searchParams]);
 
   function quitarFiltroAlerta() {
@@ -163,7 +191,49 @@ export default function Inventario() {
     { key: "movimientos", label: "Movimientos" },
     { key: "facturas", label: "Facturas" },
     { key: "merma", label: "Merma" },
+    { key: "exhibicion", label: "Exhibición" },
+    { key: "conteos", label: "Conteos físicos" },
   ];
+
+  const enExhibicion = useMemo(
+    () => products.filter((p) => (p.exhibition_stock ?? 0) > 0).sort((a, b) => a.name.localeCompare(b.name)),
+    [products]
+  );
+
+  // Conteos: qué tan confiable está el inventario (últimos 30 días).
+  const conteoStats = useMemo(() => {
+    const hace30 = Date.now() - 30 * 86_400_000;
+    const recientes = counts.filter((c) => new Date(c.created_at).getTime() >= hace30);
+    const cuadraron = recientes.filter((c) => c.diferencia === 0).length;
+    const faltantes = recientes.filter((c) => c.diferencia < 0).length;
+    const sobrantes = recientes.filter((c) => c.diferencia > 0).length;
+    const productosContados = new Set(recientes.map((c) => c.product_id)).size;
+    return {
+      total: recientes.length,
+      cuadraron,
+      faltantes,
+      sobrantes,
+      productosContados,
+      confiabilidad: recientes.length > 0 ? Math.round((cuadraron / recientes.length) * 100) : null,
+    };
+  }, [counts]);
+
+  // Conteo cíclico: sugiere qué contar hoy. Primero los que nunca se han
+  // contado o hace más que no, dando prioridad a los que más se venden y
+  // a los que tienen material apartado para clientes.
+  const sugeridosConteo = useMemo(() => {
+    const ahora = Date.now();
+    return products
+      .filter((p) => p.active !== false && (p.physical_stock > 0 || p.sold_pending > 0))
+      .map((p) => {
+        const dias = p.last_counted_at ? (ahora - new Date(p.last_counted_at).getTime()) / 86_400_000 : 999;
+        const score = Math.min(dias, 120) + ROTACION_PRIORIDAD[p.rotacion] * 10 + (p.sold_pending > 0 ? 15 : 0);
+        return { p, dias, score };
+      })
+      .filter((x) => x.dias >= 7)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 10);
+  }, [products]);
 
   return (
     <div className="max-w-6xl">
@@ -187,6 +257,18 @@ export default function Inventario() {
               className="flex items-center gap-2 border border-gigante-border text-gigante-navy text-sm font-semibold rounded-lg px-4 py-2.5"
             >
               <AlertTriangle size={16} /> Dar de baja
+            </button>
+            <button
+              onClick={() => setExhibicionModal({ mode: "sale" })}
+              className="flex items-center gap-2 border border-gigante-border text-gigante-navy text-sm font-semibold rounded-lg px-4 py-2.5"
+            >
+              <Store size={16} /> Exhibición
+            </button>
+            <button
+              onClick={() => setConteoModal({})}
+              className="flex items-center gap-2 border border-gigante-border text-gigante-navy text-sm font-semibold rounded-lg px-4 py-2.5"
+            >
+              <ClipboardCheck size={16} /> Conteo físico
             </button>
             <button
               onClick={() => setShowEntradaModal(true)}
@@ -338,6 +420,11 @@ export default function Inventario() {
                         <td className="px-4 py-3 text-gigante-muted">{p.category}</td>
                         <td className="px-4 py-3 text-right text-gigante-navy">
                           {p.physical_stock.toLocaleString()} {PRODUCT_UNIT_LABELS[p.unit]}
+                          {(p.exhibition_stock ?? 0) > 0 && (
+                            <span className="block text-[10px] text-gigante-muted">
+                              +{p.exhibition_stock} en exhibición
+                            </span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-right text-gigante-red">
                           {p.sold_pending.toLocaleString()} {PRODUCT_UNIT_LABELS[p.unit]}
@@ -489,7 +576,7 @@ export default function Inventario() {
               </thead>
               <tbody>
                 {movements.map((m) => {
-                  const positive = MOVEMENT_IS_POSITIVE[m.type] ?? true;
+                  const positive = isPositiveMovement(m.type, m.reference);
                   return (
                     <tr key={m.id} className="border-t border-gigante-border">
                       <td className="px-4 py-3 text-gigante-muted whitespace-nowrap">
@@ -627,6 +714,260 @@ export default function Inventario() {
         </div>
       )}
 
+      {tab === "exhibicion" && (
+        <div className="mt-4 space-y-4">
+          <div className="bg-white border border-gigante-border rounded-xl overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gigante-border">
+              <p className="text-sm font-semibold text-gigante-navy">Lo que está ahorita en exhibición</p>
+              {canManage && (
+                <button
+                  onClick={() => setExhibicionModal({ mode: "sale" })}
+                  className="text-xs font-semibold text-gigante-red hover:underline"
+                >
+                  + Sacar material
+                </button>
+              )}
+            </div>
+            {enExhibicion.length === 0 ? (
+              <p className="p-6 text-sm text-gigante-muted">No hay material en exhibición registrado.</p>
+            ) : (
+              <ul className="divide-y divide-gigante-border">
+                {enExhibicion.map((p) => {
+                  const estado = calcularSemaforo(p);
+                  return (
+                    <li key={p.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+                      <div className="min-w-0">
+                        <p className="text-gigante-navy truncate">
+                          {p.code} — {p.name}
+                        </p>
+                        <p className="text-xs text-gigante-muted flex items-center gap-1.5">
+                          <span className={`w-2 h-2 rounded-full ${SEMAFORO_DOT[estado]}`} />
+                          En almacén disponible: {p.physical_stock - p.sold_pending} {PRODUCT_UNIT_LABELS[p.unit]}
+                          {estado !== "verde" && (
+                            <span className="text-amber-700 font-medium">
+                              {" "}
+                              · {estado === "rojo" ? "ya no hay para vender: cambia la muestra" : "se está acabando: piensa en cambiar la muestra"}
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className="text-sm font-semibold text-gigante-navy">
+                          {p.exhibition_stock} {PRODUCT_UNIT_LABELS[p.unit]}
+                        </span>
+                        {canManage && (
+                          <button
+                            onClick={() => setExhibicionModal({ mode: "regresa", productId: p.id })}
+                            className="inline-flex items-center gap-1 text-xs text-gigante-red hover:underline"
+                          >
+                            <Undo2 size={13} /> Regresar
+                          </button>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+
+          <div className="bg-white border border-gigante-border rounded-xl overflow-hidden">
+            <p className="text-sm font-semibold text-gigante-navy px-4 py-3 border-b border-gigante-border">Historial</p>
+            {loadingDisplay ? (
+              <p className="p-6 text-sm text-gigante-muted">Cargando...</p>
+            ) : displayMovements.length === 0 ? (
+              <p className="p-6 text-sm text-gigante-muted">Todavía no hay movimientos de exhibición.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gigante-bg text-gigante-muted text-xs">
+                    <tr>
+                      <th className="text-left font-medium px-4 py-3">Fecha</th>
+                      <th className="text-left font-medium px-4 py-3">Movimiento</th>
+                      <th className="text-left font-medium px-4 py-3">Producto</th>
+                      <th className="text-right font-medium px-4 py-3">Cantidad</th>
+                      <th className="text-left font-medium px-4 py-3">Dónde / nota</th>
+                      <th className="text-left font-medium px-4 py-3">Registró</th>
+                      <th className="text-left font-medium px-4 py-3">Foto</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {displayMovements.map((d) => {
+                      const url = publicPhotoUrl("merma", d.photo_path);
+                      return (
+                        <tr key={d.id} className="border-t border-gigante-border">
+                          <td className="px-4 py-3 text-gigante-muted whitespace-nowrap">
+                            {new Date(d.created_at).toLocaleString("es-MX")}
+                          </td>
+                          <td className="px-4 py-3 text-gigante-navy">
+                            {d.tipo === "sale" ? "Salió a la tienda" : "Regresó a almacén"}
+                          </td>
+                          <td className="px-4 py-3 text-gigante-navy">
+                            {d.product?.code} — {d.product?.name}
+                          </td>
+                          <td className="px-4 py-3 text-right font-medium text-gigante-navy">
+                            {d.quantity} {d.product ? PRODUCT_UNIT_LABELS[d.product.unit] : ""}
+                          </td>
+                          <td className="px-4 py-3 text-gigante-muted">
+                            {[d.ubicacion, d.notas].filter(Boolean).join(" · ") || "—"}
+                          </td>
+                          <td className="px-4 py-3 text-gigante-muted">{nameFor(d.created_by)}</td>
+                          <td className="px-4 py-3">
+                            {url ? (
+                              <a href={url} target="_blank" rel="noreferrer" className="text-gigante-red text-xs underline">
+                                Ver foto
+                              </a>
+                            ) : (
+                              <span className="text-xs text-gigante-muted">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {tab === "conteos" && (
+        <div className="mt-4 space-y-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-white border border-gigante-border rounded-xl p-4">
+              <p className="text-xs text-gigante-muted">Confiabilidad (30 días)</p>
+              <p
+                className={`text-xl font-bold ${
+                  conteoStats.confiabilidad === null
+                    ? "text-gigante-muted"
+                    : conteoStats.confiabilidad >= 90
+                    ? "text-emerald-700"
+                    : conteoStats.confiabilidad >= 70
+                    ? "text-amber-700"
+                    : "text-gigante-red"
+                }`}
+              >
+                {conteoStats.confiabilidad === null ? "—" : `${conteoStats.confiabilidad}%`}
+              </p>
+              <p className="text-[11px] text-gigante-muted">de los conteos cuadraron</p>
+            </div>
+            <div className="bg-white border border-gigante-border rounded-xl p-4">
+              <p className="text-xs text-gigante-muted">Conteos (30 días)</p>
+              <p className="text-xl font-bold text-gigante-navy">{conteoStats.total}</p>
+              <p className="text-[11px] text-gigante-muted">{conteoStats.productosContados} productos distintos</p>
+            </div>
+            <div className="bg-white border border-gigante-border rounded-xl p-4">
+              <p className="text-xs text-gigante-muted">Con faltante</p>
+              <p className="text-xl font-bold text-gigante-red">{conteoStats.faltantes}</p>
+              <p className="text-[11px] text-gigante-muted">el sistema decía de más</p>
+            </div>
+            <div className="bg-white border border-gigante-border rounded-xl p-4">
+              <p className="text-xs text-gigante-muted">Con sobrante</p>
+              <p className="text-xl font-bold text-amber-700">{conteoStats.sobrantes}</p>
+              <p className="text-[11px] text-gigante-muted">el sistema decía de menos</p>
+            </div>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-200 text-blue-800 text-xs rounded-lg px-3 py-2">
+            <strong>Cómo se reduce el descuadre:</strong> en vez de contar todo el almacén una vez al año, cuenten
+            unos cuantos productos cada día (los de la lista de abajo). Así, en pocas semanas todo el inventario
+            está revisado y Ventas puede confiar en lo que dice el sistema.
+          </div>
+
+          <div className="bg-white border border-gigante-border rounded-xl overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gigante-border">
+              <p className="text-sm font-semibold text-gigante-navy">Sugeridos para contar hoy</p>
+              {canManage && (
+                <button onClick={() => setConteoModal({})} className="text-xs font-semibold text-gigante-red hover:underline">
+                  + Contar otro producto
+                </button>
+              )}
+            </div>
+            {sugeridosConteo.length === 0 ? (
+              <p className="p-6 text-sm text-gigante-muted">
+                Todo lo que tiene existencia se contó en los últimos 7 días. ¡Bien!
+              </p>
+            ) : (
+              <ul className="divide-y divide-gigante-border">
+                {sugeridosConteo.map(({ p, dias }) => (
+                  <li key={p.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+                    <div className="min-w-0">
+                      <p className="text-gigante-navy truncate">
+                        {p.code} — {p.name}
+                      </p>
+                      <p className="text-xs text-gigante-muted">
+                        {dias >= 999 ? "Nunca se ha contado" : `Último conteo hace ${Math.floor(dias)} días`} ·{" "}
+                        Rotación {ROTACION_LABELS[p.rotacion].toLowerCase()}
+                        {p.sold_pending > 0 && ` · ${p.sold_pending} apartadas`}
+                      </p>
+                    </div>
+                    {canManage && (
+                      <button
+                        onClick={() => setConteoModal({ productId: p.id })}
+                        className="shrink-0 text-xs font-semibold text-white bg-gigante-navy rounded-lg px-3 py-1.5"
+                      >
+                        Contar
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="bg-white border border-gigante-border rounded-xl overflow-hidden">
+            <p className="text-sm font-semibold text-gigante-navy px-4 py-3 border-b border-gigante-border">
+              Historial de conteos
+            </p>
+            {loadingCounts ? (
+              <p className="p-6 text-sm text-gigante-muted">Cargando...</p>
+            ) : counts.length === 0 ? (
+              <p className="p-6 text-sm text-gigante-muted">Todavía no hay conteos registrados.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gigante-bg text-gigante-muted text-xs">
+                    <tr>
+                      <th className="text-left font-medium px-4 py-3">Fecha</th>
+                      <th className="text-left font-medium px-4 py-3">Producto</th>
+                      <th className="text-right font-medium px-4 py-3">Sistema</th>
+                      <th className="text-right font-medium px-4 py-3">Contado</th>
+                      <th className="text-right font-medium px-4 py-3">Diferencia</th>
+                      <th className="text-left font-medium px-4 py-3">Nota</th>
+                      <th className="text-left font-medium px-4 py-3">Contó</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {counts.map((c) => (
+                      <tr key={c.id} className="border-t border-gigante-border">
+                        <td className="px-4 py-3 text-gigante-muted whitespace-nowrap">
+                          {new Date(c.created_at).toLocaleString("es-MX")}
+                        </td>
+                        <td className="px-4 py-3 text-gigante-navy">
+                          {c.product?.code} — {c.product?.name}
+                        </td>
+                        <td className="px-4 py-3 text-right text-gigante-muted">{c.sistema}</td>
+                        <td className="px-4 py-3 text-right text-gigante-navy">{c.contado}</td>
+                        <td
+                          className={`px-4 py-3 text-right font-semibold ${
+                            c.diferencia === 0 ? "text-emerald-700" : c.diferencia < 0 ? "text-gigante-red" : "text-amber-700"
+                          }`}
+                        >
+                          {c.diferencia === 0 ? "✓ cuadra" : c.diferencia > 0 ? `+${c.diferencia}` : c.diferencia}
+                        </td>
+                        <td className="px-4 py-3 text-gigante-muted">{c.notas ?? "—"}</td>
+                        <td className="px-4 py-3 text-gigante-muted">{nameFor(c.created_by)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {showEntradaModal && (
         <RegistrarEntradaModal
           products={products}
@@ -659,6 +1000,33 @@ export default function Inventario() {
         />
       )}
       {qrProduct && <CodigoQrModal product={qrProduct} onClose={() => setQrProduct(null)} />}
+      {exhibicionModal && (
+        <ExhibicionModal
+          products={products}
+          initialMode={exhibicionModal.mode}
+          initialProductId={exhibicionModal.productId}
+          onClose={() => setExhibicionModal(null)}
+          onSuccess={() => {
+            setExhibicionModal(null);
+            setTab("exhibicion");
+            reload();
+            reloadMovements();
+            reloadDisplay();
+          }}
+        />
+      )}
+      {conteoModal && (
+        <ConteoFisicoModal
+          products={products}
+          initialProductId={conteoModal.productId}
+          onClose={() => setConteoModal(null)}
+          onSuccess={() => {
+            reload();
+            reloadMovements();
+            reloadCounts();
+          }}
+        />
+      )}
     </div>
   );
 }

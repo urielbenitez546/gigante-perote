@@ -1,9 +1,21 @@
+import { useEffect } from "react";
 import { Outlet } from "react-router-dom";
+import { revisarApartados } from "../../hooks/useSales";
 import Sidebar from "./Sidebar";
 import BottomNav from "./BottomNav";
 import Header from "./Header";
 
+// Solo una vez por sesión del navegador: revisa apartados por vencer o
+// vencidos y deja aviso en la campanita (la base de datos no repite avisos).
+let apartadosRevisados = false;
+
 export default function AppLayout() {
+  useEffect(() => {
+    if (apartadosRevisados) return;
+    apartadosRevisados = true;
+    revisarApartados();
+  }, []);
+
   return (
     <div className="flex min-h-screen bg-gigante-bg">
       <Sidebar />

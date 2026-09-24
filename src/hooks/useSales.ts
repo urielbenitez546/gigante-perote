@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
-import type { SaleWithItems, DeliveryType } from "../types";
+import type { SaleWithItems, DeliveryType, ResumenPedidos } from "../types";
 
 export function useSales() {
   const [sales, setSales] = useState<SaleWithItems[]>([]);
@@ -91,4 +91,81 @@ export async function registerSalePayment(saleId: string, amount: number) {
 export async function deleteSale(saleId: string, motivo: string) {
   const { error } = await supabase.rpc("delete_sale", { p_sale_id: saleId, p_motivo: motivo });
   return { error: error?.message ?? null };
+}
+
+/** Cambia lo que falta por entregar de un renglón por otro producto
+ * (o por otra cantidad del mismo). Solo Gerencia y Ventas. */
+export async function changeSaleItem(
+  saleItemId: string,
+  newProductId: string,
+  newQuantity: number,
+  motivo: string
+) {
+  const { error } = await supabase.rpc("change_sale_item", {
+    p_sale_item_id: saleItemId,
+    p_new_product_id: newProductId,
+    p_new_quantity: newQuantity,
+    p_motivo: motivo,
+  });
+  return { error: error?.message ?? null };
+}
+
+/** Revisa apartados por vencer / vencidos y deja aviso en la campanita.
+ * No repite avisos, así que se puede llamar cada vez que abre la página. */
+export async function revisarApartados() {
+  const { data, error } = await supabase.rpc("revisar_apartados");
+  return { creadas: (data as number | null) ?? 0, error: error?.message ?? null };
+}
+
+/** Ventas con algo pendiente (sin el límite de 100 de useSales). */
+export function useOpenSales() {
+  const [sales, setSales] = useState<SaleWithItems[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const reload = useCallback(async () => {
+    setLoading(true);
+    const { data, error: err } = await supabase
+      .from("sales")
+      .select("*, sale_items(*, product:products(code, name, unit))")
+      .in("status", ["pendiente", "parcial"])
+      .order("created_at", { ascending: true });
+    if (err) {
+      setError(err.message);
+    } else {
+      setError(null);
+      setSales((data as unknown as SaleWithItems[]) ?? []);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    reload();
+  }, [reload]);
+
+  return { sales, loading, error, reload };
+}
+
+export function useResumenPedidos() {
+  const [resumen, setResumen] = useState<ResumenPedidos | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const reload = useCallback(async () => {
+    setLoading(true);
+    const { data, error: err } = await supabase.rpc("resumen_pedidos");
+    if (err) {
+      setError(err.message);
+    } else {
+      setError(null);
+      setResumen(data as ResumenPedidos);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    reload();
+  }, [reload]);
+
+  return { resumen, loading, error, reload };
 }

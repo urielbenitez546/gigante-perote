@@ -37,9 +37,12 @@ export const NAV_MODULES: NavModule[] = [
   { key: "inicio", label: "Inicio", path: "/", roles: ["gerencia", "ventas", "caja", "almacen", "reparto"] },
   { key: "inventario", label: "Inventario", path: "/inventario", roles: ["gerencia", "ventas", "almacen"] },
   { key: "ventas", label: "Ventas y Entregas", path: "/ventas", roles: ["gerencia", "ventas", "caja"] },
+  { key: "pedidos", label: "Pedidos Pendientes", path: "/pedidos", roles: ["gerencia", "ventas", "almacen", "caja"] },
   { key: "retiros", label: "Retiros en Sucursal", path: "/retiros", roles: ["gerencia", "ventas", "almacen"] },
   { key: "repartos", label: "Repartos", path: "/repartos", roles: ["gerencia", "reparto"] },
   { key: "evidencias", label: "Evidencias y Cobros", path: "/evidencias-cobros", roles: ["gerencia", "caja"] },
+  { key: "gastos", label: "Gastos", path: "/gastos", roles: ["gerencia"] },
+  { key: "capacitacion", label: "Capacitación Express", path: "/capacitacion", roles: ["gerencia", "ventas", "caja", "almacen", "reparto"] },
   { key: "manuales", label: "Manuales e Información", path: "/manuales", roles: ["gerencia", "ventas", "caja", "almacen", "reparto"] },
   { key: "asistente", label: "Asistente de Consulta", path: "/asistente", roles: ["gerencia", "ventas", "caja", "almacen", "reparto"] },
   { key: "calculadora", label: "Calculadora", path: "/calculadora", roles: ["gerencia", "ventas", "caja", "almacen", "reparto"] },
@@ -84,6 +87,8 @@ export interface Product {
   rotacion: ProductRotacion;
   descuento_porcentaje: number;
   stock_minimo: number;
+  exhibition_stock: number;
+  last_counted_at: string | null;
   color: string | null;
   medida: string | null;
   tipo: string | null;
@@ -112,7 +117,14 @@ export function calcularSemaforo(product: Product): SemaforoStatus {
   return "verde";
 }
 
-export type MovementType = "entrada" | "salida" | "ajuste" | "merma";
+export type MovementType =
+  | "entrada"
+  | "salida"
+  | "ajuste"
+  | "merma"
+  | "exhibicion"
+  | "regreso_exhibicion"
+  | "conteo";
 
 export interface InventoryMovement {
   id: string;
@@ -316,7 +328,11 @@ export type NotificationType =
   | "reparto_incidencia"
   | "stock_bajo"
   | "stock_agotado"
-  | "venta_eliminada";
+  | "venta_eliminada"
+  | "venta_modificada"
+  | "conteo_descuadre"
+  | "apartado_por_vencer"
+  | "apartado_vencido";
 
 export interface AppNotification {
   id: string;
@@ -327,6 +343,102 @@ export interface AppNotification {
   link_path: string | null;
   related_delivery_id: string | null;
   related_product_id: string | null;
+  related_sale_id: string | null;
   created_by: string | null;
   created_at: string;
+}
+
+// ============================================================
+// Exhibición, conteo físico, pedidos, gastos y capacitación
+// ============================================================
+export interface DisplayMovement {
+  id: string;
+  product_id: string;
+  tipo: "sale" | "regresa";
+  quantity: number;
+  ubicacion: string | null;
+  notas: string | null;
+  photo_path: string | null;
+  created_by: string | null;
+  created_at: string;
+  product?: Pick<Product, "code" | "name" | "unit">;
+}
+
+export interface InventoryCount {
+  id: string;
+  product_id: string;
+  sistema: number;
+  contado: number;
+  diferencia: number;
+  notas: string | null;
+  created_by: string | null;
+  created_at: string;
+  product?: Pick<Product, "code" | "name" | "unit">;
+}
+
+export interface ResumenPedidos {
+  ventas_pendientes: number;
+  ventas_parciales: number;
+  ventas_entregadas_mes: number;
+  monto_apartado: number;
+  monto_entregado: number;
+  monto_por_entregar: number;
+  por_tipo: { retiro_sucursal: number; domicilio: number };
+  productos: {
+    id: string;
+    code: string;
+    name: string;
+    unit: ProductUnit;
+    vendido: number;
+    entregado: number;
+    por_entregar: number;
+    fisico: number;
+    ventas: number;
+  }[];
+}
+
+/** Plazo que tiene el cliente para recoger o recibir su material. */
+export const DIAS_PLAZO_APARTADO = 30;
+export const DIAS_AVISO_APARTADO = 5;
+
+/** Días que le quedan a un apartado (negativo = ya venció). */
+export function diasRestantesApartado(createdAt: string, ref: Date = new Date()): number {
+  const inicio = new Date(createdAt);
+  const vence = new Date(inicio.getFullYear(), inicio.getMonth(), inicio.getDate() + DIAS_PLAZO_APARTADO);
+  const hoy = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate());
+  return Math.round((vence.getTime() - hoy.getTime()) / 86_400_000);
+}
+
+export const EXPENSE_CATEGORIES = [
+  "Combustible",
+  "Mantenimiento de camioneta",
+  "Papelería y oficina",
+  "Limpieza",
+  "Servicios (luz, agua, internet)",
+  "Reparaciones del local",
+  "Comida / viáticos",
+  "Fletes y maniobras",
+  "Otro",
+] as const;
+
+export const EXPENSE_PAYMENT_METHODS = ["Efectivo", "Transferencia", "Tarjeta"] as const;
+
+export interface Expense {
+  id: string;
+  fecha: string;
+  concepto: string;
+  categoria: string;
+  monto: number;
+  metodo_pago: string | null;
+  proveedor: string | null;
+  notas: string | null;
+  photo_paths: string[];
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface TrainingProgress {
+  user_id: string;
+  lesson_key: string;
+  completed_at: string;
 }

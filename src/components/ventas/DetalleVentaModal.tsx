@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { X, CheckCircle2, Trash2 } from "lucide-react";
-import type { SaleWithItems } from "../../types";
-import { DELIVERY_TYPE_LABELS, SALE_STATUS_LABELS } from "../../types";
+import { X, CheckCircle2, Trash2, ArrowLeftRight, CalendarClock } from "lucide-react";
+import type { SaleItem, SaleWithItems } from "../../types";
+import { DELIVERY_TYPE_LABELS, SALE_STATUS_LABELS, DIAS_AVISO_APARTADO, diasRestantesApartado } from "../../types";
+import CambiarProductoModal from "./CambiarProductoModal";
 import { useAuth } from "../../context/AuthContext";
 import { useProfileNames } from "../../hooks/useProfileNames";
 import { registerSalePayment, deleteSale } from "../../hooks/useSales";
@@ -17,6 +18,10 @@ export default function DetalleVentaModal({ sale, onClose, onUpdated }: Props) {
   const { nameFor } = useProfileNames();
   const canRegisterPayment = profile?.role === "gerencia" || profile?.role === "caja";
   const canDelete = profile?.role === "gerencia";
+  const canChangeItems = profile?.role === "gerencia" || profile?.role === "ventas";
+  const [changingItem, setChangingItem] = useState<SaleItem | null>(null);
+  const tienePendiente = sale.sale_items.some((i) => i.delivered_quantity < i.quantity);
+  const diasRestantes = diasRestantesApartado(sale.created_at);
   const hasDeliveredItems = sale.sale_items.some((i) => i.delivered_quantity > 0);
   const hasPayment = sale.amount_paid > 0;
   const pendingAmount = Math.max(sale.total - sale.amount_paid, 0);
@@ -85,6 +90,27 @@ export default function DetalleVentaModal({ sale, onClose, onUpdated }: Props) {
           Vendedor: <span className="text-gigante-navy font-medium">{nameFor(sale.created_by)}</span>
         </p>
 
+        {tienePendiente && sale.status !== "cancelada" && (
+          <p
+            className={`flex items-center gap-1.5 text-xs rounded-lg px-3 py-2 mb-3 ${
+              diasRestantes < 0
+                ? "bg-red-50 text-red-700"
+                : diasRestantes <= DIAS_AVISO_APARTADO
+                ? "bg-amber-50 text-amber-800"
+                : "bg-gigante-bg text-gigante-muted"
+            }`}
+          >
+            <CalendarClock size={14} />
+            {diasRestantes < 0
+              ? `Apartado vencido hace ${Math.abs(diasRestantes)} día(s) — el cliente tenía 1 mes para recoger/recibir.`
+              : diasRestantes === 0
+              ? "El apartado vence HOY."
+              : `Le quedan ${diasRestantes} día(s) al apartado para recoger/recibir.`}
+            {sale.scheduled_pickup_date &&
+              ` Fecha que eligió el cliente: ${new Date(sale.scheduled_pickup_date + "T12:00:00").toLocaleDateString("es-MX")}.`}
+          </p>
+        )}
+
         <div className="space-y-2">
           {sale.sale_items.map((item) => {
             const pending = item.quantity - item.delivered_quantity;
@@ -97,6 +123,14 @@ export default function DetalleVentaModal({ sale, onClose, onUpdated }: Props) {
                   </p>
                   <span className="text-[11px] text-gigante-muted">{DELIVERY_TYPE_LABELS[type]}</span>
                 </div>
+                {canChangeItems && pending > 0 && (
+                  <button
+                    onClick={() => setChangingItem(item)}
+                    className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-gigante-red hover:underline"
+                  >
+                    <ArrowLeftRight size={12} /> Cambiar por otro producto
+                  </button>
+                )}
                 <div className="grid grid-cols-3 gap-2 mt-2 text-center">
                   <div>
                     <p className="text-[11px] text-gigante-muted">Vendido</p>
@@ -267,6 +301,18 @@ export default function DetalleVentaModal({ sale, onClose, onUpdated }: Props) {
           </div>
         )}
       </div>
+      {changingItem && (
+        <CambiarProductoModal
+          sale={sale}
+          item={changingItem}
+          onClose={() => setChangingItem(null)}
+          onSuccess={() => {
+            setChangingItem(null);
+            onUpdated?.();
+            onClose();
+          }}
+        />
+      )}
     </div>
   );
 }

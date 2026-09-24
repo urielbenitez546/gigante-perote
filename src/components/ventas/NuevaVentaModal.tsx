@@ -1,6 +1,8 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { X, Plus, Trash2 } from "lucide-react";
 import type { Product, DeliveryType } from "../../types";
+import { calcularSemaforo, PRODUCT_UNIT_LABELS } from "../../types";
+import ProductSearchSelect from "../common/ProductSearchSelect";
 import { DELIVERY_TYPE_LABELS } from "../../types";
 import { registerSale, type SaleItemInput } from "../../hooks/useSales";
 
@@ -24,7 +26,7 @@ export default function NuevaVentaModal({ products, onClose, onSuccess }: Props)
   const [deliveryType, setDeliveryType] = useState<DeliveryType>("inmediata");
   const [pickupDate, setPickupDate] = useState("");
   const [items, setItems] = useState<DraftItem[]>([
-    { key: crypto.randomUUID(), product_id: products[0]?.id ?? "", quantity: 1, delivery_type: "" },
+    { key: crypto.randomUUID(), product_id: "", quantity: 1, delivery_type: "" },
   ]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +49,7 @@ export default function NuevaVentaModal({ products, onClose, onSuccess }: Props)
   function addItem() {
     setItems((prev) => [
       ...prev,
-      { key: crypto.randomUUID(), product_id: products[0]?.id ?? "", quantity: 1, delivery_type: "" },
+      { key: crypto.randomUUID(), product_id: "", quantity: 1, delivery_type: "" },
     ]);
   }
 
@@ -203,17 +205,15 @@ export default function NuevaVentaModal({ products, onClose, onSuccess }: Props)
                 return (
                   <div key={item.key} className="border border-gigante-border rounded-lg p-2">
                     <div className="flex gap-2 items-start">
-                      <select
-                        value={item.product_id}
-                        onChange={(e) => updateItem(item.key, { product_id: e.target.value })}
-                        className="flex-1 rounded-lg border border-gigante-border px-2 py-2 text-xs"
-                      >
-                        {products.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.code} — {p.name}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="flex-1 min-w-0">
+                        <ProductSearchSelect
+                          products={products}
+                          value={item.product_id}
+                          onChange={(id) => updateItem(item.key, { product_id: id })}
+                          showStock
+                          size="sm"
+                        />
+                      </div>
                       <input
                         type="number"
                         min="1"
@@ -245,9 +245,31 @@ export default function NuevaVentaModal({ products, onClose, onSuccess }: Props)
                         ))}
                       </select>
                       <span className="text-[10px] text-gigante-muted whitespace-nowrap">
-                        disp: {disponible}
+                        {item.product_id ? `disp: ${disponible}` : ""}
                       </span>
                     </div>
+                    {(() => {
+                      const p = products.find((prod) => prod.id === item.product_id);
+                      if (!p) return null;
+                      const estado = calcularSemaforo(p);
+                      const unidad = PRODUCT_UNIT_LABELS[p.unit];
+                      if (item.quantity > disponible) {
+                        return (
+                          <p className="mt-1.5 text-[11px] rounded-md px-2 py-1 bg-red-50 text-red-700">
+                            🔴 No alcanza: pides {item.quantity} y solo hay {Math.max(disponible, 0)} {unidad} disponibles.
+                            Ofrece otro producto.
+                          </p>
+                        );
+                      }
+                      if (estado === "amarillo") {
+                        return (
+                          <p className="mt-1.5 text-[11px] rounded-md px-2 py-1 bg-amber-50 text-amber-800">
+                            🟡 Se está acabando: quedan {disponible} {unidad}. Confirma en almacén antes de prometer más.
+                          </p>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
                 );
               })}

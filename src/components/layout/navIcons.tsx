@@ -10,6 +10,9 @@ import {
   Calculator,
   Settings,
   Tag,
+  ClipboardList,
+  Receipt,
+  GraduationCap,
   type LucideIcon,
 } from "lucide-react";
 
@@ -17,9 +20,12 @@ export const MODULE_ICONS: Record<string, LucideIcon> = {
   inicio: Home,
   inventario: Package,
   ventas: ShoppingCart,
+  pedidos: ClipboardList,
   retiros: Warehouse,
   repartos: Truck,
   evidencias: Camera,
+  gastos: Receipt,
+  capacitacion: GraduationCap,
   manuales: BookOpen,
   asistente: MessageCircle,
   calculadora: Calculator,

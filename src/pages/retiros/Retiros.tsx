@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
-import { Warehouse, CheckCircle2 } from "lucide-react";
+import { Warehouse, CheckCircle2, CalendarClock } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useSales, registerRetiro } from "../../hooks/useSales";
 import { pendingLinesFor } from "../../lib/pendingLines";
 import ConfirmarEntregaParcialModal from "../../components/ventas/ConfirmarEntregaParcialModal";
 import type { SaleWithItems } from "../../types";
-import { SALE_STATUS_LABELS } from "../../types";
+import { SALE_STATUS_LABELS, DIAS_AVISO_APARTADO, diasRestantesApartado } from "../../types";
 
 const STATUS_BADGE: Record<string, string> = {
   pendiente: "bg-amber-100 text-amber-700",
@@ -86,7 +86,29 @@ export default function Retiros() {
               {withRetiroLines.map(({ sale, lines }) => (
                 <tr key={sale.id} className="border-t border-gigante-border">
                   <td className="px-4 py-3 font-medium text-gigante-navy">{sale.folio}</td>
-                  <td className="px-4 py-3 text-gigante-navy">{sale.customer_name}</td>
+                  <td className="px-4 py-3 text-gigante-navy">
+                    {sale.customer_name}
+                    {lines.length > 0 &&
+                      (() => {
+                        const d = diasRestantesApartado(sale.created_at);
+                        if (d > DIAS_AVISO_APARTADO) return null;
+                        return (
+                          <span
+                            className={`ml-2 inline-flex items-center gap-1 text-[10px] rounded-full px-1.5 py-0.5 ${
+                              d < 0 ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-800"
+                            }`}
+                          >
+                            <CalendarClock size={10} />
+                            {d < 0 ? `vencido hace ${Math.abs(d)} d` : d === 0 ? "vence hoy" : `vence en ${d} d`}
+                          </span>
+                        );
+                      })()}
+                    {lines.length > 0 && sale.scheduled_pickup_date && (
+                      <span className="block text-[10px] text-gigante-muted">
+                        Dijo que recoge: {new Date(sale.scheduled_pickup_date + "T12:00:00").toLocaleDateString("es-MX")}
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-gigante-muted">
                     {lines.length === 0
                       ? "—"

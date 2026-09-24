@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
-import type { Product, InventoryMovement } from "../types";
+import type { Product, InventoryMovement, DisplayMovement, InventoryCount } from "../types";
 
 export function useProducts() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -99,4 +99,86 @@ export async function updateProductDescuento(productId: string, descuento: numbe
     p_descuento: descuento,
   });
   return { error: error?.message ?? null };
+}
+
+/** Historial de material sacado a exhibición / regresado a almacén. */
+export function useDisplayMovements() {
+  const [displayMovements, setDisplayMovements] = useState<DisplayMovement[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const reload = useCallback(async () => {
+    setLoading(true);
+    const { data } = await supabase
+      .from("display_movements")
+      .select("*, product:products(code, name, unit)")
+      .order("created_at", { ascending: false })
+      .limit(100);
+    setDisplayMovements((data as unknown as DisplayMovement[]) ?? []);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    reload();
+  }, [reload]);
+
+  return { displayMovements, loading, reload };
+}
+
+/** Conteos físicos registrados (los más recientes primero). */
+export function useInventoryCounts() {
+  const [counts, setCounts] = useState<InventoryCount[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const reload = useCallback(async () => {
+    setLoading(true);
+    const { data } = await supabase
+      .from("inventory_counts")
+      .select("*, product:products(code, name, unit)")
+      .order("created_at", { ascending: false })
+      .limit(200);
+    setCounts((data as unknown as InventoryCount[]) ?? []);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    reload();
+  }, [reload]);
+
+  return { counts, loading, reload };
+}
+
+export async function moveToDisplay(
+  productId: string,
+  quantity: number,
+  ubicacion: string,
+  notas: string,
+  photoPath: string | null
+) {
+  const { error } = await supabase.rpc("move_to_display", {
+    p_product_id: productId,
+    p_quantity: quantity,
+    p_ubicacion: ubicacion || null,
+    p_notas: notas || null,
+    p_photo_path: photoPath,
+  });
+  return { error: error?.message ?? null };
+}
+
+export async function returnFromDisplay(productId: string, quantity: number, notas: string) {
+  const { error } = await supabase.rpc("return_from_display", {
+    p_product_id: productId,
+    p_quantity: quantity,
+    p_notas: notas || null,
+  });
+  return { error: error?.message ?? null };
+}
+
+/** Registra un conteo físico. Devuelve la diferencia (contado − sistema). */
+export async function registerPhysicalCount(productId: string, contado: number, notas: string) {
+  const { data, error } = await supabase.rpc("register_physical_count", {
+    p_product_id: productId,
+    p_contado: contado,
+    p_notas: notas || null,
+  });
+  return { diferencia: (data as number | null) ?? null, error: error?.message ?? null };
 }

@@ -98,3 +98,8 @@ export function searchManualesYFaq(
 
   return [...faqResults, ...manualResults].sort((a, b) => b.score - a.score);
 }
+
+/** Quita acentos y pasa a minúsculas (para buscar "baño" escribiendo "bano"). */
+export function normalizeText(text: string): string {
+  return normalize(text ?? "");
+}

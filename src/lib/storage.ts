@@ -1,6 +1,6 @@
 import { supabase } from "./supabaseClient";
 
-export type PhotoBucket = "facturas" | "merma" | "repartos-firmas" | "repartos-evidencia" | "manuales";
+export type PhotoBucket = "facturas" | "merma" | "repartos-firmas" | "repartos-evidencia" | "manuales" | "gastos";
 
 /**
  * Sube una foto a un bucket de Supabase Storage y devuelve la ruta
@@ -48,4 +48,18 @@ export function publicPhotoUrl(bucket: PhotoBucket, path: string | null): string
   if (!path) return null;
   const { data } = supabase.storage.from(bucket).getPublicUrl(path);
   return data.publicUrl;
+}
+
+/**
+ * Link temporal para buckets PRIVADOS (ej. "gastos"): no se puede ver
+ * con un link público, así que se pide uno que dura unos minutos.
+ */
+export async function signedPhotoUrl(
+  bucket: PhotoBucket,
+  path: string,
+  seconds = 300
+): Promise<string | null> {
+  const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, seconds);
+  if (error) return null;
+  return data.signedUrl;
 }

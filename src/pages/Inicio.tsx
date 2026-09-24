@@ -220,6 +220,9 @@ export default function Inicio() {
               Ver Inventario <ChevronRight size={14} />
             </Link>
           </div>
+          <p className="text-[11px] text-gigante-muted -mt-2 mb-2">
+            Si alguno está de muestra en la tienda, cambia la exhibición por un producto que sí tenga existencia.
+          </p>
           <ul className="divide-y divide-gigante-border">
             {productosEnAlerta.map(({ p, estado }) => (
               <li key={p.id}>
@@ -229,7 +232,10 @@ export default function Inicio() {
                 >
                 <div className="min-w-0">
                   <p className="text-gigante-navy truncate">{p.name}</p>
-                  <p className="text-xs text-gigante-muted">{p.code}</p>
+                  <p className="text-xs text-gigante-muted">
+                    {p.code} · disp. {Math.max(p.physical_stock - p.sold_pending, 0)}
+                    {(p.exhibition_stock ?? 0) > 0 && ` · ${p.exhibition_stock} en exhibición`}
+                  </p>
                 </div>
                 <span
                   className={`text-xs rounded-full px-2 py-1 shrink-0 ml-2 ${

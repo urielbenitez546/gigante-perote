@@ -16,6 +16,9 @@ import Administracion from "./pages/administracion/Administracion";
 import Calculadora from "./pages/calculadora/Calculadora";
 import Etiquetas from "./pages/etiquetas/Etiquetas";
 import ProductoDetalle from "./pages/productos/ProductoDetalle";
+import PedidosPendientes from "./pages/pedidos/PedidosPendientes";
+import Gastos from "./pages/gastos/Gastos";
+import Capacitacion from "./pages/capacitacion/Capacitacion";
 
 export default function App() {
   return (
@@ -53,6 +56,23 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/pedidos"
+              element={
+                <ProtectedRoute allowedRoles={["gerencia", "ventas", "almacen", "caja"]}>
+                  <PedidosPendientes />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/gastos"
+              element={
+                <ProtectedRoute allowedRoles={["gerencia"]}>
+                  <Gastos />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/capacitacion" element={<Capacitacion />} />
             <Route
               path="/retiros"
               element={
