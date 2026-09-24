@@ -6,13 +6,15 @@ import { registerFaq } from "../../hooks/useManuals";
 interface Props {
   onClose: () => void;
   onSuccess: () => void;
+  /** Para crear la respuesta a una pregunta que el Asistente no supo contestar. */
+  initialQuestion?: string;
 }
 
 const ALL_ROLES: AppRole[] = ["gerencia", "ventas", "caja", "almacen", "reparto"];
 const ALL_CATEGORIES: ManualCategory[] = ["bienvenida", "puesto", "protocolo", "politica", "otro"];
 
-export default function RegistrarFaqModal({ onClose, onSuccess }: Props) {
-  const [question, setQuestion] = useState("");
+export default function RegistrarFaqModal({ onClose, onSuccess, initialQuestion = "" }: Props) {
+  const [question, setQuestion] = useState(initialQuestion);
   const [answer, setAnswer] = useState("");
   const [category, setCategory] = useState<ManualCategory | "">("");
   const [selectedRoles, setSelectedRoles] = useState<AppRole[]>([]);
