@@ -815,3 +815,27 @@ categoría → seleccionar todos → asignar).
 
 ### Para aplicarlo
 1. Supabase: consulta nueva → `supabase/migrations/0032_tamano_etiqueta.sql` → Run.
+
+## 40. Reparto de etiquetas entre vendedores (reemplaza las zonas)
+
+- Se quitó la pestaña “Zonas y vendedores”. Ahora, cuando hay etiquetas por cambiar, aparece
+  **“Repartir entre vendedores”**: eliges a quiénes (de entrada, todos los de Ventas) y el sistema las
+  reparte **al azar y por partes iguales** (`label_queue.asignado_a`).
+- Cada vendedor ve directo **“Mías”**; hay una tarjeta de avance por persona y en la tabla la columna
+  **“Le toca”** permite pasar una etiqueta a otra persona.
+- Las etiquetas nuevas que lleguen después quedan “Sin repartir” hasta que alguien le vuelva a dar Repartir.
+  “Volver a repartir” permite rehacer el reparto de las que aún no se imprimen.
+- Las tablas de zonas de la 0031 se quedan en la base, pero ya no se usan.
+
+### Para aplicarlo
+1. Supabase: consulta nueva → `supabase/migrations/0033_repartir_etiquetas.sql` → Run.
+
+## 41. Contraste del Excel contra lo exhibido
+
+- Al subir el Excel, la vista previa muestra cuántos productos cambian pero **no están exhibidos**
+  (columna “Exhibido”). Sus precios sí se actualizan.
+- En “Etiquetas por cambiar” esas etiquetas NO aparecen para imprimir ni se reparten: quedan en
+  **“Revisar exhibición”**. Ahí, “Ya está exhibido” abre el aviso de exhibición con foto; cuando queda
+  confirmado, la etiqueta pasa sola a “Por cambiar” y entra al siguiente reparto. Si hace falta, se
+  pueden seleccionar e imprimir de todos modos.
+- Migración: `supabase/migrations/0034_etiquetas_solo_exhibidos.sql` (el reparto solo toma exhibidos).

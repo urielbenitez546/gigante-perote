@@ -34,6 +34,19 @@ export async function asignarZona(productIds: string[], zonaId: string | null) {
   return { n: (data as number | null) ?? 0, error: error?.message ?? null };
 }
 
+export async function repartirEtiquetas(vendedores: string[], todas: boolean) {
+  const { data, error } = await supabase.rpc("repartir_etiquetas", { p_vendedores: vendedores, p_todas: todas });
+  return {
+    data: data as { repartidas: number; por_vendedor: Record<string, number> } | null,
+    error: error?.message ?? null,
+  };
+}
+
+export async function reasignarEtiquetas(ids: string[], vendedor: string | null) {
+  const { data, error } = await supabase.rpc("reasignar_etiquetas", { p_ids: ids, p_vendedor: vendedor });
+  return { n: (data as number | null) ?? 0, error: error?.message ?? null };
+}
+
 export async function asignarTamanoEtiqueta(productIds: string[], tamano: string | null) {
   const { data, error } = await supabase.rpc("asignar_tamano_etiqueta", { p_product_ids: productIds, p_tamano: tamano ?? "" });
   return { n: (data as number | null) ?? 0, error: error?.message ?? null };

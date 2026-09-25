@@ -552,6 +552,8 @@ export interface LabelQueueItem {
   impresa_at: string | null;
   colocada_por: string | null;
   colocada_at: string | null;
+  /** A quién le tocó imprimir y colocar esta etiqueta (reparto al azar). */
+  asignado_a?: string | null;
   created_at: string;
   updated_at: string;
   product?: Product;

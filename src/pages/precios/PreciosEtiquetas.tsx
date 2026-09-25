@@ -6,7 +6,9 @@ import {
   Printer,
   CheckCheck,
   Percent,
-  MapPin,
+  Shuffle,
+  Store,
+  EyeOff,
   History,
   FileSpreadsheet,
   ArrowRight,
@@ -16,19 +18,18 @@ import {
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useProducts } from "../../hooks/useInventory";
+import ExhibicionModal from "../../components/inventario/ExhibicionModal";
 import { useProfiles } from "../../hooks/useProfiles";
 import { useProfileNames } from "../../hooks/useProfileNames";
 import {
   useLabelQueue,
-  useStoreZones,
   useDiscountRules,
   useLabelBatches,
   marcarEtiquetas,
   aplicarActualizacion,
   guardarReglas,
-  guardarZona,
-  borrarZona,
-  asignarZona,
+  repartirEtiquetas,
+  reasignarEtiquetas,
   asignarTamanoEtiqueta,
   type FilaActualizacion,
 } from "../../hooks/useEtiquetas";
@@ -57,7 +58,7 @@ const money = (n: number | null | undefined) =>
 const rotLabel = (r: string | null | undefined) => (r ? ROTACION_LABELS[r as ProductRotacion] ?? r : "—");
 const ROTACIONES: ProductRotacion[] = ["incorporacion", "rapido", "medio", "lento", "muy_lento", "obsoleto"];
 
-type Tab = "cambiar" | "excel" | "reglas" | "zonas" | "historial";
+type Tab = "cambiar" | "excel" | "reglas" | "historial";
 
 function descripcionCambio(q: LabelQueueItem): string[] {
   const partes: string[] = [];
@@ -73,43 +74,107 @@ function PorCambiar({ esGerencia }: { esGerencia: boolean }) {
   const navigate = useNavigate();
   const { profile } = useAuth();
   const { items, loading, error, reload } = useLabelQueue();
-  const { zonas } = useStoreZones();
+  const { profiles } = useProfiles();
   const { nameFor } = useProfileNames();
-  const misZonas = useMemo(() => zonas.filter((z) => z.vendedor_id === profile?.id).map((z) => z.id), [zonas, profile]);
-  const [zonaFiltro, setZonaFiltro] = useState<string>("todas");
-  // Cuando cargan las zonas, el vendedor ve directo las suyas.
+  const nombreCorto = (id: string | null | undefined) => profiles.find((p) => p.id === id)?.full_name ?? nameFor(id);
+
+  // A quiénes se les puede repartir: Ventas y Gerencia activos.
+  const posibles = useMemo(
+    () => profiles.filter((p) => p.active && (p.role === "ventas" || p.role === "gerencia")),
+    [profiles]
+  );
+
+  // Solo se imprime lo que está exhibido en tienda. Lo que no, se queda en
+  // "Revisar exhibición" para no gastar papel en algo que no está a la vista.
+  const exhibido = (q: LabelQueueItem) => q.product?.exhibido !== false;
+  const abiertas = useMemo(() => items.filter((q) => q.estado !== "colocada" && exhibido(q)), [items]);
+  const porRevisar = useMemo(() => items.filter((q) => q.estado !== "colocada" && !exhibido(q)), [items]);
+  const [exhibirId, setExhibirId] = useState<string | null>(null);
+  const sinRepartir = abiertas.filter((q) => !q.asignado_a).length;
+  const tengoAsignadas = abiertas.some((q) => q.asignado_a === profile?.id);
+
+  const [filtro, setFiltro] = useState<string>("todas"); // "todas" | "mias" | "sin" | id de la persona
+  // Si al vendedor ya le tocaron etiquetas, ve directo las suyas.
   const eligio = useRef(false);
   useEffect(() => {
-    if (!eligio.current && misZonas.length > 0) setZonaFiltro("mias");
-  }, [misZonas]);
-  const [estado, setEstado] = useState<"abiertas" | "colocada">("abiertas");
+    if (!eligio.current && tengoAsignadas) setFiltro("mias");
+  }, [tengoAsignadas]);
+  const [estado, setEstado] = useState<"abiertas" | "revisar" | "colocada">("abiertas");
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
+  // ----- Reparto al azar -----
+  const [repartiendo, setRepartiendo] = useState(false);
+  const [elegidos, setElegidos] = useState<Set<string>>(new Set());
+  const [todas, setTodas] = useState(false);
+  const [guardando, setGuardando] = useState(false);
+  useEffect(() => {
+    // De entrada se marcan los de Ventas (si no hay, todos los posibles).
+    const ventas = posibles.filter((p) => p.role === "ventas");
+    setElegidos(new Set((ventas.length > 0 ? ventas : posibles).map((p) => p.id)));
+  }, [posibles]);
+  const aRepartir = todas ? abiertas.filter((q) => !q.asignado_a || q.estado === "pendiente").length : sinRepartir;
+
+  async function repartir() {
+    setErr(null);
+    setMsg(null);
+    if (elegidos.size === 0) return setErr("Elige al menos a un vendedor.");
+    setGuardando(true);
+    const { data, error: e } = await repartirEtiquetas([...elegidos], todas);
+    setGuardando(false);
+    if (e) {
+      return setErr(e.includes("repartir_etiquetas") ? `${e} — ¿ya corriste la migración 0033 en Supabase?` : e);
+    }
+    const detalle = Object.entries(data?.por_vendedor ?? {})
+      .map(([n, c]) => `${n}: ${c}`)
+      .join(" · ");
+    setMsg(`✅ Se repartieron ${data?.repartidas ?? 0} etiqueta(s). ${detalle}`);
+    setRepartiendo(false);
+    eligio.current = true;
+    setFiltro("todas");
+    setSel(new Set());
+    reload();
+  }
+
+  async function reasignar(id: string, persona: string) {
+    setErr(null);
+    const { error: e } = await reasignarEtiquetas([id], persona || null);
+    if (e) return setErr(e);
+    reload();
+  }
+
   const filtradas = useMemo(() => {
     return items.filter((q) => {
-      if (estado === "abiertas" ? q.estado === "colocada" : q.estado !== "colocada") return false;
-      const z = q.product?.zona_id ?? null;
-      if (zonaFiltro === "mias") return z !== null && misZonas.includes(z);
-      if (zonaFiltro === "sin") return z === null;
-      if (zonaFiltro !== "todas") return z === zonaFiltro;
+      if (estado === "colocada") {
+        if (q.estado !== "colocada") return false;
+      } else {
+        if (q.estado === "colocada") return false;
+        if (estado === "revisar") return !exhibido(q);
+        if (!exhibido(q)) return false;
+      }
+      if (filtro === "mias") return q.asignado_a === profile?.id;
+      if (filtro === "sin") return !q.asignado_a;
+      if (filtro !== "todas") return q.asignado_a === filtro;
       return true;
     });
-  }, [items, estado, zonaFiltro, misZonas]);
+  }, [items, estado, filtro, profile]);
 
+  // Avance por persona (y "sin repartir").
   const avance = useMemo(() => {
-    const porZona = new Map<string, { pend: number; imp: number; col: number }>();
+    const m = new Map<string, { pend: number; imp: number; col: number }>();
     for (const q of items) {
-      const k = q.product?.zona_id ?? "sin";
-      const a = porZona.get(k) ?? { pend: 0, imp: 0, col: 0 };
+      if (q.estado !== "colocada" && !exhibido(q)) continue;
+      const k = q.asignado_a ?? "sin";
+      const a = m.get(k) ?? { pend: 0, imp: 0, col: 0 };
       if (q.estado === "pendiente") a.pend++;
       else if (q.estado === "impresa") a.imp++;
       else a.col++;
-      porZona.set(k, a);
+      m.set(k, a);
     }
-    return porZona;
+    return m;
   }, [items]);
+  const personas = [...avance.keys()].filter((k) => k !== "sin");
 
   const seleccionadas = filtradas.filter((q) => sel.has(q.id));
   const todasSel = filtradas.length > 0 && filtradas.every((q) => sel.has(q.id));
@@ -157,41 +222,123 @@ function PorCambiar({ esGerencia }: { esGerencia: boolean }) {
   }
 
   const chips: { key: string; label: string }[] = [
-    ...(misZonas.length > 0 ? [{ key: "mias", label: "Mis zonas" }] : []),
+    ...(tengoAsignadas ? [{ key: "mias", label: "Mías" }] : []),
     { key: "todas", label: "Todas" },
-    ...zonas.map((z) => ({ key: z.id, label: z.nombre })),
-    { key: "sin", label: "Sin zona" },
+    ...personas.map((id) => ({ key: id, label: nombreCorto(id) })),
+    ...(sinRepartir > 0 ? [{ key: "sin", label: "Sin repartir" }] : []),
   ];
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {[...zonas.map((z) => ({ id: z.id, nombre: z.nombre, vendedor: z.vendedor_id })), { id: "sin", nombre: "Sin zona", vendedor: null }].map(
-          (z) => {
-            const a = avance.get(z.id) ?? { pend: 0, imp: 0, col: 0 };
+      {estado === "abiertas" && (sinRepartir > 0 || repartiendo) && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+          {!repartiendo ? (
+            <div className="flex flex-wrap items-center gap-3">
+              <p className="text-sm text-amber-900 flex-1 min-w-[220px]">
+                Hay <strong>{sinRepartir}</strong> etiqueta(s) sin repartir. Repártelas al azar y por partes iguales entre
+                los vendedores.
+              </p>
+              <button
+                onClick={() => setRepartiendo(true)}
+                className="inline-flex items-center gap-1.5 text-sm font-semibold text-white bg-gigante-navy rounded-lg px-4 py-2"
+              >
+                <Shuffle size={15} /> Repartir entre vendedores
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm font-semibold text-gigante-navy">¿Entre quiénes se reparten?</p>
+              <div className="flex flex-wrap gap-2">
+                {posibles.map((p) => (
+                  <label
+                    key={p.id}
+                    className={`inline-flex items-center gap-2 text-sm rounded-lg border px-3 py-2 cursor-pointer ${
+                      elegidos.has(p.id) ? "border-gigante-navy bg-white" : "border-gigante-border bg-white/60 text-gigante-muted"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={elegidos.has(p.id)}
+                      onChange={() =>
+                        setElegidos((prev) => {
+                          const n = new Set(prev);
+                          if (n.has(p.id)) n.delete(p.id);
+                          else n.add(p.id);
+                          return n;
+                        })
+                      }
+                    />
+                    {p.full_name}
+                    {p.puesto && <span className="text-[11px] text-gigante-muted">({p.puesto})</span>}
+                  </label>
+                ))}
+              </div>
+              <label className="flex items-center gap-2 text-xs text-gigante-navy">
+                <input type="checkbox" checked={todas} onChange={(e) => setTodas(e.target.checked)} />
+                Volver a repartir también las que ya tenían dueño (solo las que falta imprimir)
+              </label>
+              <p className="text-xs text-gigante-muted">
+                {elegidos.size > 0
+                  ? `${aRepartir} etiqueta(s) entre ${elegidos.size} persona(s): a cada quien le tocan unas ${Math.ceil(
+                      aRepartir / elegidos.size
+                    )}.`
+                  : "Elige al menos a una persona."}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={repartir}
+                  disabled={guardando || elegidos.size === 0 || aRepartir === 0}
+                  className="inline-flex items-center gap-1.5 text-sm font-semibold text-white bg-gigante-red disabled:opacity-40 rounded-lg px-4 py-2"
+                >
+                  <Shuffle size={15} /> {guardando ? "Repartiendo..." : "Repartir al azar"}
+                </button>
+                <button
+                  onClick={() => setRepartiendo(false)}
+                  className="text-sm text-gigante-navy border border-gigante-border bg-white rounded-lg px-4 py-2"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {personas.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {personas.map((id) => {
+            const a = avance.get(id) ?? { pend: 0, imp: 0, col: 0 };
             const total = a.pend + a.imp + a.col;
-            if (z.id === "sin" && total === 0) return null;
             const pct = total > 0 ? Math.round((a.col / total) * 100) : 100;
             return (
               <button
-                key={z.id}
-                onClick={() => setZonaFiltro(z.id)}
-                className={`text-left bg-white border rounded-xl p-3 ${zonaFiltro === z.id ? "border-gigante-navy ring-1 ring-gigante-navy" : "border-gigante-border"}`}
+                key={id}
+                onClick={() => {
+                  eligio.current = true;
+                  setFiltro(id);
+                  setSel(new Set());
+                }}
+                className={`text-left bg-white border rounded-xl p-3 ${filtro === id ? "border-gigante-navy ring-1 ring-gigante-navy" : "border-gigante-border"}`}
               >
-                <p className="text-sm font-semibold text-gigante-navy truncate">{z.nombre}</p>
-                <p className="text-[11px] text-gigante-muted truncate">{z.vendedor ? nameFor(z.vendedor) : "Sin vendedor asignado"}</p>
+                <p className="text-sm font-semibold text-gigante-navy truncate">
+                  {nombreCorto(id)}
+                  {id === profile?.id && <span className="text-[11px] font-normal text-gigante-muted"> (tú)</span>}
+                </p>
                 <p className="text-xs mt-1">
                   <span className="text-gigante-red font-semibold">{a.pend} por imprimir</span>
                   {a.imp > 0 && <span className="text-amber-700"> · {a.imp} por colocar</span>}
+                </p>
+                <p className="text-[11px] text-gigante-muted">
+                  {a.col} de {total} colocadas
                 </p>
                 <div className="h-1.5 rounded-full bg-gigante-bg overflow-hidden mt-1.5">
                   <div className="h-full bg-emerald-500" style={{ width: `${pct}%` }} />
                 </div>
               </button>
             );
-          }
-        )}
-      </div>
+          })}
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
         {chips.map((c) => (
@@ -199,11 +346,11 @@ function PorCambiar({ esGerencia }: { esGerencia: boolean }) {
             key={c.key}
             onClick={() => {
               eligio.current = true;
-              setZonaFiltro(c.key);
+              setFiltro(c.key);
               setSel(new Set());
             }}
             className={`text-xs rounded-full px-3 py-1.5 border ${
-              zonaFiltro === c.key ? "bg-gigante-navy text-white border-gigante-navy" : "border-gigante-border text-gigante-navy bg-white"
+              filtro === c.key ? "bg-gigante-navy text-white border-gigante-navy" : "border-gigante-border text-gigante-navy bg-white"
             }`}
           >
             {c.label}
@@ -228,6 +375,27 @@ function PorCambiar({ esGerencia }: { esGerencia: boolean }) {
         >
           Ya colocadas (30 días)
         </button>
+        {porRevisar.length > 0 && (
+          <button
+            onClick={() => {
+              setEstado("revisar");
+              setSel(new Set());
+            }}
+            className={`text-xs rounded-full px-3 py-1.5 border ${
+              estado === "revisar" ? "bg-amber-600 text-white border-amber-600" : "border-amber-300 text-amber-800 bg-amber-50"
+            }`}
+          >
+            Revisar exhibición ({porRevisar.length})
+          </button>
+        )}
+        {estado === "abiertas" && sinRepartir === 0 && abiertas.length > 0 && !repartiendo && (
+          <button
+            onClick={() => setRepartiendo(true)}
+            className="ml-auto inline-flex items-center gap-1 text-xs text-gigante-muted hover:text-gigante-navy"
+          >
+            <Shuffle size={13} /> Volver a repartir
+          </button>
+        )}
       </div>
 
       {(error || err) && (
@@ -238,7 +406,18 @@ function PorCambiar({ esGerencia }: { esGerencia: boolean }) {
       )}
       {msg && <p className="text-sm text-emerald-800 bg-emerald-50 rounded-lg px-3 py-2">{msg}</p>}
 
-      {estado === "abiertas" && (
+      {estado === "revisar" && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-900">
+          <p className="font-semibold">Estos productos cambiaron de precio o descuento, pero en el sistema NO están exhibidos.</p>
+          <p className="text-xs mt-1">
+            Antes de imprimir, revisa en la tienda: si sí está exhibido, dale <strong>“Ya está exhibido”</strong> y toma la
+            foto; en cuanto quede confirmado, la etiqueta pasa sola a “Por cambiar”. Si no está exhibido, no se imprime nada
+            (se imprimirá cuando lo exhiban). Si de todos modos la necesitas, selecciónala e imprímela.
+          </p>
+        </div>
+      )}
+
+      {estado !== "colocada" && (
         <div className="sticky top-14 z-10 bg-gigante-bg py-2 flex flex-wrap items-center gap-2">
           {grupos.length === 0 ? (
             <button
@@ -278,14 +457,18 @@ function PorCambiar({ esGerencia }: { esGerencia: boolean }) {
           <p className="p-6 text-sm text-gigante-muted">Cargando...</p>
         ) : filtradas.length === 0 ? (
           <p className="p-6 text-sm text-gigante-muted">
-            {estado === "abiertas" ? "✅ No hay etiquetas por cambiar aquí." : "Todavía no hay etiquetas colocadas."}
+            {estado === "abiertas"
+              ? "✅ No hay etiquetas por cambiar aquí."
+              : estado === "revisar"
+                ? "✅ Nada por revisar."
+                : "Todavía no hay etiquetas colocadas."}
           </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gigante-bg text-gigante-muted text-xs">
                 <tr>
-                  {estado === "abiertas" && (
+                  {estado !== "colocada" && (
                     <th className="px-3 py-3 w-8">
                       <input
                         type="checkbox"
@@ -301,6 +484,7 @@ function PorCambiar({ esGerencia }: { esGerencia: boolean }) {
                   <th className="text-right font-medium px-3 py-3">Precio en etiqueta</th>
                   <th className="text-left font-medium px-3 py-3">Etiqueta</th>
                   <th className="text-left font-medium px-3 py-3">Tamaño</th>
+                  <th className="text-left font-medium px-3 py-3">Le toca</th>
                   <th className="text-left font-medium px-3 py-3">Estado</th>
                 </tr>
               </thead>
@@ -311,7 +495,7 @@ function PorCambiar({ esGerencia }: { esGerencia: boolean }) {
                   const final = Number(p?.unit_price ?? 0) * (1 - desc / 100);
                   return (
                     <tr key={q.id} className="border-t border-gigante-border align-top">
-                      {estado === "abiertas" && (
+                      {estado !== "colocada" && (
                         <td className="px-3 py-3">
                           <input type="checkbox" checked={sel.has(q.id)} onChange={() => toggle(q.id)} aria-label="Seleccionar" />
                         </td>
@@ -359,9 +543,39 @@ function PorCambiar({ esGerencia }: { esGerencia: boolean }) {
                           </select>
                         )}
                       </td>
+                      <td className="px-3 py-3">
+                        {q.estado === "colocada" ? (
+                          <span className="text-xs text-gigante-navy">{q.asignado_a ? nombreCorto(q.asignado_a) : "—"}</span>
+                        ) : (
+                          <select
+                            value={q.asignado_a ?? ""}
+                            onChange={(e) => reasignar(q.id, e.target.value)}
+                            aria-label="A quién le toca"
+                            className={`text-xs rounded-lg border bg-white px-2 py-1 ${q.asignado_a ? "border-gigante-border" : "border-amber-300 text-amber-800"}`}
+                          >
+                            <option value="">Sin repartir</option>
+                            {posibles.map((pp) => (
+                              <option key={pp.id} value={pp.id}>
+                                {pp.full_name}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </td>
                       <td className="px-3 py-3 text-xs whitespace-nowrap">
-                        {q.estado === "pendiente" && <span className="text-gigante-red font-medium">Por imprimir</span>}
-                        {q.estado === "impresa" && <span className="text-amber-700 font-medium">Impresa, por colocar</span>}
+                        {estado === "revisar" && p && (
+                          <button
+                            onClick={() => setExhibirId(p.id)}
+                            className="mb-1 inline-flex items-center gap-1 text-[11px] font-semibold text-white bg-amber-600 rounded-lg px-2 py-1"
+                          >
+                            <Store size={12} /> Ya está exhibido
+                          </button>
+                        )}
+                        {estado === "revisar" && <span className="block text-amber-700 font-medium">No está exhibido</span>}
+                        {estado !== "revisar" && q.estado === "pendiente" && <span className="text-gigante-red font-medium">Por imprimir</span>}
+                        {estado !== "revisar" && q.estado === "impresa" && (
+                          <span className="text-amber-700 font-medium">Impresa, por colocar</span>
+                        )}
                         {q.estado === "colocada" && (
                           <span className="text-emerald-700">
                             Colocada por {nameFor(q.colocada_por)}
@@ -377,6 +591,24 @@ function PorCambiar({ esGerencia }: { esGerencia: boolean }) {
           </div>
         )}
       </div>
+      {exhibirId && (
+        <ExhibicionModal
+          products={porRevisar.map((q) => q.product).filter(Boolean) as Product[]}
+          tipo="exhibir"
+          initialProductId={exhibirId}
+          esGerencia={esGerencia}
+          onClose={() => setExhibirId(null)}
+          onSuccess={() => {
+            setExhibirId(null);
+            setMsg(
+              esGerencia
+                ? "✅ Quedó exhibido. Su etiqueta ya pasó a “Por cambiar”."
+                : "✅ Enviado a Gerencia. Cuando confirme la foto, la etiqueta pasa sola a “Por cambiar”."
+            );
+            reload();
+          }}
+        />
+      )}
       {esGerencia && (
         <p className="text-[11px] text-gigante-muted">
           Cualquier cambio de precio, descuento o rotación (desde el Excel o a mano en Inventario) manda el producto aquí solo.
@@ -396,6 +628,7 @@ const CAMPOS: { key: CampoExcel; label: string; obligatorio: boolean }[] = [
 ];
 
 function SubirExcel({ onAplicado }: { onAplicado: () => void }) {
+  const { products } = useProducts();
   const [archivo, setArchivo] = useState<File | null>(null);
   const [hoja, setHoja] = useState<HojaLeida | null>(null);
   const [cols, setCols] = useState<Record<CampoExcel, number>>({ id: -1, rotacion: -1, precio: -1, descuento: -1, sucursal: -1 });
@@ -466,6 +699,13 @@ function SubirExcel({ onAplicado }: { onAplicado: () => void }) {
   }
 
   const r = resultado ?? simulacion;
+
+  // ¿El producto del Excel está exhibido? (se busca por ID del Excel o por código)
+  const exhibidoPorId = (id: string): boolean | null => {
+    const p = products.find((x) => String(x.external_id ?? "") === String(id) || x.code === String(id));
+    return p ? p.exhibido : null;
+  };
+  const noExhibidos = r ? r.detalle.filter((d) => exhibidoPorId(d.id) === false) : [];
 
   return (
     <div className="space-y-4 max-w-4xl">
@@ -578,7 +818,7 @@ function SubirExcel({ onAplicado }: { onAplicado: () => void }) {
           <p className="text-sm font-semibold text-gigante-navy">
             {resultado ? "✅ Actualización aplicada" : "3. Esto es lo que va a cambiar"}
           </p>
-          <div className="grid grid-cols-3 gap-3 text-center">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
             <div className="bg-gigante-bg rounded-lg p-3">
               <p className="text-2xl font-bold text-gigante-red">{r.cambiados}</p>
               <p className="text-[11px] text-gigante-muted">cambian (etiqueta nueva)</p>
@@ -591,7 +831,18 @@ function SubirExcel({ onAplicado }: { onAplicado: () => void }) {
               <p className="text-2xl font-bold text-amber-700">{r.no_encontrados.length}</p>
               <p className="text-[11px] text-gigante-muted">ID no encontrados</p>
             </div>
+            <div className="bg-amber-50 rounded-lg p-3">
+              <p className="text-2xl font-bold text-amber-700">{noExhibidos.length}</p>
+              <p className="text-[11px] text-amber-800">cambian pero no están exhibidos</p>
+            </div>
           </div>
+          {noExhibidos.length > 0 && (
+            <p className="text-xs text-amber-900 bg-amber-50 rounded-lg px-3 py-2">
+              <EyeOff size={12} className="inline -mt-0.5" /> {noExhibidos.length} de los {r.detalle.length} productos que
+              cambian no están exhibidos según el sistema. Sus precios sí se actualizan, pero sus etiquetas quedan en
+              <strong> “Revisar exhibición”</strong> y no se reparten para imprimir hasta que alguien confirme que están en tienda.
+            </p>
+          )}
           {r.no_encontrados.length > 0 && (
             <p className="text-xs text-amber-800 bg-amber-50 rounded-lg px-3 py-2">
               Estos ID no están en el inventario de la sucursal (se ignoran): {r.no_encontrados.slice(0, 40).join(", ")}
@@ -614,6 +865,7 @@ function SubirExcel({ onAplicado }: { onAplicado: () => void }) {
                     <th className="text-right font-medium px-2 py-1.5">Precio</th>
                     <th className="text-right font-medium px-2 py-1.5">Descuento</th>
                     <th className="text-right font-medium px-2 py-1.5">Precio final</th>
+                    <th className="text-left font-medium px-2 py-1.5">Exhibido</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -639,6 +891,15 @@ function SubirExcel({ onAplicado }: { onAplicado: () => void }) {
                       <td className="px-2 py-1.5 text-right font-semibold whitespace-nowrap">
                         {money(Number(d.precio_despues) * (1 - Number(d.descuento_despues) / 100))}
                       </td>
+                      <td className="px-2 py-1.5 whitespace-nowrap">
+                        {exhibidoPorId(d.id) === false ? (
+                          <span className="text-amber-700 font-semibold">No → a revisar</span>
+                        ) : exhibidoPorId(d.id) ? (
+                          <span className="text-emerald-700">Sí</span>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -660,7 +921,8 @@ function SubirExcel({ onAplicado }: { onAplicado: () => void }) {
             </div>
           ) : (
             <p className="text-sm text-emerald-800">
-              Listo. A los vendedores les llegó el aviso; ya pueden imprimir sus etiquetas en “Por cambiar”.
+              Listo. Ahora en “Etiquetas por cambiar” dale “Repartir entre vendedores”.
+              {noExhibidos.length > 0 && ` Las ${noExhibidos.length} que no están exhibidas quedaron en “Revisar exhibición”.`}
             </p>
           )}
         </div>
@@ -737,199 +999,6 @@ function Reglas({ onAplicado }: { onAplicado: () => void }) {
   );
 }
 
-// ============================================================ Zonas
-function Zonas() {
-  const { zonas, reload: reloadZonas } = useStoreZones();
-  const { profiles } = useProfiles();
-  const { products, reload: reloadProducts } = useProducts();
-  const vendedores = profiles.filter((p) => p.active && (p.role === "ventas" || p.role === "gerencia"));
-  const [nueva, setNueva] = useState("");
-  const [buscar, setBuscar] = useState("");
-  const [categoria, setCategoria] = useState("Todas");
-  const [filtroZona, setFiltroZona] = useState("todas");
-  const [sel, setSel] = useState<Set<string>>(new Set());
-  const [destino, setDestino] = useState("");
-  const [msg, setMsg] = useState<string | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-
-  const categorias = useMemo(() => ["Todas", ...Array.from(new Set(products.map((p) => p.category)))], [products]);
-  const lista = useMemo(
-    () =>
-      products.filter(
-        (p) =>
-          productoCoincide(p, buscar) &&
-          (categoria === "Todas" || p.category === categoria) &&
-          (filtroZona === "todas" || (filtroZona === "sin" ? !p.zona_id : p.zona_id === filtroZona))
-      ),
-    [products, buscar, categoria, filtroZona]
-  );
-  const todos = lista.length > 0 && lista.every((p) => sel.has(p.id));
-  const nombreZona = (id: string | null) => zonas.find((z) => z.id === id)?.nombre ?? "Sin zona";
-
-  async function asignar() {
-    setErr(null);
-    if (sel.size === 0) return setErr("Selecciona productos.");
-    const { n, error } = await asignarZona(Array.from(sel), destino || null);
-    if (error) return setErr(error);
-    setMsg(`${n} producto(s) asignados a ${destino ? nombreZona(destino) : "Sin zona"}.`);
-    setSel(new Set());
-    reloadProducts();
-  }
-
-  return (
-    <div className="space-y-5">
-      <div>
-        <p className="text-sm font-semibold text-gigante-navy mb-2">Zonas de la tienda y quién las atiende</p>
-        <div className="bg-white border border-gigante-border rounded-xl divide-y divide-gigante-border max-w-2xl">
-          {zonas.map((z) => (
-            <div key={z.id} className="flex items-center gap-2 px-4 py-3 flex-wrap">
-              <MapPin size={15} className="text-gigante-red" />
-              <span className="text-sm text-gigante-navy flex-1 min-w-[8rem]">{z.nombre}</span>
-              <span className="text-[11px] text-gigante-muted">{products.filter((p) => p.zona_id === z.id).length} productos</span>
-              <select
-                value={z.vendedor_id ?? ""}
-                onChange={async (e) => {
-                  await guardarZona({ id: z.id, nombre: z.nombre, vendedor_id: e.target.value || null, orden: z.orden });
-                  reloadZonas();
-                }}
-                className="rounded-lg border border-gigante-border px-2 py-1.5 text-xs"
-              >
-                <option value="">Sin vendedor</option>
-                {vendedores.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.full_name}
-                  </option>
-                ))}
-              </select>
-              <button
-                onClick={async () => {
-                  if (!window.confirm(`¿Borrar la zona “${z.nombre}”? Sus productos quedan sin zona.`)) return;
-                  await borrarZona(z.id);
-                  reloadZonas();
-                  reloadProducts();
-                }}
-                className="text-gigante-muted hover:text-gigante-red"
-                aria-label="Borrar zona"
-              >
-                <Trash2 size={14} />
-              </button>
-            </div>
-          ))}
-          <div className="flex items-center gap-2 px-4 py-3">
-            <input
-              value={nueva}
-              onChange={(e) => setNueva(e.target.value)}
-              placeholder="Nueva zona (ej. Exhibidor de baños)"
-              className="flex-1 rounded-lg border border-gigante-border px-3 py-1.5 text-sm"
-            />
-            <button
-              onClick={async () => {
-                if (!nueva.trim()) return;
-                const { error } = await guardarZona({ nombre: nueva.trim(), vendedor_id: null, orden: zonas.length + 1 });
-                if (error) setErr(error);
-                setNueva("");
-                reloadZonas();
-              }}
-              className="inline-flex items-center gap-1 text-xs font-semibold text-white bg-gigante-navy rounded-lg px-3 py-1.5"
-            >
-              <Plus size={13} /> Agregar
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div>
-        <p className="text-sm font-semibold text-gigante-navy mb-1">Asignar productos a una zona</p>
-        <p className="text-xs text-gigante-muted mb-2">
-          Se hace una sola vez. Filtra (por ejemplo, la categoría que está en esa pared), selecciona todos y asígnalos.
-        </p>
-        <div className="flex flex-wrap gap-2 mb-2">
-          <input
-            value={buscar}
-            onChange={(e) => setBuscar(e.target.value)}
-            placeholder="Buscar por ID, código, nombre o marca..."
-            className="flex-1 min-w-[12rem] rounded-lg border border-gigante-border px-3 py-2 text-sm"
-          />
-          <select value={categoria} onChange={(e) => setCategoria(e.target.value)} className="rounded-lg border border-gigante-border px-2 py-2 text-sm">
-            {categorias.map((c) => (
-              <option key={c}>{c}</option>
-            ))}
-          </select>
-          <select value={filtroZona} onChange={(e) => setFiltroZona(e.target.value)} className="rounded-lg border border-gigante-border px-2 py-2 text-sm">
-            <option value="todas">Zona: todas</option>
-            <option value="sin">Sin zona</option>
-            {zonas.map((z) => (
-              <option key={z.id} value={z.id}>
-                {z.nombre}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 mb-2">
-          <span className="text-xs text-gigante-muted">{sel.size} seleccionados →</span>
-          <select value={destino} onChange={(e) => setDestino(e.target.value)} className="rounded-lg border border-gigante-border px-2 py-1.5 text-sm">
-            <option value="">Sin zona</option>
-            {zonas.map((z) => (
-              <option key={z.id} value={z.id}>
-                {z.nombre}
-              </option>
-            ))}
-          </select>
-          <button onClick={asignar} className="text-sm font-semibold text-white bg-gigante-red rounded-lg px-3 py-1.5">
-            Asignar
-          </button>
-        </div>
-        {err && <p className="text-sm text-gigante-red bg-gigante-red/10 rounded-lg px-3 py-2 mb-2">{err}</p>}
-        {msg && <p className="text-sm text-emerald-800 bg-emerald-50 rounded-lg px-3 py-2 mb-2">{msg}</p>}
-        <div className="bg-white border border-gigante-border rounded-xl overflow-hidden max-h-[28rem] overflow-y-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gigante-bg text-gigante-muted text-xs sticky top-0">
-              <tr>
-                <th className="px-3 py-2 w-8">
-                  <input
-                    type="checkbox"
-                    checked={todos}
-                    onChange={() => setSel(todos ? new Set() : new Set(lista.map((p) => p.id)))}
-                    aria-label="Seleccionar todos"
-                  />
-                </th>
-                <th className="text-left font-medium px-3 py-2">ID</th>
-                <th className="text-left font-medium px-3 py-2">Producto</th>
-                <th className="text-left font-medium px-3 py-2">Categoría</th>
-                <th className="text-left font-medium px-3 py-2">Zona actual</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lista.slice(0, 1000).map((p) => (
-                <tr key={p.id} className="border-t border-gigante-border">
-                  <td className="px-3 py-2">
-                    <input
-                      type="checkbox"
-                      checked={sel.has(p.id)}
-                      onChange={() =>
-                        setSel((prev) => {
-                          const n = new Set(prev);
-                          if (n.has(p.id)) n.delete(p.id);
-                          else n.add(p.id);
-                          return n;
-                        })
-                      }
-                    />
-                  </td>
-                  <td className="px-3 py-2 font-semibold text-gigante-navy">{productoId(p) || p.code}</td>
-                  <td className="px-3 py-2 text-gigante-navy">{p.name}</td>
-                  <td className="px-3 py-2 text-gigante-muted">{p.category}</td>
-                  <td className="px-3 py-2 text-gigante-muted">{nombreZona(p.zona_id)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ============================================================ Historial
 function Historial() {
   const { lotes } = useLabelBatches();
@@ -967,7 +1036,6 @@ export default function PreciosEtiquetas() {
     { key: "cambiar", label: "Etiquetas por cambiar", icon: Printer, show: true },
     { key: "excel", label: "Subir Excel de rotación", icon: Upload, show: esGerencia },
     { key: "reglas", label: "Descuentos por rotación", icon: Percent, show: esGerencia },
-    { key: "zonas", label: "Zonas y vendedores", icon: MapPin, show: esGerencia },
     { key: "historial", label: "Historial", icon: History, show: true },
   ];
 
@@ -977,8 +1045,8 @@ export default function PreciosEtiquetas() {
         <Tags size={22} /> Precios y Etiquetas
       </h1>
       <p className="text-sm text-gigante-muted mt-1">
-        Sube el Excel de rotación, el sistema calcula precios y descuentos, y cada vendedor imprime solo las etiquetas de su
-        zona que cambiaron.
+        Sube el Excel de rotación, el sistema calcula precios y descuentos, se reparten al azar entre los
+        vendedores y cada quien imprime las que le tocaron.
       </p>
 
       <div className="flex gap-2 mt-4 overflow-x-auto pb-1">
@@ -1006,7 +1074,6 @@ export default function PreciosEtiquetas() {
         {tab === "cambiar" && <PorCambiar esGerencia={esGerencia} />}
         {tab === "excel" && esGerencia && <SubirExcel onAplicado={() => undefined} />}
         {tab === "reglas" && esGerencia && <Reglas onAplicado={() => undefined} />}
-        {tab === "zonas" && esGerencia && <Zonas />}
         {tab === "historial" && <Historial />}
       </div>
     </div>

@@ -246,12 +246,12 @@ export const KB_PAGINA: EntradaKB[] = [
     categoria: "pagina",
     pregunta: "¿Cómo actualizo precios, rotación y etiquetas cuando llega el Excel?",
     variantes: ["llego el excel de rotacion", "etiquetas por cambiar", "como hago las etiquetas rojas", "actualizar descuentos"],
-    claves: ["excel", "rotacion", "etiquetas", "roja", "descuento", "actualizar", "zona", "imprimir"],
+    claves: ["excel", "rotacion", "etiquetas", "roja", "descuento", "actualizar", "repartir", "vendedores", "imprimir", "tamano"],
     respuesta:
       "• Gerencia: “Precios y Etiquetas” → “Subir Excel de rotación”. Revisa qué columna es el ID y la rotación, toca “Ver qué va a cambiar” y luego “Aplicar”. El sistema calcula el descuento (del Excel o de la tabla por rotación) y el precio final.\n" +
-      "• Solo los productos que cambiaron pasan a “Etiquetas por cambiar”, repartidos por zona (pared izquierda, centro, pared derecha).\n" +
-      "• Cada vendedor abre “Mis zonas”, selecciona todo, toca “Imprimir” y se abre el generador con todas sus etiquetas listas: roja (precio de antes tachado y %) si tiene descuento, azul si no.\n" +
-      "• Al pegarlas, “Ya las coloqué”. Gerencia ve el avance por zona.",
+      "• Solo los productos que cambiaron pasan a “Etiquetas por cambiar”. Con “Repartir entre vendedores” se reparten al azar y por partes iguales.\n" +
+      "• Cada vendedor abre “Mías”, selecciona todo y toca “Imprimir” (hay un botón por tamaño: carta, media carta, 1/4, 1/8). Se abre el generador con todas sus etiquetas listas: roja (precio de antes tachado y %) si tiene descuento, azul si no.\n" +
+      "• Al pegarlas, “Ya las coloqué”. Gerencia ve el avance de cada vendedor.",
     roles: ["gerencia", "ventas"],
     link: { to: "/precios-etiquetas", label: "Ir a Precios y Etiquetas" },
     fuente: FP,
