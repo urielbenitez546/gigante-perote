@@ -118,12 +118,16 @@ export const KB_PAGINA: EntradaKB[] = [
   {
     id: "pag-exhibicion",
     categoria: "pagina",
-    pregunta: "¿Cómo registro material que sale a exhibición?",
-    variantes: ["sacar muestra", "poner de muestra en la tienda", "regresar muestra"],
-    claves: ["exhibicion", "muestra", "sacar", "tienda", "regresar"],
+    pregunta: "¿Cómo funciona la exhibición de productos?",
+    variantes: ["ya exhibi un producto", "poner de muestra en la tienda", "quitar de exhibicion", "auditoria de exhibicion"],
+    claves: ["exhibicion", "exhibir", "exhibido", "muestra", "tienda", "quitar", "auditoria"],
     respuesta:
-      "Inventario → “Exhibición” → “Sacar a la tienda”: producto, cantidad y dónde se exhibe (puedes subir foto). Deja de contar como disponible pero no es merma. Cuando se quite la muestra, en la pestaña “Exhibición” toca “Regresar”.",
-    roles: ["gerencia", "almacen"],
+      "Regla del Gerente: todo lo que tiene existencia debe estar exhibido y lo que se acabó se quita de la tienda.\n" +
+      "• En Inventario → pestaña “Exhibición” ves lo que falta exhibir, lo que hay que quitar y lo que está por confirmar.\n" +
+      "• Cuando coloques un producto: “Ya lo exhibí” → foto (obligatoria), dónde quedó, cómo es la muestra y cuánto material tomaste del almacén.\n" +
+      "• Cuando lo quites: “Ya lo quité” (y cuánto material regresa).\n" +
+      "• Gerencia revisa la foto y confirma o rechaza. Todo queda en el historial para auditoría.\n" +
+      "• Si un producto exhibido se acaba, o llega mercancía de uno sin exhibir, a todos les llega aviso en la campanita.",
     link: { to: "/inventario?tab=exhibicion", label: "Ir a Exhibición" },
     fuente: FP,
   },

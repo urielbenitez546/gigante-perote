@@ -89,6 +89,9 @@ export interface Product {
   stock_minimo: number;
   exhibition_stock: number;
   last_counted_at: string | null;
+  exhibido: boolean;
+  exhibido_desde: string | null;
+  exhibido_ubicacion: string | null;
   color: string | null;
   medida: string | null;
   tipo: string | null;
@@ -332,7 +335,11 @@ export type NotificationType =
   | "venta_modificada"
   | "conteo_descuadre"
   | "apartado_por_vencer"
-  | "apartado_vencido";
+  | "apartado_vencido"
+  | "exhibicion_quitar"
+  | "exhibicion_poner"
+  | "exhibicion_revision"
+  | "exhibicion_rechazada";
 
 export interface AppNotification {
   id: string;
@@ -476,4 +483,37 @@ export function productoCoincide(p: Product, busqueda: string): boolean {
     p.name.toLowerCase().includes(q) ||
     p.brand.toLowerCase().includes(q)
   );
+}
+
+// ============================================================
+// Auditoría de exhibición
+// ============================================================
+export type EstadoExhibicion = "ok" | "falta_exhibir" | "quitar" | "sin_stock";
+
+/**
+ * Regla del Gerente: todo lo que tiene existencia disponible debe estar
+ * exhibido, y lo que ya no tiene debe quitarse de exhibición.
+ */
+export function estadoExhibicion(p: Pick<Product, "physical_stock" | "sold_pending" | "exhibido">): EstadoExhibicion {
+  const disponible = p.physical_stock - p.sold_pending;
+  if (disponible > 0) return p.exhibido ? "ok" : "falta_exhibir";
+  return p.exhibido ? "quitar" : "sin_stock";
+}
+
+export interface DisplayRequest {
+  id: string;
+  product_id: string;
+  tipo: "exhibir" | "retirar";
+  cantidad: number;
+  muestra: string | null;
+  ubicacion: string | null;
+  notas: string | null;
+  photo_path: string | null;
+  estado: "pendiente" | "confirmada" | "rechazada";
+  solicitado_por: string | null;
+  solicitado_at: string;
+  revisado_por: string | null;
+  revisado_at: string | null;
+  comentario_revision: string | null;
+  product?: Pick<Product, "code" | "name" | "unit" | "external_id">;
 }

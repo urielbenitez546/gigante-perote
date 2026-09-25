@@ -1,8 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Search, Plus, Package, Boxes, ShoppingCart, CheckCircle2, FileText, AlertTriangle, Pencil, QrCode, Store, ClipboardCheck, Undo2 } from "lucide-react";
+import { Search, Plus, Package, Boxes, ShoppingCart, CheckCircle2, FileText, AlertTriangle, Pencil, QrCode, Store, ClipboardCheck, Undo2, Camera, Check, XCircle } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
-import { useProducts, useInventoryMovements, useDisplayMovements, useInventoryCounts } from "../../hooks/useInventory";
+import {
+  useProducts,
+  useInventoryMovements,
+  useInventoryCounts,
+  useDisplayRequests,
+  revisarExhibicion,
+  marcarExhibidosInicial,
+} from "../../hooks/useInventory";
 import { usePurchaseInvoices, useWriteOffs } from "../../hooks/usePurchases";
 import { useProfileNames } from "../../hooks/useProfileNames";
 import RegistrarEntradaModal from "../../components/inventario/RegistrarEntradaModal";
@@ -20,6 +27,9 @@ import {
   calcularSemaforo,
   productoCoincide,
   productoId,
+  estadoExhibicion,
+  type DisplayRequest,
+  type EstadoExhibicion,
   type Product,
   type ProductRotacion,
   type SemaforoStatus,
@@ -87,9 +97,15 @@ export default function Inventario() {
   const { invoices, loading: loadingInvoices, reload: reloadInvoices } = usePurchaseInvoices();
   const { writeOffs, loading: loadingWriteOffs, reload: reloadWriteOffs } = useWriteOffs();
   const { nameFor } = useProfileNames();
-  const { displayMovements, loading: loadingDisplay, reload: reloadDisplay } = useDisplayMovements();
+  const { requests: displayRequests, loading: loadingDisplay, reload: reloadDisplay } = useDisplayRequests();
   const { counts, loading: loadingCounts, reload: reloadCounts } = useInventoryCounts();
-  const [exhibicionModal, setExhibicionModal] = useState<{ mode: "sale" | "regresa"; productId?: string } | null>(null);
+  const [exhibicionModal, setExhibicionModal] = useState<{ tipo: "exhibir" | "retirar"; productId?: string } | null>(null);
+  const [exhFiltro, setExhFiltro] = useState<"pendientes" | "falta_exhibir" | "quitar" | "ok" | "historial">("falta_exhibir");
+  const [revision, setRevision] = useState<{ id: string; comentario: string } | null>(null);
+  const [exhError, setExhError] = useState<string | null>(null);
+  const [exhMsg, setExhMsg] = useState<string | null>(null);
+  const puedeExhibir = profile?.role === "gerencia" || profile?.role === "ventas" || profile?.role === "almacen";
+  const esGerencia = profile?.role === "gerencia";
   const [conteoModal, setConteoModal] = useState<{ productId?: string } | null>(null);
 
   const [tab, setTab] = useState<TabKey>("productos");
@@ -193,10 +209,40 @@ export default function Inventario() {
     { key: "conteos", label: "Conteos físicos" },
   ];
 
-  const enExhibicion = useMemo(
-    () => products.filter((p) => (p.exhibition_stock ?? 0) > 0).sort((a, b) => a.name.localeCompare(b.name)),
-    [products]
-  );
+  // Auditoría de exhibición: todo lo que tiene existencia debe estar exhibido
+  // y lo que no tiene existencia debe quitarse.
+  const auditoria = useMemo(() => {
+    const activos = products.filter((p) => p.active !== false);
+    const grupos: Record<EstadoExhibicion, Product[]> = { ok: [], falta_exhibir: [], quitar: [], sin_stock: [] };
+    for (const p of activos) grupos[estadoExhibicion(p)].push(p);
+    for (const k of Object.keys(grupos) as EstadoExhibicion[]) grupos[k].sort((a, b) => a.name.localeCompare(b.name));
+    const conStock = grupos.ok.length + grupos.falta_exhibir.length;
+    const exhibidos = grupos.ok.length + grupos.quitar.length;
+    return { grupos, conStock, exhibidos, cuadra: grupos.falta_exhibir.length === 0 && grupos.quitar.length === 0 };
+  }, [products]);
+
+  const pendientesExh = useMemo(() => displayRequests.filter((r) => r.estado === "pendiente"), [displayRequests]);
+  const pendientePorProducto = useMemo(() => new Set(pendientesExh.map((r) => r.product_id)), [pendientesExh]);
+
+  async function revisar(r: DisplayRequest, aprobar: boolean, comentario = "") {
+    setExhError(null);
+    const { error: err } = await revisarExhibicion(r.id, aprobar, comentario);
+    if (err) return setExhError(err);
+    setRevision(null);
+    reload();
+    reloadMovements();
+    reloadDisplay();
+  }
+
+  async function cargaInicial() {
+    if (!window.confirm(`Se marcarán como EXHIBIDOS los ${auditoria.grupos.falta_exhibir.length} productos que hoy tienen existencia y no están marcados. Úsalo solo al empezar el control, si de verdad ya están en la tienda. ¿Continuar?`)) return;
+    setExhError(null);
+    const { marcados, error: err } = await marcarExhibidosInicial();
+    if (err) return setExhError(err);
+    setExhMsg(`Listo: ${marcados} productos marcados como exhibidos.`);
+    reload();
+    reloadDisplay();
+  }
 
   // Conteos: qué tan confiable está el inventario (últimos 30 días).
   const conteoStats = useMemo(() => {
@@ -257,7 +303,7 @@ export default function Inventario() {
               <AlertTriangle size={16} /> Dar de baja
             </button>
             <button
-              onClick={() => setExhibicionModal({ mode: "sale" })}
+              onClick={() => setTab("exhibicion")}
               className="flex items-center gap-2 border border-gigante-border text-gigante-navy text-sm font-semibold rounded-lg px-4 py-2.5"
             >
               <Store size={16} /> Exhibición
@@ -285,7 +331,7 @@ export default function Inventario() {
       )}
 
       {/* Tarjetas de resumen */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-5">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-5">
         <div className="bg-white border border-gigante-border rounded-xl p-4">
           <div className="w-9 h-9 rounded-lg bg-gigante-navy text-white flex items-center justify-center mb-2">
             <Package size={16} />
@@ -293,6 +339,35 @@ export default function Inventario() {
           <p className="text-xs text-gigante-muted">Total de productos</p>
           <p className="text-xl font-bold text-gigante-navy">{stats.totalProductos}</p>
         </div>
+        <button
+          onClick={() => setTab("exhibicion")}
+          className={`text-left bg-white border rounded-xl p-4 hover:shadow-sm ${
+            auditoria.cuadra ? "border-emerald-300" : "border-amber-300"
+          }`}
+        >
+          <div
+            className={`w-9 h-9 rounded-lg text-white flex items-center justify-center mb-2 ${
+              auditoria.cuadra ? "bg-emerald-600" : "bg-amber-500"
+            }`}
+          >
+            <Store size={16} />
+          </div>
+          <p className="text-xs text-gigante-muted">En exhibición</p>
+          <p className="text-xl font-bold text-gigante-navy">
+            {auditoria.exhibidos} <span className="text-sm font-medium text-gigante-muted">/ {auditoria.conStock} con existencia</span>
+          </p>
+          <p className="text-[11px] mt-0.5">
+            {auditoria.cuadra ? (
+              <span className="text-emerald-700 font-medium">✅ Cuadra</span>
+            ) : (
+              <span className="text-amber-700 font-medium">
+                {auditoria.grupos.falta_exhibir.length > 0 && `⚠️ ${auditoria.grupos.falta_exhibir.length} faltan `}
+                {auditoria.grupos.quitar.length > 0 && `· 🔴 ${auditoria.grupos.quitar.length} quitar`}
+              </span>
+            )}
+            {pendientesExh.length > 0 && <span className="text-gigante-muted"> · {pendientesExh.length} por confirmar</span>}
+          </p>
+        </button>
         <div className="bg-white border border-gigante-border rounded-xl p-4">
           <div className="w-9 h-9 rounded-lg bg-emerald-600 text-white flex items-center justify-center mb-2">
             <Boxes size={16} />
@@ -437,6 +512,19 @@ export default function Inventario() {
                             />
                             {(p.physical_stock - p.sold_pending).toLocaleString()} {PRODUCT_UNIT_LABELS[p.unit]}
                           </span>
+                          {(() => {
+                            const e = estadoExhibicion(p);
+                            if (e === "sin_stock") return null;
+                            return (
+                              <span
+                                className={`block text-[10px] font-medium ${
+                                  e === "ok" ? "text-emerald-700" : e === "falta_exhibir" ? "text-amber-700" : "text-red-700"
+                                }`}
+                              >
+                                {e === "ok" ? "🏬 exhibido" : e === "falta_exhibir" ? "⚠️ falta exhibir" : "🔴 quitar de exhibición"}
+                              </span>
+                            );
+                          })()}
                         </td>
                         <td className="px-4 py-3 text-right text-gigante-navy">
                           {p.descuento_porcentaje > 0 ? (
@@ -717,119 +805,227 @@ export default function Inventario() {
 
       {tab === "exhibicion" && (
         <div className="mt-4 space-y-4">
-          <div className="bg-white border border-gigante-border rounded-xl overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gigante-border">
-              <p className="text-sm font-semibold text-gigante-navy">Lo que está ahorita en exhibición</p>
-              {canManage && (
+          <div className="bg-blue-50 border border-blue-200 text-blue-800 text-xs rounded-lg px-3 py-2">
+            <strong>Regla:</strong> todo producto con existencia disponible debe estar exhibido en la tienda, y lo que
+            ya no tiene existencia se quita para no ofrecerlo. Ventas o Almacén avisan con foto; Gerencia confirma. Cuando
+            un producto exhibido se acaba, o llega mercancía de uno sin exhibir, a todos les llega aviso en la campanita.
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {(
+              [
+                ["falta_exhibir", "⚠️ Falta exhibir", auditoria.grupos.falta_exhibir.length, "text-amber-700"],
+                ["quitar", "🔴 Quitar de exhibición", auditoria.grupos.quitar.length, "text-red-700"],
+                ["pendientes", "⏳ Por confirmar", pendientesExh.length, "text-gigante-navy"],
+                ["ok", "✅ Exhibidos con existencia", auditoria.grupos.ok.length, "text-emerald-700"],
+              ] as const
+            ).map(([key, label, n, color]) => (
+              <button
+                key={key}
+                onClick={() => setExhFiltro(key)}
+                className={`text-left bg-white border rounded-xl p-3 ${
+                  exhFiltro === key ? "border-gigante-navy ring-1 ring-gigante-navy" : "border-gigante-border"
+                }`}
+              >
+                <p className="text-[11px] text-gigante-muted">{label}</p>
+                <p className={`text-xl font-bold ${color}`}>{n}</p>
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => setExhFiltro("historial")}
+              className={`text-xs rounded-full px-3 py-1.5 border ${
+                exhFiltro === "historial" ? "bg-gigante-navy text-white border-gigante-navy" : "border-gigante-border text-gigante-navy bg-white"
+              }`}
+            >
+              Historial de auditoría
+            </button>
+            {puedeExhibir && (
+              <>
                 <button
-                  onClick={() => setExhibicionModal({ mode: "sale" })}
-                  className="text-xs font-semibold text-gigante-red hover:underline"
+                  onClick={() => setExhibicionModal({ tipo: "exhibir" })}
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-white bg-gigante-red rounded-full px-3 py-1.5"
                 >
-                  + Sacar material
+                  <Camera size={13} /> Ya exhibí un producto
                 </button>
-              )}
-            </div>
-            {enExhibicion.length === 0 ? (
-              <p className="p-6 text-sm text-gigante-muted">No hay material en exhibición registrado.</p>
-            ) : (
-              <ul className="divide-y divide-gigante-border">
-                {enExhibicion.map((p) => {
-                  const estado = calcularSemaforo(p);
-                  return (
-                    <li key={p.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
-                      <div className="min-w-0">
-                        <p className="text-gigante-navy truncate">
-                          {p.code} — {p.name}
-                        </p>
-                        <p className="text-xs text-gigante-muted flex items-center gap-1.5">
-                          <span className={`w-2 h-2 rounded-full ${SEMAFORO_DOT[estado]}`} />
-                          En almacén disponible: {p.physical_stock - p.sold_pending} {PRODUCT_UNIT_LABELS[p.unit]}
-                          {estado !== "verde" && (
-                            <span className="text-amber-700 font-medium">
-                              {" "}
-                              · {estado === "rojo" ? "ya no hay para vender: cambia la muestra" : "se está acabando: piensa en cambiar la muestra"}
-                            </span>
-                          )}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-3 shrink-0">
-                        <span className="text-sm font-semibold text-gigante-navy">
-                          {p.exhibition_stock} {PRODUCT_UNIT_LABELS[p.unit]}
-                        </span>
-                        {canManage && (
-                          <button
-                            onClick={() => setExhibicionModal({ mode: "regresa", productId: p.id })}
-                            className="inline-flex items-center gap-1 text-xs text-gigante-red hover:underline"
-                          >
-                            <Undo2 size={13} /> Regresar
-                          </button>
-                        )}
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
+                <button
+                  onClick={() => setExhibicionModal({ tipo: "retirar" })}
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-gigante-navy border border-gigante-border bg-white rounded-full px-3 py-1.5"
+                >
+                  <Undo2 size={13} /> Ya quité un producto
+                </button>
+              </>
+            )}
+            {esGerencia && auditoria.exhibidos === 0 && auditoria.grupos.falta_exhibir.length > 0 && (
+              <button onClick={cargaInicial} className="text-xs text-gigante-muted underline ml-auto">
+                Carga inicial: marcar como exhibido todo lo que hoy tiene existencia
+              </button>
             )}
           </div>
 
-          <div className="bg-white border border-gigante-border rounded-xl overflow-hidden">
-            <p className="text-sm font-semibold text-gigante-navy px-4 py-3 border-b border-gigante-border">Historial</p>
-            {loadingDisplay ? (
-              <p className="p-6 text-sm text-gigante-muted">Cargando...</p>
-            ) : displayMovements.length === 0 ? (
-              <p className="p-6 text-sm text-gigante-muted">Todavía no hay movimientos de exhibición.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-gigante-bg text-gigante-muted text-xs">
-                    <tr>
-                      <th className="text-left font-medium px-4 py-3">Fecha</th>
-                      <th className="text-left font-medium px-4 py-3">Movimiento</th>
-                      <th className="text-left font-medium px-4 py-3">Producto</th>
-                      <th className="text-right font-medium px-4 py-3">Cantidad</th>
-                      <th className="text-left font-medium px-4 py-3">Dónde / nota</th>
-                      <th className="text-left font-medium px-4 py-3">Registró</th>
-                      <th className="text-left font-medium px-4 py-3">Foto</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {displayMovements.map((d) => {
-                      const url = publicPhotoUrl("merma", d.photo_path);
-                      return (
-                        <tr key={d.id} className="border-t border-gigante-border">
-                          <td className="px-4 py-3 text-gigante-muted whitespace-nowrap">
-                            {new Date(d.created_at).toLocaleString("es-MX")}
-                          </td>
-                          <td className="px-4 py-3 text-gigante-navy">
-                            {d.tipo === "sale" ? "Salió a la tienda" : "Regresó a almacén"}
-                          </td>
-                          <td className="px-4 py-3 text-gigante-navy">
-                            {d.product?.code} — {d.product?.name}
-                          </td>
-                          <td className="px-4 py-3 text-right font-medium text-gigante-navy">
-                            {d.quantity} {d.product ? PRODUCT_UNIT_LABELS[d.product.unit] : ""}
-                          </td>
-                          <td className="px-4 py-3 text-gigante-muted">
-                            {[d.ubicacion, d.notas].filter(Boolean).join(" · ") || "—"}
-                          </td>
-                          <td className="px-4 py-3 text-gigante-muted">{nameFor(d.created_by)}</td>
-                          <td className="px-4 py-3">
-                            {url ? (
-                              <a href={url} target="_blank" rel="noreferrer" className="text-gigante-red text-xs underline">
-                                Ver foto
-                              </a>
+          {exhError && <p className="text-sm text-gigante-red bg-gigante-red/10 rounded-lg px-3 py-2">{exhError}</p>}
+          {exhMsg && <p className="text-sm text-emerald-800 bg-emerald-50 rounded-lg px-3 py-2">{exhMsg}</p>}
+
+          {(exhFiltro === "falta_exhibir" || exhFiltro === "quitar" || exhFiltro === "ok") && (
+            <div className="bg-white border border-gigante-border rounded-xl overflow-hidden">
+              {auditoria.grupos[exhFiltro].length === 0 ? (
+                <p className="p-6 text-sm text-gigante-muted">
+                  {exhFiltro === "falta_exhibir"
+                    ? "✅ Todo lo que tiene existencia está exhibido."
+                    : exhFiltro === "quitar"
+                    ? "✅ No hay productos exhibidos sin existencia."
+                    : "Todavía no hay productos marcados como exhibidos."}
+                </p>
+              ) : (
+                <ul className="divide-y divide-gigante-border">
+                  {auditoria.grupos[exhFiltro].slice(0, 200).map((p) => {
+                    const disp = p.physical_stock - p.sold_pending;
+                    const pendiente = pendientePorProducto.has(p.id);
+                    return (
+                      <li key={p.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+                        <div className="min-w-0">
+                          <p className="text-gigante-navy truncate">
+                            {productoId(p) && <span className="font-semibold">ID {productoId(p)} · </span>}
+                            {p.code} — {p.name}
+                          </p>
+                          <p className="text-xs text-gigante-muted">
+                            Disponible: {Math.max(disp, 0).toLocaleString()} {PRODUCT_UNIT_LABELS[p.unit]}
+                            {p.exhibido && p.exhibido_ubicacion && ` · Exhibido en: ${p.exhibido_ubicacion}`}
+                            {p.exhibido && p.exhibido_desde && ` · desde ${new Date(p.exhibido_desde).toLocaleDateString("es-MX")}`}
+                            {(p.exhibition_stock ?? 0) > 0 && ` · ${p.exhibition_stock} de muestra`}
+                          </p>
+                        </div>
+                        {pendiente ? (
+                          <span className="shrink-0 text-[11px] rounded-full bg-gigante-bg text-gigante-navy px-2 py-1">⏳ Por confirmar</span>
+                        ) : (
+                          puedeExhibir &&
+                          exhFiltro !== "ok" && (
+                            <button
+                              onClick={() =>
+                                setExhibicionModal({ tipo: exhFiltro === "falta_exhibir" ? "exhibir" : "retirar", productId: p.id })
+                              }
+                              className="shrink-0 inline-flex items-center gap-1 text-xs font-semibold text-white bg-gigante-navy rounded-lg px-3 py-1.5"
+                            >
+                              {exhFiltro === "falta_exhibir" ? (
+                                <>
+                                  <Camera size={13} /> Ya lo exhibí
+                                </>
+                              ) : (
+                                <>
+                                  <Undo2 size={13} /> Ya lo quité
+                                </>
+                              )}
+                            </button>
+                          )
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          )}
+
+          {(exhFiltro === "pendientes" || exhFiltro === "historial") && (
+            <div className="bg-white border border-gigante-border rounded-xl overflow-hidden">
+              {loadingDisplay ? (
+                <p className="p-6 text-sm text-gigante-muted">Cargando...</p>
+              ) : (exhFiltro === "pendientes" ? pendientesExh : displayRequests).length === 0 ? (
+                <p className="p-6 text-sm text-gigante-muted">
+                  {exhFiltro === "pendientes" ? "✅ No hay avisos por confirmar." : "Todavía no hay movimientos de exhibición."}
+                </p>
+              ) : (
+                <ul className="divide-y divide-gigante-border">
+                  {(exhFiltro === "pendientes" ? pendientesExh : displayRequests).map((r) => {
+                    const url = publicPhotoUrl("exhibicion", r.photo_path);
+                    const unidad = r.product ? PRODUCT_UNIT_LABELS[r.product.unit] : "";
+                    return (
+                      <li key={r.id} className="px-4 py-3 flex gap-3">
+                        {url ? (
+                          <a href={url} target="_blank" rel="noreferrer" className="shrink-0">
+                            <img src={url} alt="Evidencia" className="w-20 h-20 object-cover rounded-lg border border-gigante-border" />
+                          </a>
+                        ) : (
+                          <div className="w-20 h-20 shrink-0 rounded-lg bg-gigante-bg flex items-center justify-center text-[10px] text-gigante-muted text-center">
+                            Sin foto
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1 text-sm">
+                          <p className="text-gigante-navy">
+                            <span className={`font-semibold ${r.tipo === "exhibir" ? "text-emerald-700" : "text-red-700"}`}>
+                              {r.tipo === "exhibir" ? "Exhibió" : "Quitó"}
+                            </span>{" "}
+                            {r.product?.external_id && <>ID {r.product.external_id} · </>}
+                            {r.product?.code} — {r.product?.name}
+                          </p>
+                          <p className="text-xs text-gigante-muted">
+                            {nameFor(r.solicitado_por)} · {new Date(r.solicitado_at).toLocaleString("es-MX")}
+                            {r.ubicacion && ` · ${r.ubicacion}`}
+                          </p>
+                          {(r.muestra || r.cantidad > 0 || r.notas) && (
+                            <p className="text-xs text-gigante-muted">
+                              {r.muestra && `Muestra: ${r.muestra}. `}
+                              {r.cantidad > 0 &&
+                                `${r.tipo === "exhibir" ? "Tomó del almacén" : "Regresó al almacén"}: ${r.cantidad} ${unidad}. `}
+                              {r.notas}
+                            </p>
+                          )}
+                          {r.estado === "pendiente" ? (
+                            esGerencia ? (
+                              revision?.id === r.id ? (
+                                <div className="mt-2 flex gap-2 flex-wrap">
+                                  <input
+                                    value={revision.comentario}
+                                    onChange={(e) => setRevision({ id: r.id, comentario: e.target.value })}
+                                    placeholder="¿Por qué se rechaza?"
+                                    className="flex-1 min-w-[10rem] rounded-lg border border-gigante-border px-2 py-1.5 text-xs"
+                                  />
+                                  <button onClick={() => setRevision(null)} className="text-xs text-gigante-muted">
+                                    Cancelar
+                                  </button>
+                                  <button
+                                    onClick={() => revisar(r, false, revision.comentario)}
+                                    className="text-xs font-semibold text-white bg-gigante-red rounded-lg px-3 py-1.5"
+                                  >
+                                    Rechazar
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="mt-2 flex gap-2">
+                                  <button
+                                    onClick={() => revisar(r, true)}
+                                    className="inline-flex items-center gap-1 text-xs font-semibold text-white bg-emerald-600 rounded-lg px-3 py-1.5"
+                                  >
+                                    <Check size={13} /> Confirmar
+                                  </button>
+                                  <button
+                                    onClick={() => setRevision({ id: r.id, comentario: "" })}
+                                    className="inline-flex items-center gap-1 text-xs font-semibold text-gigante-red border border-gigante-red/40 rounded-lg px-3 py-1.5"
+                                  >
+                                    <XCircle size={13} /> Rechazar
+                                  </button>
+                                </div>
+                              )
                             ) : (
-                              <span className="text-xs text-gigante-muted">—</span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+                              <p className="text-xs mt-1 text-gigante-navy">⏳ Esperando confirmación de Gerencia</p>
+                            )
+                          ) : (
+                            <p className={`text-xs mt-1 ${r.estado === "confirmada" ? "text-emerald-700" : "text-red-700"}`}>
+                              {r.estado === "confirmada" ? "✔ Confirmado" : "✖ Rechazado"} por {nameFor(r.revisado_por)}
+                              {r.revisado_at && ` · ${new Date(r.revisado_at).toLocaleString("es-MX")}`}
+                              {r.comentario_revision && ` · “${r.comentario_revision}”`}
+                            </p>
+                          )}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -1004,12 +1200,14 @@ export default function Inventario() {
       {exhibicionModal && (
         <ExhibicionModal
           products={products}
-          initialMode={exhibicionModal.mode}
+          tipo={exhibicionModal.tipo}
           initialProductId={exhibicionModal.productId}
+          esGerencia={esGerencia}
           onClose={() => setExhibicionModal(null)}
           onSuccess={() => {
             setExhibicionModal(null);
             setTab("exhibicion");
+            setExhFiltro(esGerencia ? "historial" : "pendientes");
             reload();
             reloadMovements();
             reloadDisplay();

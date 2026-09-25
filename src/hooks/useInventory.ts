@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
-import type { Product, InventoryMovement, DisplayMovement, InventoryCount } from "../types";
+import type { Product, InventoryMovement, DisplayMovement, InventoryCount, DisplayRequest } from "../types";
 
 export function useProducts() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -181,4 +181,69 @@ export async function registerPhysicalCount(productId: string, contado: number, 
     p_notas: notas || null,
   });
   return { diferencia: (data as number | null) ?? null, error: error?.message ?? null };
+}
+
+// ============================================================
+// Auditoría de exhibición
+// ============================================================
+export function useDisplayRequests() {
+  const [requests, setRequests] = useState<DisplayRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const reload = useCallback(async () => {
+    setLoading(true);
+    const { data, error: err } = await supabase
+      .from("display_requests")
+      .select("*, product:products(code, name, unit, external_id)")
+      .order("solicitado_at", { ascending: false })
+      .limit(300);
+    if (err) setError(err.message);
+    else {
+      setError(null);
+      setRequests((data as unknown as DisplayRequest[]) ?? []);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    reload();
+  }, [reload]);
+
+  return { requests, loading, error, reload };
+}
+
+export async function solicitarExhibicion(input: {
+  productId: string;
+  tipo: "exhibir" | "retirar";
+  cantidad: number;
+  muestra: string;
+  ubicacion: string;
+  notas: string;
+  photoPath: string | null;
+}) {
+  const { error } = await supabase.rpc("solicitar_exhibicion", {
+    p_product_id: input.productId,
+    p_tipo: input.tipo,
+    p_cantidad: input.cantidad,
+    p_muestra: input.muestra || null,
+    p_ubicacion: input.ubicacion || null,
+    p_notas: input.notas || null,
+    p_photo_path: input.photoPath,
+  });
+  return { error: error?.message ?? null };
+}
+
+export async function revisarExhibicion(requestId: string, aprobar: boolean, comentario: string) {
+  const { error } = await supabase.rpc("revisar_exhibicion", {
+    p_request_id: requestId,
+    p_aprobar: aprobar,
+    p_comentario: comentario || null,
+  });
+  return { error: error?.message ?? null };
+}
+
+export async function marcarExhibidosInicial() {
+  const { data, error } = await supabase.rpc("marcar_exhibidos_inicial");
+  return { marcados: (data as number | null) ?? 0, error: error?.message ?? null };
 }

@@ -1,6 +1,6 @@
 import { supabase } from "./supabaseClient";
 
-export type PhotoBucket = "facturas" | "merma" | "repartos-firmas" | "repartos-evidencia" | "manuales" | "gastos" | "capacitacion";
+export type PhotoBucket = "facturas" | "merma" | "repartos-firmas" | "repartos-evidencia" | "manuales" | "gastos" | "capacitacion" | "exhibicion";
 
 /**
  * Sube una foto a un bucket de Supabase Storage y devuelve la ruta

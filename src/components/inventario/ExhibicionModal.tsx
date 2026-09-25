@@ -1,184 +1,194 @@
 import { useState, type FormEvent } from "react";
-import { X, Upload, Store, Undo2 } from "lucide-react";
-import { PRODUCT_UNIT_LABELS, type Product } from "../../types";
-import { moveToDisplay, returnFromDisplay } from "../../hooks/useInventory";
+import { X, Camera, Store, Undo2 } from "lucide-react";
+import { PRODUCT_UNIT_LABELS, productoId, type Product } from "../../types";
+import { solicitarExhibicion } from "../../hooks/useInventory";
 import { uploadPhoto } from "../../lib/storage";
 import ProductSearchSelect from "../common/ProductSearchSelect";
 
 interface Props {
   products: Product[];
-  /** "sale" = sacar de almacén a la tienda; "regresa" = de la tienda a almacén. */
-  initialMode?: "sale" | "regresa";
+  /** "exhibir" = ya se colocó en la tienda; "retirar" = ya se quitó. */
+  tipo: "exhibir" | "retirar";
   initialProductId?: string;
+  esGerencia: boolean;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export default function ExhibicionModal({ products, initialMode = "sale", initialProductId = "", onClose, onSuccess }: Props) {
-  const [mode, setMode] = useState<"sale" | "regresa">(initialMode);
+/**
+ * Aviso de exhibición. Ventas o Almacén registran que ya exhibieron (o
+ * quitaron) un producto, con foto como evidencia; queda pendiente hasta
+ * que Gerencia lo confirma. Lo que registra Gerencia se confirma solo.
+ */
+export default function ExhibicionModal({ products, tipo, initialProductId = "", esGerencia, onClose, onSuccess }: Props) {
   const [productId, setProductId] = useState(initialProductId);
-  const [quantity, setQuantity] = useState("");
+  const [cantidad, setCantidad] = useState("0");
+  const [muestra, setMuestra] = useState("");
   const [ubicacion, setUbicacion] = useState("");
   const [notas, setNotas] = useState("");
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [foto, setFoto] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const exhibir = tipo === "exhibir";
+  const pool = products.filter((p) => (exhibir ? !p.exhibido : p.exhibido));
   const product = products.find((p) => p.id === productId) ?? null;
   const disponible = product ? product.physical_stock - product.sold_pending : 0;
-  const enExhibicion = product?.exhibition_stock ?? 0;
-  const maximo = mode === "sale" ? disponible : enExhibicion;
   const unidad = product ? PRODUCT_UNIT_LABELS[product.unit] : "";
 
-  // Al regresar, solo tiene sentido elegir productos que sí están en exhibición.
-  const pool = mode === "regresa" ? products.filter((p) => (p.exhibition_stock ?? 0) > 0) : products;
+  function elegirFoto(f: File | null) {
+    setFoto(f);
+    setPreview(f ? URL.createObjectURL(f) : null);
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    const qty = Number(quantity);
-    if (!product) return setError("Elige un producto.");
-    if (!qty || qty <= 0) return setError("Pon una cantidad mayor a cero.");
-    if (qty > maximo) {
-      return setError(
-        mode === "sale"
-          ? `Solo hay ${maximo} ${unidad} disponibles para sacar (lo apartado para clientes no se puede tomar).`
-          : `En exhibición solo hay ${maximo} ${unidad}.`
-      );
-    }
+    const qty = Number(cantidad) || 0;
+    if (!product) return setError("Elige el producto.");
+    if (qty < 0) return setError("La cantidad no puede ser negativa.");
+    if (exhibir && qty > disponible) return setError(`Solo hay ${disponible} ${unidad} disponibles para la muestra.`);
+    if (!exhibir && qty > (product.exhibition_stock ?? 0))
+      return setError(`En exhibición solo hay registrado ${product.exhibition_stock ?? 0} ${unidad} de material.`);
+    if (exhibir && !foto) return setError("Toma una foto de cómo quedó la exhibición: es la evidencia para la auditoría.");
 
     setSubmitting(true);
-    let res: { error: string | null };
-    if (mode === "sale") {
-      let photoPath: string | null = null;
-      if (photoFile) {
-        const up = await uploadPhoto("merma", photoFile);
-        if (up.error) {
-          setSubmitting(false);
-          return setError(`No se pudo subir la foto: ${up.error}`);
-        }
-        photoPath = up.path;
+    let photoPath: string | null = null;
+    if (foto) {
+      const up = await uploadPhoto("exhibicion", foto);
+      if (up.error) {
+        setSubmitting(false);
+        return setError(`No se pudo subir la foto: ${up.error}`);
       }
-      res = await moveToDisplay(product.id, qty, ubicacion.trim(), notas.trim(), photoPath);
-    } else {
-      res = await returnFromDisplay(product.id, qty, notas.trim());
+      photoPath = up.path;
     }
+    const { error: err } = await solicitarExhibicion({
+      productId: product.id,
+      tipo,
+      cantidad: qty,
+      muestra: muestra.trim(),
+      ubicacion: ubicacion.trim(),
+      notas: notas.trim(),
+      photoPath,
+    });
     setSubmitting(false);
-    if (res.error) return setError(res.error);
+    if (err) return setError(err);
     onSuccess();
   }
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 overflow-y-auto">
       <div className="bg-white rounded-2xl w-full max-w-md p-5 my-8">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-bold text-gigante-navy">Material para exhibición</h2>
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-lg font-bold text-gigante-navy flex items-center gap-2">
+            {exhibir ? <Store size={20} /> : <Undo2 size={20} />}
+            {exhibir ? "Ya lo exhibí" : "Ya lo quité de exhibición"}
+          </h2>
           <button onClick={onClose} aria-label="Cerrar" className="text-gigante-muted">
             <X size={20} />
           </button>
         </div>
-
-        <div className="grid grid-cols-2 gap-2 mb-4">
-          <button
-            type="button"
-            onClick={() => {
-              setMode("sale");
-              setError(null);
-            }}
-            className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold border ${
-              mode === "sale" ? "bg-gigante-navy text-white border-gigante-navy" : "border-gigante-border text-gigante-navy"
-            }`}
-          >
-            <Store size={14} /> Sacar a la tienda
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setMode("regresa");
-              setProductId("");
-              setError(null);
-            }}
-            className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold border ${
-              mode === "regresa" ? "bg-gigante-navy text-white border-gigante-navy" : "border-gigante-border text-gigante-navy"
-            }`}
-          >
-            <Undo2 size={14} /> Regresar a almacén
-          </button>
-        </div>
-
         <p className="text-xs text-gigante-muted mb-4">
-          {mode === "sale"
-            ? "Lo que saques deja de contar como disponible para vender, pero NO es merma: queda registrado como “en exhibición”."
-            : "Cuando se quita una muestra de la tienda y vuelve a almacén, regresa a estar disponible para vender."}
+          {esGerencia
+            ? "Como Gerencia, tu registro queda confirmado de inmediato."
+            : "Queda pendiente hasta que Gerencia revise la foto y lo confirme."}
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gigante-navy mb-1">Producto</label>
-            {mode === "regresa" && pool.length === 0 ? (
-              <p className="text-xs text-gigante-muted">No hay ningún producto en exhibición todavía.</p>
+            {pool.length === 0 ? (
+              <p className="text-xs text-gigante-muted">
+                {exhibir ? "Todos los productos ya están marcados como exhibidos." : "No hay productos marcados como exhibidos."}
+              </p>
             ) : (
-              <ProductSearchSelect products={pool} value={productId} onChange={setProductId} showStock={mode === "sale"} />
+              <ProductSearchSelect products={pool} value={productId} onChange={setProductId} showStock />
             )}
             {product && (
               <p className="text-xs text-gigante-muted mt-1">
-                Disponible para vender: <strong>{disponible}</strong> {unidad} · En exhibición:{" "}
-                <strong>{enExhibicion}</strong> {unidad}
+                {productoId(product) && <>ID {productoId(product)} · </>}Disponible: <strong>{disponible}</strong> {unidad}
+                {(product.exhibition_stock ?? 0) > 0 && (
+                  <>
+                    {" "}
+                    · Material ya en exhibición: <strong>{product.exhibition_stock}</strong> {unidad}
+                  </>
+                )}
               </p>
             )}
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gigante-navy mb-1">
-              Cantidad {product && <span className="text-gigante-muted font-normal">(máx. {maximo})</span>}
+              {exhibir ? "Foto de cómo quedó (obligatoria)" : "Foto del espacio ya sin el producto (opcional)"}
+            </label>
+            <label className="flex items-center gap-2 border border-dashed border-gigante-border rounded-lg px-3 py-3 text-sm text-gigante-muted cursor-pointer">
+              <Camera size={16} />
+              <span className="truncate">{foto ? foto.name : "Tomar o elegir foto"}</span>
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={(e) => elegirFoto(e.target.files?.[0] ?? null)}
+              />
+            </label>
+            {preview && <img src={preview} alt="Vista previa" className="mt-2 max-h-40 rounded-lg border border-gigante-border" />}
+          </div>
+
+          {exhibir && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gigante-navy mb-1">¿Dónde está exhibido?</label>
+                <input
+                  value={ubicacion}
+                  onChange={(e) => setUbicacion(e.target.value)}
+                  placeholder="Ej. Pared 3, área de baños"
+                  className="w-full rounded-lg border border-gigante-border px-3 py-2.5 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gigante-navy mb-1">¿Cómo es la muestra? (opcional)</label>
+                <input
+                  value={muestra}
+                  onChange={(e) => setMuestra(e.target.value)}
+                  placeholder="Ej. tablero con 2 piezas, panel de mosaico, 1 m² en piso"
+                  className="w-full rounded-lg border border-gigante-border px-3 py-2.5 text-sm"
+                />
+              </div>
+            </>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-gigante-navy mb-1">
+              {exhibir
+                ? `Material que se tomó del almacén para la muestra${unidad ? ` (${unidad})` : ""}`
+                : `Material que regresa al almacén${unidad ? ` (${unidad})` : ""}`}
             </label>
             <input
               type="number"
               min="0"
               step="any"
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
+              value={cantidad}
+              onChange={(e) => setCantidad(e.target.value)}
               className="w-full rounded-lg border border-gigante-border px-3 py-2.5 text-sm"
             />
+            <p className="text-[11px] text-gigante-muted mt-1">
+              {exhibir
+                ? "Deja 0 si la muestra no se tomó del inventario (por ejemplo, un muestrario que manda el proveedor). Lo que pongas aquí se descuenta de lo disponible para vender."
+                : "Si el material de la muestra está en buen estado y vuelve a venderse, ponlo aquí. Si se dañó, regístralo aparte en “Dar de baja”."}
+            </p>
           </div>
-
-          {mode === "sale" && (
-            <div>
-              <label className="block text-sm font-medium text-gigante-navy mb-1">¿Dónde se va a exhibir? (opcional)</label>
-              <input
-                value={ubicacion}
-                onChange={(e) => setUbicacion(e.target.value)}
-                placeholder="Ej. Pared 3, área de baños"
-                className="w-full rounded-lg border border-gigante-border px-3 py-2.5 text-sm"
-              />
-            </div>
-          )}
 
           <div>
             <label className="block text-sm font-medium text-gigante-navy mb-1">Nota (opcional)</label>
             <input
               value={notas}
               onChange={(e) => setNotas(e.target.value)}
-              placeholder={mode === "sale" ? "Ej. reemplaza la muestra del piso beige" : "Ej. se cambió la muestra"}
+              placeholder={exhibir ? "Ej. se le puso etiqueta de precio" : "Ej. se agotó, se puso otro en su lugar"}
               className="w-full rounded-lg border border-gigante-border px-3 py-2.5 text-sm"
             />
           </div>
-
-          {mode === "sale" && (
-            <div>
-              <label className="block text-sm font-medium text-gigante-navy mb-1">Foto de cómo quedó (opcional)</label>
-              <label className="flex items-center gap-2 border border-dashed border-gigante-border rounded-lg px-3 py-3 text-sm text-gigante-muted cursor-pointer">
-                <Upload size={16} />
-                <span className="truncate">{photoFile ? photoFile.name : "Elegir foto"}</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => setPhotoFile(e.target.files?.[0] ?? null)}
-                />
-              </label>
-            </div>
-          )}
 
           {error && <p className="text-sm text-gigante-red bg-gigante-red/10 rounded-lg px-3 py-2">{error}</p>}
 
@@ -192,10 +202,10 @@ export default function ExhibicionModal({ products, initialMode = "sale", initia
             </button>
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || pool.length === 0}
               className="flex-1 bg-gigante-red hover:bg-gigante-redDark disabled:opacity-60 text-white rounded-lg py-2.5 text-sm font-semibold"
             >
-              {submitting ? "Guardando..." : mode === "sale" ? "Sacar a exhibición" : "Regresar a almacén"}
+              {submitting ? "Guardando..." : esGerencia ? "Registrar" : "Enviar a Gerencia"}
             </button>
           </div>
         </form>
