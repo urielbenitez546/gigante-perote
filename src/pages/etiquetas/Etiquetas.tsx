@@ -10,12 +10,17 @@ import { useLocation } from "react-router-dom";
 // producto desde Inventario), ese es el momento de convertirla en un
 // componente React de verdad.
 export default function Etiquetas() {
-  // Si viene de "Precios y Etiquetas" trae ?lote=<clave> para precargar todas las etiquetas.
+  // Si viene de "Precios y Etiquetas" trae ?lote=<clave>&tam=<tamaño> para
+  // precargar todas las etiquetas. Se pasan al iframe después de "#" porque
+  // Netlify redirige /etiquetas.html y en esa redirección se pierde lo que
+  // va después de "?"; lo que va después de "#" nunca se pierde.
   const { search } = useLocation();
+  const params = new URLSearchParams(search).toString();
   return (
     <div style={{ height: "calc(100vh - 32px)", minHeight: 600 }}>
       <iframe
-        src={`/etiquetas.html${search}`}
+        key={params}
+        src={`/etiquetas.html${params ? `#${params}` : ""}`}
         title="Generador de Etiquetas"
         style={{ width: "100%", height: "100%", border: "none", borderRadius: 12 }}
       />

@@ -29,10 +29,19 @@ import {
   guardarZona,
   borrarZona,
   asignarZona,
+  asignarTamanoEtiqueta,
   type FilaActualizacion,
 } from "../../hooks/useEtiquetas";
 import { leerExcel, detectarColumnas, type CampoExcel, type HojaLeida } from "../../lib/excel";
-import { prepararLote } from "../../lib/etiquetasLote";
+import {
+  agruparPorTamano,
+  prepararLote,
+  tamanoAutomatico,
+  TAMANO_LABELS,
+  TAMANO_USO,
+  TAMANOS,
+  type TamanoEtiqueta,
+} from "../../lib/etiquetasLote";
 import {
   ROTACION_LABELS,
   productoId,
@@ -114,14 +123,28 @@ function PorCambiar({ esGerencia }: { esGerencia: boolean }) {
     });
   }
 
-  async function imprimir() {
-    const productos = seleccionadas.map((q) => q.product).filter(Boolean) as Product[];
+  // Las seleccionadas, separadas por tamaño de hoja (carta, media, 1/4, 1/8).
+  const grupos = useMemo(() => agruparPorTamano(seleccionadas, (q) => q.product), [seleccionadas]);
+
+  async function imprimir(tamano: TamanoEtiqueta, grupo: typeof seleccionadas) {
+    const productos = grupo.map((q) => q.product).filter(Boolean) as Product[];
     if (productos.length === 0) return;
     await marcarEtiquetas(
-      seleccionadas.filter((q) => q.estado === "pendiente").map((q) => q.id),
+      grupo.filter((q) => q.estado === "pendiente").map((q) => q.id),
       "impresa"
     );
-    navigate(prepararLote(productos));
+    navigate(prepararLote(productos, tamano));
+  }
+
+  async function cambiarTamano(productId: string, valor: string) {
+    setErr(null);
+    const { error: e } = await asignarTamanoEtiqueta([productId], valor || null);
+    if (e) {
+      return setErr(
+        e.includes("asignar_tamano_etiqueta") ? `${e} — ¿ya corriste la migración 0032 en Supabase?` : e
+      );
+    }
+    reload();
   }
 
   async function colocar() {
@@ -217,13 +240,25 @@ function PorCambiar({ esGerencia }: { esGerencia: boolean }) {
 
       {estado === "abiertas" && (
         <div className="sticky top-14 z-10 bg-gigante-bg py-2 flex flex-wrap items-center gap-2">
-          <button
-            onClick={imprimir}
-            disabled={seleccionadas.length === 0}
-            className="inline-flex items-center gap-1.5 text-sm font-semibold text-white bg-gigante-red disabled:opacity-40 rounded-lg px-4 py-2"
-          >
-            <Printer size={15} /> Imprimir {seleccionadas.length > 0 ? `${seleccionadas.length} etiqueta(s)` : "seleccionadas"}
-          </button>
+          {grupos.length === 0 ? (
+            <button
+              disabled
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-white bg-gigante-red opacity-40 rounded-lg px-4 py-2"
+            >
+              <Printer size={15} /> Imprimir seleccionadas
+            </button>
+          ) : (
+            grupos.map((g) => (
+              <button
+                key={g.tamano}
+                onClick={() => imprimir(g.tamano, g.items)}
+                title={TAMANO_USO[g.tamano]}
+                className="inline-flex items-center gap-1.5 text-sm font-semibold text-white bg-gigante-red rounded-lg px-4 py-2"
+              >
+                <Printer size={15} /> Imprimir {g.items.length} · {TAMANO_LABELS[g.tamano]}
+              </button>
+            ))
+          )}
           <button
             onClick={colocar}
             disabled={seleccionadas.length === 0}
@@ -233,6 +268,7 @@ function PorCambiar({ esGerencia }: { esGerencia: boolean }) {
           </button>
           <span className="text-xs text-gigante-muted">
             Roja = tiene descuento (precio de antes tachado y %). Azul = precio normal.
+            {grupos.length > 1 && " Se imprime un tamaño a la vez: imprime uno, regresa y dale al siguiente."}
           </span>
         </div>
       )}
@@ -264,6 +300,7 @@ function PorCambiar({ esGerencia }: { esGerencia: boolean }) {
                   <th className="text-left font-medium px-3 py-3">Qué cambió</th>
                   <th className="text-right font-medium px-3 py-3">Precio en etiqueta</th>
                   <th className="text-left font-medium px-3 py-3">Etiqueta</th>
+                  <th className="text-left font-medium px-3 py-3">Tamaño</th>
                   <th className="text-left font-medium px-3 py-3">Estado</th>
                 </tr>
               </thead>
@@ -304,6 +341,23 @@ function PorCambiar({ esGerencia }: { esGerencia: boolean }) {
                         >
                           {desc > 0 ? "Roja" : "Azul"}
                         </span>
+                      </td>
+                      <td className="px-3 py-3">
+                        {p && (
+                          <select
+                            value={p.tamano_etiqueta ?? ""}
+                            onChange={(e) => cambiarTamano(p.id, e.target.value)}
+                            aria-label="Tamaño de etiqueta"
+                            className="text-xs rounded-lg border border-gigante-border bg-white px-2 py-1"
+                          >
+                            <option value="">{TAMANO_LABELS[tamanoAutomatico(p)]} (auto)</option>
+                            {TAMANOS.map((t) => (
+                              <option key={t} value={t}>
+                                {TAMANO_LABELS[t]}
+                              </option>
+                            ))}
+                          </select>
+                        )}
                       </td>
                       <td className="px-3 py-3 text-xs whitespace-nowrap">
                         {q.estado === "pendiente" && <span className="text-gigante-red font-medium">Por imprimir</span>}

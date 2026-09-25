@@ -1345,8 +1345,26 @@ Minimum version required to store current data is: `+i+`.
   // Precarga de un jalón todas las etiquetas que cambiaron (rojas con
   // precio de antes y % si tienen descuento; azules si no).
   (async function cargarLote(){
-    const clave = new URLSearchParams(window.location.search).get("lote");
+    // Viene después de "#" (no se pierde con redirecciones); por compatibilidad también se lee "?".
+    const hashParams = new URLSearchParams((window.location.hash || "").replace(/^#/, ""));
+    const searchParams = new URLSearchParams(window.location.search);
+    const clave = hashParams.get("lote") || searchParams.get("lote");
+    const tam = hashParams.get("tam") || searchParams.get("tam");
+    // Limpia lotes viejos (más de 1 día) para no llenar el navegador.
+    try {
+      const ahora = Date.now();
+      for (let i = localStorage.length - 1; i >= 0; i--){
+        const k = localStorage.key(i);
+        const m = k && k.match(/^lote-etiquetas-(\d+)$/);
+        if (m && k !== clave && ahora - Number(m[1]) > 24*60*60*1000) localStorage.removeItem(k);
+      }
+    } catch(e) {}
     if (!clave) return;
+    if (tam && SIZE_CONFIG[tam]){
+      const sel = document.getElementById("sizeKey");
+      sel.value = tam;
+      sel.dispatchEvent(new Event("change"));
+    }
     let lista = null;
     try { lista = JSON.parse(localStorage.getItem(clave) || "null"); } catch(e) { lista = null; }
     if (!Array.isArray(lista) || lista.length === 0){
@@ -1355,10 +1373,10 @@ Minimum version required to store current data is: `+i+`.
     }
     for (const item of lista){
       const data = Object.assign(emptyForm(), item);
-      if (data.productId) await ensureQrForProduct(data.productId);
+      try { if (data.productId) await ensureQrForProduct(data.productId); } catch(e) { console.warn("[Lote] QR:", e); }
       productos.push(data);
     }
-    try { localStorage.removeItem(clave); } catch(e) {}
+    // El lote NO se borra aquí: si la página se recarga, se vuelve a cargar. Se limpia solo al día siguiente.
     renderList();
     renderPreview();
     const hint = document.getElementById("buscarHint");

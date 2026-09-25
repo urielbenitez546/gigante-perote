@@ -99,6 +99,8 @@ export interface Product {
   tipo: string | null;
   calidad: string | null;
   medida_caja: string | null;
+  /** Tamaño de etiqueta fijado a mano; null = automático por tipo de producto. */
+  tamano_etiqueta?: "carta" | "media" | "cuarto" | "octavo" | null;
   external_id: string | null;
   active: boolean;
   created_at: string;

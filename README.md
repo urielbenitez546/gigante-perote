@@ -800,3 +800,18 @@ categoría → seleccionar todos → asignar).
 ### Para aplicarlo
 1. Supabase: consulta nueva → **todo** `supabase/migrations/0031_actualizacion_etiquetas.sql` → Run.
 2. Se agregó la librería `xlsx` (lector de Excel) a `package.json`: Netlify la instala sola al publicar.
+
+## 39. Tamaño de etiqueta automático e impresión por tamaño
+
+- El sistema elige el tamaño según el producto (primero por nombre, luego por categoría):
+  **Carta** tinacos, cisternas, calentadores · **Media carta** pisos, azulejos, porcelanatos
+  (o medidas tipo 60x60) · **1/4** lavabos, WC, cuadros, pegazulejo, cosas de caja mediana ·
+  **1/8** cenefas, llaves, mangueras, accesorios chicos. Lo que no reconoce va en 1/4.
+- En “Etiquetas por cambiar” cada producto muestra su tamaño y se puede corregir a mano
+  (se guarda en `products.tamano_etiqueta`; “(auto)” = automático).
+- Al seleccionar, aparece un botón **Imprimir** por cada tamaño; el generador abre ya con ese tamaño.
+- Arreglo: el lote ahora viaja después de `#` en la dirección (las redirecciones de Netlify ya
+  no lo pierden) y no se borra al abrirlo, así que recargar la página no vacía la lista.
+
+### Para aplicarlo
+1. Supabase: consulta nueva → `supabase/migrations/0032_tamano_etiqueta.sql` → Run.

@@ -34,6 +34,11 @@ export async function asignarZona(productIds: string[], zonaId: string | null) {
   return { n: (data as number | null) ?? 0, error: error?.message ?? null };
 }
 
+export async function asignarTamanoEtiqueta(productIds: string[], tamano: string | null) {
+  const { data, error } = await supabase.rpc("asignar_tamano_etiqueta", { p_product_ids: productIds, p_tamano: tamano ?? "" });
+  return { n: (data as number | null) ?? 0, error: error?.message ?? null };
+}
+
 export function useDiscountRules() {
   const [reglas, setReglas] = useState<DiscountRule[]>([]);
   const [loading, setLoading] = useState(true);
