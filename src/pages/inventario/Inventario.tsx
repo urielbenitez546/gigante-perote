@@ -18,6 +18,8 @@ import {
   PRODUCT_UNIT_LABELS,
   SEMAFORO_LABELS,
   calcularSemaforo,
+  productoCoincide,
+  productoId,
   type Product,
   type ProductRotacion,
   type SemaforoStatus,
@@ -138,11 +140,7 @@ export default function Inventario() {
     // Desde una alerta: solo ese producto (aunque ya haya cambiado de color).
     if (productoAlerta) return products.filter((p) => p.id === productoAlerta);
     return products.filter((p) => {
-      const matchesSearch =
-        search.trim() === "" ||
-        p.name.toLowerCase().includes(search.toLowerCase()) ||
-        p.code.toLowerCase().includes(search.toLowerCase()) ||
-        p.brand.toLowerCase().includes(search.toLowerCase());
+      const matchesSearch = productoCoincide(p, search);
       const matchesCategory = categoryFilter === "Todas" || p.category === categoryFilter;
       const matchesBrand = brandFilter === "Todas" || p.brand === brandFilter;
       const matchesSemaforo = semaforoFilter === "Todos" || calcularSemaforo(p) === semaforoFilter;
@@ -341,7 +339,7 @@ export default function Inventario() {
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar por nombre, código o marca..."
+                placeholder="Buscar por ID, código, nombre o marca..."
                 className="w-full rounded-lg border border-gigante-border pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gigante-navy/30"
               />
             </div>
@@ -398,6 +396,7 @@ export default function Inventario() {
                 <table className="w-full text-sm hidden md:table">
                   <thead className="bg-gigante-bg text-gigante-muted text-xs">
                     <tr>
+                      <th className="text-left font-medium px-4 py-3">ID</th>
                       <th className="text-left font-medium px-4 py-3">Código</th>
                       <th className="text-left font-medium px-4 py-3">Producto</th>
                       <th className="text-left font-medium px-4 py-3">Marca</th>
@@ -414,6 +413,7 @@ export default function Inventario() {
                   <tbody>
                     {filteredProducts.map((p) => (
                       <tr key={p.id} className="border-t border-gigante-border">
+                        <td className="px-4 py-3 font-semibold text-gigante-navy">{productoId(p) || "—"}</td>
                         <td className="px-4 py-3 text-gigante-navy">{p.code}</td>
                         <td className="px-4 py-3 text-gigante-navy">{p.name}</td>
                         <td className="px-4 py-3 text-gigante-muted">{p.brand}</td>
@@ -489,6 +489,7 @@ export default function Inventario() {
                         <div>
                           <p className="text-sm font-medium text-gigante-navy">{p.name}</p>
                           <p className="text-xs text-gigante-muted">
+                            {productoId(p) && <span className="font-semibold text-gigante-navy">ID {productoId(p)} · </span>}
                             {p.code} · {p.brand}
                           </p>
                         </div>

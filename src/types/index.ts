@@ -460,3 +460,20 @@ export interface TrainingVideo {
 
 /** Clave con la que se guarda en training_progress que un video ya se vio. */
 export const videoLessonKey = (videoId: string) => `video:${videoId}`;
+
+/** ID del sistema de la empresa (el "Id" del Excel de inventario). */
+export function productoId(p: Pick<Product, "external_id" | "code">): string {
+  return p.external_id != null && String(p.external_id).trim() !== "" ? String(p.external_id) : "";
+}
+
+/** ¿El producto coincide con lo buscado? Busca por ID, código, nombre y marca. */
+export function productoCoincide(p: Product, busqueda: string): boolean {
+  const q = busqueda.trim().toLowerCase();
+  if (!q) return true;
+  return (
+    productoId(p).toLowerCase().includes(q) ||
+    p.code.toLowerCase().includes(q) ||
+    p.name.toLowerCase().includes(q) ||
+    p.brand.toLowerCase().includes(q)
+  );
+}

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Package, ArrowLeft } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
-import { ROTACION_LABELS, PRODUCT_UNIT_LABELS, type Product } from "../../types";
+import { ROTACION_LABELS, PRODUCT_UNIT_LABELS, productoId, type Product } from "../../types";
 
 const ROTACION_BADGE: Record<string, string> = {
   rapido: "bg-emerald-100 text-emerald-700",
@@ -63,7 +63,7 @@ export default function ProductoDetalle() {
 
       <div className="bg-white border border-gigante-border rounded-2xl p-5">
         <div className="flex items-center gap-2 text-gigante-muted text-xs mb-1">
-          <Package size={14} /> {product.code}
+          <Package size={14} /> {productoId(product) && <strong className="text-gigante-navy">ID {productoId(product)} ·</strong>} {product.code}
         </div>
         <h1 className="text-xl font-bold text-gigante-navy">{product.name}</h1>
         <p className="text-sm text-gigante-muted mt-0.5">

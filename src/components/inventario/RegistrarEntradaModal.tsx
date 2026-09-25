@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import ProductSearchSelect from "../common/ProductSearchSelect";
 import { X } from "lucide-react";
 import type { Product } from "../../types";
 import { registerInventoryEntry } from "../../hooks/useInventory";
@@ -10,7 +11,7 @@ interface Props {
 }
 
 export default function RegistrarEntradaModal({ products, onClose, onSuccess }: Props) {
-  const [productId, setProductId] = useState(products[0]?.id ?? "");
+  const [productId, setProductId] = useState("");
   const [quantity, setQuantity] = useState("");
   const [reference, setReference] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -54,17 +55,7 @@ export default function RegistrarEntradaModal({ products, onClose, onSuccess }: 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gigante-navy mb-1">Producto</label>
-            <select
-              value={productId}
-              onChange={(e) => setProductId(e.target.value)}
-              className="w-full rounded-lg border border-gigante-border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gigante-navy/30"
-            >
-              {products.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.code} — {p.name}
-                </option>
-              ))}
-            </select>
+            <ProductSearchSelect products={products} value={productId} onChange={setProductId} />
           </div>
 
           <div>

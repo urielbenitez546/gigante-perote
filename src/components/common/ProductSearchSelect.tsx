@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Search, X } from "lucide-react";
 import { normalizeText } from "../../lib/search";
-import { calcularSemaforo, SEMAFORO_LABELS, PRODUCT_UNIT_LABELS, type Product, type SemaforoStatus } from "../../types";
+import { calcularSemaforo, productoId, SEMAFORO_LABELS, PRODUCT_UNIT_LABELS, type Product, type SemaforoStatus } from "../../types";
 
 const DOT: Record<SemaforoStatus, string> = {
   verde: "bg-emerald-500",
@@ -30,7 +30,7 @@ export default function ProductSearchSelect({
   products,
   value,
   onChange,
-  placeholder = "Busca por código, nombre o marca...",
+  placeholder = "Busca por ID, código, nombre o marca...",
   showStock = false,
   excludeIds = [],
   size = "md",
@@ -54,12 +54,14 @@ export default function ProductSearchSelect({
     const pool = products.filter((p) => p.active !== false && !excludeIds.includes(p.id));
     if (!q) return pool.slice(0, 20);
     const words = q.split(/\s+/);
-    return pool
-      .filter((p) => {
-        const hay = normalizeText(`${p.code} ${p.name} ${p.brand} ${p.category}`);
-        return words.every((w) => hay.includes(w));
-      })
-      .slice(0, 30);
+    // Si escriben el ID exacto (ej. 30243), ese producto sale primero.
+    const exacto = pool.filter((p) => productoId(p) === q || normalizeText(p.code) === q);
+    const resto = pool.filter((p) => {
+      if (exacto.includes(p)) return false;
+      const hay = normalizeText(`${productoId(p)} ${p.code} ${p.name} ${p.brand} ${p.category}`);
+      return words.every((w) => hay.includes(w));
+    });
+    return [...exacto, ...resto].slice(0, 30);
   }, [products, query, excludeIds]);
 
   const pad = size === "sm" ? "py-2 text-xs" : "py-2.5 text-sm";
@@ -79,6 +81,7 @@ export default function ProductSearchSelect({
           className="flex-1 min-w-0 text-left truncate text-gigante-navy"
           title="Cambiar producto"
         >
+          {productoId(selected) && <span className="font-semibold">ID {productoId(selected)} · </span>}
           <span className="font-medium">{selected.code}</span> — {selected.name}
           {showStock && (
             <span className="text-gigante-muted">
@@ -139,6 +142,7 @@ export default function ProductSearchSelect({
                     {showStock && <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${DOT[estado]}`} />}
                     <span className="flex-1 min-w-0">
                       <span className="block text-xs text-gigante-navy truncate">
+                        {productoId(p) && <span className="font-semibold">ID {productoId(p)} · </span>}
                         <span className="font-semibold">{p.code}</span> — {p.name}
                       </span>
                       <span className="block text-[10px] text-gigante-muted truncate">

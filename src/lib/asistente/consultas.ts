@@ -84,7 +84,10 @@ export async function buscarProductos(terminos: string[]): Promise<Product[]> {
   const filtros = utiles
     .flatMap((t) => {
       const p = patronIlike(t);
-      return p ? [`name.ilike.*${p}*`, `code.ilike.*${p}*`] : [];
+      const f = p ? [`name.ilike.*${p}*`, `code.ilike.*${p}*`] : [];
+      // Un número puede ser el ID del sistema de la empresa (ej. 30243).
+      if (/^\d{2,}$/.test(t)) f.push(`external_id.eq.${t}`);
+      return f;
     })
     .join(",");
   if (!filtros) return [];
@@ -93,11 +96,12 @@ export async function buscarProductos(terminos: string[]): Promise<Product[]> {
   // Puntaje: cuántos términos aparecen de verdad (sin acentos) en código/nombre/marca.
   const conPuntaje = productos
     .map((p) => {
-      const hay = n(`${p.code} ${p.name} ${p.brand}`);
+      const hay = n(`${p.external_id ?? ""} ${p.code} ${p.name} ${p.brand}`);
       const code = n(p.code);
+      const idSistema = String(p.external_id ?? "");
       let puntaje = 0;
       for (const t of utiles) {
-        if (code === t) puntaje += 5;
+        if (code === t || idSistema === t) puntaje += 5;
         else if (hay.includes(t)) puntaje += 2;
       }
       return { p, puntaje };
@@ -140,7 +144,7 @@ function respuestaStock(productos: Product[], quierePrecio: boolean): RespuestaD
     if (estado === "amarillo") lineas.push("Quedan pocas: confirma con Almacén antes de prometer cantidades grandes.");
     if (estado === "rojo") lineas.push("No hay disponible: ofrece un producto parecido o consulta con Gerencia cuándo se surte.");
     return {
-      titulo: quierePrecio ? `Precio y existencia — ${p.code}` : `Existencia — ${p.code}`,
+      titulo: `${quierePrecio ? "Precio y existencia" : "Existencia"} — ${p.external_id ? `ID ${p.external_id} · ` : ""}${p.code}`,
       texto: `${p.name} (${p.brand})\n${lineas.join("\n")}`,
       link: { to: `/producto/${p.id}`, label: "Ver ficha del producto" },
       fuente: FUENTE,
@@ -148,16 +152,16 @@ function respuestaStock(productos: Product[], quierePrecio: boolean): RespuestaD
   }
   return {
     titulo: `Encontré ${productos.length} productos`,
-    texto: "Estos coinciden con lo que buscas. Si quieres el detalle de uno, pregúntame por su código (ej. “¿cuánto hay de " +
-      productos[0].code + "?”).",
+    texto: "Estos coinciden con lo que buscas. Si quieres el detalle de uno, pregúntame por su ID (ej. “¿cuánto hay de " +
+      (productos[0].external_id ?? productos[0].code) + "?”).",
     tabla: {
-      columnas: ["Código", "Producto", "Disponible", "Precio"],
+      columnas: ["ID", "Código", "Producto", "Disponible", "Precio"],
       filas: productos.map((p) => {
         const disp = p.physical_stock - p.sold_pending;
         const e = calcularSemaforo(p);
         const dot = e === "verde" ? "🟢" : e === "amarillo" ? "🟡" : "🔴";
         const precio = p.unit_price * (1 - (p.descuento_porcentaje ?? 0) / 100);
-        return [p.code, p.name, `${dot} ${fmt(Math.max(disp, 0))} ${unidad(p.unit, disp)}`, money(precio)];
+        return [String(p.external_id ?? "—"), p.code, p.name, `${dot} ${fmt(Math.max(disp, 0))} ${unidad(p.unit, disp)}`, money(precio)];
       }),
     },
     link: { to: "/inventario", label: "Ir a Inventario" },

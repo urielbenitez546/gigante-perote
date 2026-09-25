@@ -406,7 +406,7 @@ Minimum version required to store current data is: `+i+`.
       <div class="field" style="position:relative;">
         <label>Buscar en tu Inventario (opcional)</label>
         <div style="display:flex; gap:8px;">
-          <input id="buscarProducto" placeholder="Escribe el código o nombre del producto..." style="flex:1;">
+          <input id="buscarProducto" placeholder="Escribe el ID, código o nombre del producto..." style="flex:1;">
           <button type="button" id="btnEscanearProducto" style="flex-shrink:0; white-space:nowrap; padding:0 14px; border-radius:8px; border:1px solid #0E1E42; background:#fff; color:#0E1E42; font-weight:600; font-size:13px; cursor:pointer;">📷 Escanear</button>
         </div>
         <div id="resultadosBusqueda" style="display:none; position:absolute; z-index:20; background:#fff; border:1px solid #ddd; border-radius:8px; margin-top:4px; max-height:220px; overflow-y:auto; width:100%; box-shadow:0 4px 12px rgba(0,0,0,.10);"></div>
@@ -694,7 +694,9 @@ Minimum version required to store current data is: `+i+`.
     }
     hint.textContent = "Buscando...";
     const q = encodeURIComponent(`*${query.trim()}*`);
-    const url = `${SUPABASE_URL}/rest/v1/products?select=id,code,name,brand,unit,unit_price,descuento_porcentaje,external_id&or=(code.ilike.${q},name.ilike.${q})&limit=8`;
+    // Si escriben solo números, también se busca por el ID del sistema (ej. 30243).
+    const idFiltro = /^\d+$/.test(query.trim()) ? `,external_id.eq.${query.trim()}` : "";
+    const url = `${SUPABASE_URL}/rest/v1/products?select=id,code,name,brand,unit,unit_price,descuento_porcentaje,external_id&or=(code.ilike.${q},name.ilike.${q}${idFiltro})&limit=8`;
     try {
       const res = await fetch(url, {
         headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${token}` }
@@ -709,7 +711,7 @@ Minimum version required to store current data is: `+i+`.
       }
       box.innerHTML = data.map(p => `
         <div class="resultado-item" data-id="${p.id}" style="padding:10px 12px; font-size:13px; cursor:pointer; border-bottom:1px solid #f0f0f0;">
-          <strong>${escapeHtml(p.code)}</strong> — ${escapeHtml(p.name)}
+          ${p.external_id ? `<strong>ID ${escapeHtml(String(p.external_id))}</strong> · ` : ""}<strong>${escapeHtml(p.code)}</strong> — ${escapeHtml(p.name)}
         </div>
       `).join("");
       box.style.display = "block";
@@ -736,7 +738,7 @@ Minimum version required to store current data is: `+i+`.
     const precioFinal = producto.unit_price * (1 - (producto.descuento_porcentaje || 0) / 100);
     document.getElementById("precio").value = precioFinal.toFixed(2);
     document.getElementById("unidadPrecio").value = UNIDAD_POR_UNIT[producto.unit] || "";
-    document.getElementById("buscarProducto").value = `${producto.code} — ${producto.name}`;
+    document.getElementById("buscarProducto").value = `${producto.external_id ? "ID " + producto.external_id + " · " : ""}${producto.code} — ${producto.name}`;
     await ensureQrForProduct(producto.id);
   }
 

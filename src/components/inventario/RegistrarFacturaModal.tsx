@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import ProductSearchSelect from "../common/ProductSearchSelect";
 import { X, Plus, Trash2, Upload } from "lucide-react";
 import type { Product } from "../../types";
 import { registerPurchaseInvoice, type InvoiceItemInput } from "../../hooks/usePurchases";
@@ -19,13 +20,13 @@ export default function RegistrarFacturaModal({ products, onClose, onSuccess }: 
   const [supplier, setSupplier] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [items, setItems] = useState<DraftItem[]>([
-    { key: crypto.randomUUID(), product_id: products[0]?.id ?? "", quantity: 1 },
+    { key: crypto.randomUUID(), product_id: "", quantity: 1 },
   ]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function addItem() {
-    setItems((prev) => [...prev, { key: crypto.randomUUID(), product_id: products[0]?.id ?? "", quantity: 1 }]);
+    setItems((prev) => [...prev, { key: crypto.randomUUID(), product_id: "", quantity: 1 }]);
   }
   function removeItem(key: string) {
     setItems((prev) => prev.filter((i) => i.key !== key));
@@ -146,17 +147,14 @@ export default function RegistrarFacturaModal({ products, onClose, onSuccess }: 
                 const p = products.find((prod) => prod.id === item.product_id);
                 return (
                   <div key={item.key} className="flex gap-2 items-start">
-                    <select
-                      value={item.product_id}
-                      onChange={(e) => updateItem(item.key, { product_id: e.target.value })}
-                      className="flex-1 rounded-lg border border-gigante-border px-2 py-2 text-xs"
-                    >
-                      {products.map((prod) => (
-                        <option key={prod.id} value={prod.id}>
-                          {prod.code} — {prod.name} ({prod.brand})
-                        </option>
-                      ))}
-                    </select>
+                    <div className="flex-1 min-w-0">
+                      <ProductSearchSelect
+                        products={products}
+                        value={item.product_id}
+                        onChange={(id) => updateItem(item.key, { product_id: id })}
+                        size="sm"
+                      />
+                    </div>
                     <input
                       type="number"
                       min="1"

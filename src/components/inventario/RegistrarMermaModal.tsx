@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import ProductSearchSelect from "../common/ProductSearchSelect";
 import { X, Upload } from "lucide-react";
 import type { Product } from "../../types";
 import { registerWriteOff } from "../../hooks/usePurchases";
@@ -11,7 +12,7 @@ interface Props {
 }
 
 export default function RegistrarMermaModal({ products, onClose, onSuccess }: Props) {
-  const [productId, setProductId] = useState(products[0]?.id ?? "");
+  const [productId, setProductId] = useState("");
   const [quantity, setQuantity] = useState("");
   const [reason, setReason] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -78,17 +79,7 @@ export default function RegistrarMermaModal({ products, onClose, onSuccess }: Pr
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gigante-navy mb-1">Producto</label>
-            <select
-              value={productId}
-              onChange={(e) => setProductId(e.target.value)}
-              className="w-full rounded-lg border border-gigante-border px-3 py-2.5 text-sm"
-            >
-              {products.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.code} — {p.name}
-                </option>
-              ))}
-            </select>
+            <ProductSearchSelect products={products} value={productId} onChange={setProductId} />
             <p className="text-[11px] text-gigante-muted mt-1">Existencia física actual: {stock}</p>
           </div>
 
