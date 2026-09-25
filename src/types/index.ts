@@ -46,6 +46,7 @@ export const NAV_MODULES: NavModule[] = [
   { key: "manuales", label: "Manuales e Información", path: "/manuales", roles: ["gerencia", "ventas", "caja", "almacen", "reparto"] },
   { key: "asistente", label: "Asistente de Consulta", path: "/asistente", roles: ["gerencia", "ventas", "caja", "almacen", "reparto"] },
   { key: "calculadora", label: "Calculadora", path: "/calculadora", roles: ["gerencia", "ventas", "caja", "almacen", "reparto"] },
+  { key: "precios", label: "Precios y Etiquetas", path: "/precios-etiquetas", roles: ["gerencia", "ventas"] },
   { key: "etiquetas", label: "Generador de Etiquetas", path: "/etiquetas", roles: ["gerencia", "ventas", "caja"] },
   { key: "administracion", label: "Administración", path: "/administracion", roles: ["gerencia"] },
 ];
@@ -92,6 +93,7 @@ export interface Product {
   exhibido: boolean;
   exhibido_desde: string | null;
   exhibido_ubicacion: string | null;
+  zona_id: string | null;
   color: string | null;
   medida: string | null;
   tipo: string | null;
@@ -339,7 +341,8 @@ export type NotificationType =
   | "exhibicion_quitar"
   | "exhibicion_poner"
   | "exhibicion_revision"
-  | "exhibicion_rechazada";
+  | "exhibicion_rechazada"
+  | "etiquetas_por_cambiar";
 
 export interface AppNotification {
   id: string;
@@ -516,4 +519,66 @@ export interface DisplayRequest {
   revisado_at: string | null;
   comentario_revision: string | null;
   product?: Pick<Product, "code" | "name" | "unit" | "external_id">;
+}
+
+// ============================================================
+// Actualización de precios y etiquetas
+// ============================================================
+export interface StoreZone {
+  id: string;
+  nombre: string;
+  vendedor_id: string | null;
+  orden: number;
+}
+
+export interface DiscountRule {
+  rotacion: ProductRotacion;
+  descuento: number;
+}
+
+export interface LabelQueueItem {
+  id: string;
+  product_id: string;
+  batch_id: string | null;
+  rotacion_antes: ProductRotacion | null;
+  rotacion_despues: ProductRotacion | null;
+  precio_antes: number | null;
+  precio_despues: number | null;
+  descuento_antes: number | null;
+  descuento_despues: number | null;
+  estado: "pendiente" | "impresa" | "colocada";
+  impresa_at: string | null;
+  colocada_por: string | null;
+  colocada_at: string | null;
+  created_at: string;
+  updated_at: string;
+  product?: Product;
+}
+
+export interface LabelBatch {
+  id: string;
+  nombre: string;
+  filas: number;
+  actualizados: number;
+  no_encontrados: string[];
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface ResultadoActualizacion {
+  lote_id: string | null;
+  cambiados: number;
+  sin_cambio: number;
+  no_encontrados: string[];
+  rotaciones_no_reconocidas: string[];
+  detalle: {
+    id: string;
+    nombre: string;
+    rotacion_antes: string;
+    rotacion_despues: string;
+    precio_antes: number;
+    precio_despues: number;
+    descuento_antes: number;
+    descuento_despues: number;
+  }[];
 }

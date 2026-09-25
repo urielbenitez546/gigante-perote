@@ -10,6 +10,7 @@ import {
   Calculator,
   Settings,
   Tag,
+  Tags,
   ClipboardList,
   Receipt,
   GraduationCap,
@@ -29,6 +30,7 @@ export const MODULE_ICONS: Record<string, LucideIcon> = {
   manuales: BookOpen,
   asistente: MessageCircle,
   calculadora: Calculator,
+  precios: Tags,
   etiquetas: Tag,
   administracion: Settings,
 };

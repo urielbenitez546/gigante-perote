@@ -690,3 +690,113 @@ No requiere ningún cambio en Supabase, solo el código nuevo.
 La Calculadora la construirá tu compañero por separado, y el Asistente de Consulta actual se
 reemplazará más adelante por el suyo cuando esté listo. Falta la conexión a GitHub y la publicación
 en Netlify para dejar el prototipo accesible fuera de tu computadora.
+
+## 32. Semáforo de inventario + alertas en la campanita
+
+- Cada producto tiene su **mínimo de existencia** (Inventario → lápiz ✏️ del producto; lo cambian Gerencia y Almacén).
+- Semáforo según lo **disponible** (existencia física − vendidos pendientes):
+  🟢 arriba del mínimo · 🟡 en el mínimo o menos · 🔴 en 0.
+- Se ve en Inventario (puntito de color + filtro "Semáforo") y en Inicio (lista "Antes de vender, checa esto").
+- Cuando un producto **empeora** de color (verde→amarillo, →rojo), llega una notificación a la campanita de
+  Gerencia, Almacén y Ventas. Al darle clic abre Inventario mostrando solo ese producto.
+  No repite el mismo aviso del mismo producto en menos de 24 horas.
+
+### Para aplicarlo en tu Supabase
+1. SQL Editor → New query → pega **todo** `supabase/migrations/0025_semaforo_stock_alertas.sql` → Run.
+2. Pon el mínimo a los productos que quieras vigilar (si se queda en 0, solo avisa cuando se acaba).
+
+## 33. Eliminar venta (solo Gerencia)
+
+En el detalle de la venta, Gerencia tiene el botón **"Eliminar esta venta"** (pide un motivo). Solo se puede
+si todavía no se entregó nada, ningún reparto va en camino y Caja no tiene cobro registrado (si ya cobró,
+primero se corrige el cobro a $0). Lo apartado regresa a disponible y queda aviso en la campanita de
+Gerencia y Caja con folio, cliente, total, motivo y quién la eliminó.
+
+### Para aplicarlo en tu Supabase
+SQL Editor → New query → pega **todo** `supabase/migrations/0026_eliminar_venta.sql` → Run
+(después de la 0025).
+
+## 34. Pendientes del Gerente (8 puntos)
+
+| # | Qué | Dónde |
+|---|-----|-------|
+| 1 | **Tablero de pedidos pendientes**: pedidos abiertos, $ que falta entregar, $ ya entregado, avance, material pendiente por producto (y aviso si en almacén no alcanza). | Menú → Pedidos Pendientes |
+| 2 | **Material para exhibición**: sacar a la tienda / regresar a almacén. Deja de estar disponible pero no es merma. | Inventario → botón "Exhibición" y pestaña "Exhibición" |
+| 3 | **Cambiar un producto en una venta ya hecha**: solo lo que falta por entregar; recalcula total; avisa a Caja si hay que regresar o cobrar diferencia. | Detalle de la venta → "Cambiar por otro producto" |
+| 4 | **Gastos con comprobante** (solo Gerencia), total del mes y por categoría. Comprobantes en bucket PRIVADO. | Menú → Gastos |
+| 5 | **Vencimiento de apartados**: plazo 1 mes. Aviso en campanita 5 días antes y al vencer (una sola vez por venta). Etiqueta de días en Pedidos, Retiros y detalle de venta. No cancela solo: Gerencia decide. | Automático al abrir la página |
+| 6 | **Stock visible al vender**: buscador de productos con semáforo y disponible; aviso si no alcanza o se está acabando. En Inicio, recordatorio de cambiar exhibición. | Nueva venta / Inicio |
+| 7 | **Menos descuadre**: conteo físico "a ciegas", lista diaria de sugeridos para contar (conteo cíclico), % de confiabilidad, historial y aviso a Gerencia si no cuadra. | Inventario → "Conteo físico" y pestaña "Conteos físicos" |
+| 8 | **Capacitación Express**: 16 lecciones cortas por área con pasos, "Ir a practicar" y pregunta rápida; Gerencia ve el avance del equipo. Contenido editable en `src/data/capacitacion.ts`. | Menú → Capacitación Express |
+
+### Para aplicarlo en tu Supabase
+1. Consulta nueva → **todo** `0027a_tipos_exhibicion_conteo.sql` → Run (sola). Espera "Success".
+2. Consulta nueva → **todo** `0027b_pendientes_gerente.sql` → Run.
+   (Crea también el bucket privado `gastos`; no hace falta crearlo a mano.)
+
+## 35. Videos de capacitación
+
+En **Capacitación Express → Videos** (lista a la izquierda, reproductor a la derecha):
+- Gerencia agrega videos: **subiendo el archivo** (máx. 50 MB) o **pegando un link** de YouTube ("no listado") o Google Drive.
+- Cada video lleva título, duración (se lee sola al subir), de qué trata, responsabilidades del puesto y para qué puestos es.
+- Gerencia puede reordenar, editar, ocultar o borrar videos.
+- El empleado ve solo los de su puesto; se marca "visto" solo al llegar casi al final (o con el botón).
+- "Avance del equipo" junta videos + lecciones por persona.
+- Los archivos van en un bucket **privado** (`capacitacion`): solo se ven con sesión iniciada.
+
+### Para aplicarlo en tu Supabase
+Consulta nueva → **todo** `supabase/migrations/0028_videos_capacitacion.sql` → Run (después de 0027b).
+
+## 36. Asistente de Consulta (chatbot) con respuestas predeterminadas y datos en vivo
+
+Sin inteligencia artificial de pago: todo corre en el navegador.
+- **~70 preguntas y respuestas predeterminadas** sacadas del *Manual de Bienvenida e Inducción*, del *Manual de
+  Puestos y Funciones* y de la guía de uso de la página (`src/data/asistente/`). Cada respuesta dice de qué
+  manual y sección viene. Entiende sinónimos y distintas formas de preguntar (motor en `src/lib/asistente/motor.ts`).
+- **Datos en vivo** (`src/lib/asistente/consultas.ts`): cuánto hay y precio de un producto, qué se está acabando,
+  incidencias de reparto y reportes, repartos pendientes, apartados vencidos/por vencer, resumen de pedidos,
+  estado de un folio (V-1001), ventas de hoy, cobros pendientes, confiabilidad de conteos. Respeta los permisos
+  de cada puesto.
+- **Respuestas calculadas**: qué camisa toca hoy/mañana/tal día, días de vacaciones según años de antigüedad.
+- Sugerencias según el puesto, pestaña "Todas las preguntas" por categoría, 👍/👎 en cada respuesta.
+- También usa las preguntas frecuentes que Gerencia registra en Manuales e Información.
+- **Aprende con el uso**: cada pregunta se guarda; Gerencia ve en "Preguntas sin respuesta" las que no supo
+  contestar o que "no sirvieron" y crea la respuesta en un clic.
+
+### Para aplicarlo en tu Supabase
+Consulta nueva → **todo** `supabase/migrations/0029_asistente_preguntas.sql` → Run.
+
+## 37. Auditoría de exhibición
+
+Regla del Gerente: **todo lo que tiene existencia debe estar exhibido, y lo que se acabó se quita**.
+- Tarjeta "En exhibición" en Inventario (junto a Total de productos): exhibidos vs. productos con existencia,
+  cuántos faltan, cuántos hay que quitar y cuántos esperan confirmación.
+- Pestaña "Exhibición": Falta exhibir · Quitar de exhibición · Por confirmar · Exhibidos · Historial de auditoría.
+- Ventas / Almacén: "Ya lo exhibí" (foto obligatoria, ubicación, cómo es la muestra, material tomado del almacén)
+  o "Ya lo quité" (material que regresa). Queda pendiente; Gerencia confirma o rechaza con motivo.
+  Lo que registra Gerencia se confirma solo.
+- Alertas a todos: "Quitar de exhibición" (se acabó un producto exhibido) y "Exhibir producto" (llegó mercancía
+  de uno sin exhibir). A Gerencia: "Confirmar exhibición".
+- Carga inicial (una sola vez): Gerencia puede marcar como exhibido todo lo que hoy tiene existencia.
+
+### Para aplicarlo en tu Supabase
+Consulta nueva → **todo** `supabase/migrations/0030_auditoria_exhibicion.sql` → Run (crea también el bucket `exhibicion`).
+
+## 38. Precios y Etiquetas (actualización casi automática)
+
+Antes: cada vendedor anotaba los ID de su zona, buscaba precio y rotación uno por uno, calculaba el % a mano y hacía
+las etiquetas (días). Ahora (menú **Precios y Etiquetas**):
+1. **Gerencia sube el Excel** de rotación tal como llega (.xlsx/.xls/.csv). Detecta solas las columnas (ID, rotación,
+   precio y % si vienen), muestra qué va a cambiar y aplica al confirmar.
+2. El descuento sale del Excel o de **Descuentos por rotación** (tabla que Gerencia llena una vez).
+3. Solo lo que cambió entra a **Etiquetas por cambiar**, repartido por **zona** (Pared izquierda / Centro / Pared
+   derecha, editables) con su vendedor. Cambios manuales de precio/descuento/rotación también entran solos.
+4. Cada vendedor: **Mis zonas → seleccionar todo → Imprimir**. Se abre el Generador con todas cargadas: **roja** con
+   precio de antes tachado y % si hay descuento, **azul** si no. Luego **Ya las coloqué**. Gerencia ve el avance.
+
+Primera vez: en **Zonas y vendedores** asigna el vendedor de cada zona y los productos a cada zona (filtra por
+categoría → seleccionar todos → asignar).
+
+### Para aplicarlo
+1. Supabase: consulta nueva → **todo** `supabase/migrations/0031_actualizacion_etiquetas.sql` → Run.
+2. Se agregó la librería `xlsx` (lector de Excel) a `package.json`: Netlify la instala sola al publicar.

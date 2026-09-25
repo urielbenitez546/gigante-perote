@@ -325,6 +325,9 @@
     justify-content:center;
   }
   .etiqueta .price-row{display:flex; align-items:flex-start; line-height:1; white-space:nowrap; max-width:100%;}
+  .etiqueta .antes-row{display:flex; align-items:center; gap:0.4em; font-weight:700; white-space:nowrap; margin-bottom:0.15em;}
+  .etiqueta .antes-row .antes{color:#6b7280; text-decoration:line-through; text-decoration-thickness:0.12em;}
+  .etiqueta .antes-row .desc-badge{background:#C41230; color:#fff; border-radius:0.3em; padding:0.05em 0.35em;}
   .etiqueta .dollar{font-weight:700;}
   .etiqueta .amount{font-weight:800; line-height:0.85;}
   .etiqueta .cents{font-weight:800; vertical-align:top; line-height:1;}
@@ -1174,6 +1177,12 @@ Minimum version required to store current data is: `+i+`.
     const gridCols = fieldRows.length > 0 ? "minmax(0, 42%) minmax(0, 1fr)" : "0 minmax(0, 1fr)";
 
     const precioFmt = formatPrecio(data.precio);
+    const antesFmt = data.precioAntes && Number(data.descuento) > 0 ? formatPrecio(data.precioAntes) : null;
+    const antesHtml = antesFmt ? `
+      <div class="antes-row" style="font-size:${p('unidad')};">
+        <span class="antes">Antes $${antesFmt.entero}${antesFmt.centavos !== null ? "." + antesFmt.centavos : ""}</span>
+        <span class="desc-badge">-${Number(data.descuento).toLocaleString("es-MX", { maximumFractionDigits: 1 })}%</span>
+      </div>` : "";
     const precioHtml = precioFmt ? `
       <div class="price-row">
         <span class="dollar" style="font-size:${p('dollar')}; margin-top:${p('dollar')};">$</span>
@@ -1202,6 +1211,7 @@ Minimum version required to store current data is: `+i+`.
           <div class="fields-price" style="grid-template-columns:${gridCols};">
             <div class="fields">${fieldsHtml}</div>
             <div class="price-col">
+              ${antesHtml}
               ${precioHtml}
               ${data.unidadPrecio ? `<div class="unidad" style="font-size:${p('unidad')}; color:${bg};">${escapeHtml(data.unidadPrecio)}</div>` : ""}
             </div>
@@ -1330,6 +1340,30 @@ Minimum version required to store current data is: `+i+`.
   renderList();
   renderPosGrid();
   renderPreview();
+
+  // ---------- Lote desde "Precios y Etiquetas" (?lote=<clave>) ----------
+  // Precarga de un jalón todas las etiquetas que cambiaron (rojas con
+  // precio de antes y % si tienen descuento; azules si no).
+  (async function cargarLote(){
+    const clave = new URLSearchParams(window.location.search).get("lote");
+    if (!clave) return;
+    let lista = null;
+    try { lista = JSON.parse(localStorage.getItem(clave) || "null"); } catch(e) { lista = null; }
+    if (!Array.isArray(lista) || lista.length === 0){
+      alert("No encontré el lote de etiquetas. Vuelve a “Precios y Etiquetas” y dale Imprimir otra vez.");
+      return;
+    }
+    for (const item of lista){
+      const data = Object.assign(emptyForm(), item);
+      if (data.productId) await ensureQrForProduct(data.productId);
+      productos.push(data);
+    }
+    try { localStorage.removeItem(clave); } catch(e) {}
+    renderList();
+    renderPreview();
+    const hint = document.getElementById("buscarHint");
+    if (hint) hint.textContent = `Se cargaron ${lista.length} etiqueta(s) de “Precios y Etiquetas”. Revisa la vista previa y dale Imprimir todas.`;
+  })();
 
   // ---------- Letrero de descuento (estrella) ----------
 

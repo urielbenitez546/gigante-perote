@@ -19,6 +19,7 @@ import ProductoDetalle from "./pages/productos/ProductoDetalle";
 import PedidosPendientes from "./pages/pedidos/PedidosPendientes";
 import Gastos from "./pages/gastos/Gastos";
 import Capacitacion from "./pages/capacitacion/Capacitacion";
+import PreciosEtiquetas from "./pages/precios/PreciosEtiquetas";
 
 export default function App() {
   return (
@@ -73,6 +74,14 @@ export default function App() {
               }
             />
             <Route path="/capacitacion" element={<Capacitacion />} />
+            <Route
+              path="/precios-etiquetas"
+              element={
+                <ProtectedRoute allowedRoles={["gerencia", "ventas"]}>
+                  <PreciosEtiquetas />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/retiros"
               element={
