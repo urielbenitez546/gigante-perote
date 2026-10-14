@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
-import { Search, Plus, Package, Boxes, ShoppingCart, CheckCircle2, FileText, AlertTriangle, Pencil, QrCode, Store, ClipboardCheck, Undo2, Camera, Check, XCircle } from "lucide-react";
+import { Link, useSearchParams } from "react-router-dom";
+import { Search, Plus, Package, Boxes, ShoppingCart, CheckCircle2, FileText, AlertTriangle, Pencil, QrCode, Store, ClipboardCheck, Undo2, Camera, Check, XCircle, History } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import {
   useProducts,
@@ -559,13 +559,23 @@ export default function Inventario() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <button
-                            onClick={() => setQrProduct(p)}
-                            aria-label="Ver código QR"
-                            className="text-gigante-muted hover:text-gigante-navy"
-                          >
-                            <QrCode size={15} />
-                          </button>
+                          <div className="flex items-center justify-end gap-3">
+                            <Link
+                              to={`/producto/${p.id}`}
+                              aria-label="Ver Kardex del producto"
+                              title="Kardex"
+                              className="text-gigante-muted hover:text-gigante-navy"
+                            >
+                              <History size={15} />
+                            </Link>
+                            <button
+                              onClick={() => setQrProduct(p)}
+                              aria-label="Ver código QR"
+                              className="text-gigante-muted hover:text-gigante-navy"
+                            >
+                              <QrCode size={15} />
+                            </button>
+                          </div>
                         </td>
                         {canEditProduct && (
                           <td className="px-4 py-3 text-right">
@@ -604,6 +614,13 @@ export default function Inventario() {
                               <Pencil size={15} />
                             </button>
                           )}
+                          <Link
+                            to={`/producto/${p.id}`}
+                            aria-label="Ver Kardex del producto"
+                            className="text-gigante-muted hover:text-gigante-navy"
+                          >
+                            <History size={15} />
+                          </Link>
                           <button
                             onClick={() => setQrProduct(p)}
                             aria-label="Ver código QR"
