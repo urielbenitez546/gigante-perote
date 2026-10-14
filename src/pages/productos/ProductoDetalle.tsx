@@ -21,8 +21,10 @@ const ROTACION_BADGE: Record<string, string> = {
 
 type ModalAbierto = "entrada" | "salida" | "conteo" | null;
 
-export default function ProductoDetalle() {
-  const { id } = useParams<{ id: string }>();
+export default function ProductoDetalle({ productId }: { productId?: string } = {}) {
+  const params = useParams<{ id: string }>();
+  const id = productId ?? params.id;
+  const embedded = !!productId;
   const { profile } = useAuth();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
@@ -87,9 +89,11 @@ export default function ProductoDetalle() {
 
   return (
     <div className="max-w-md">
-      <Link to="/inventario" className="inline-flex items-center gap-1 text-sm text-gigante-muted mb-4">
-        <ArrowLeft size={15} /> Inventario
-      </Link>
+      {!embedded && (
+        <Link to="/inventario" className="inline-flex items-center gap-1 text-sm text-gigante-muted mb-4">
+          <ArrowLeft size={15} /> Inventario
+        </Link>
+      )}
 
       <div className="bg-white border border-gigante-border rounded-2xl p-5">
         <div className="flex items-center gap-2 text-gigante-muted text-xs mb-1">

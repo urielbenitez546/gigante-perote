@@ -36,6 +36,7 @@ export interface NavModule {
 export const NAV_MODULES: NavModule[] = [
   { key: "inicio", label: "Inicio", path: "/", roles: ["gerencia", "ventas", "caja", "almacen", "reparto"] },
   { key: "inventario", label: "Inventario", path: "/inventario", roles: ["gerencia", "ventas", "almacen"] },
+  { key: "kardex", label: "Kardex", path: "/kardex", roles: ["gerencia", "almacen"] },
   { key: "ventas", label: "Ventas y Entregas", path: "/ventas", roles: ["gerencia", "ventas", "caja"] },
   { key: "pedidos", label: "Pedidos Pendientes", path: "/pedidos", roles: ["gerencia", "ventas", "almacen", "caja"] },
   { key: "retiros", label: "Retiros en Sucursal", path: "/retiros", roles: ["gerencia", "ventas", "almacen"] },

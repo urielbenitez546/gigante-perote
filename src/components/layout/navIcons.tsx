@@ -14,12 +14,14 @@ import {
   ClipboardList,
   Receipt,
   GraduationCap,
+  History,
   type LucideIcon,
 } from "lucide-react";
 
 export const MODULE_ICONS: Record<string, LucideIcon> = {
   inicio: Home,
   inventario: Package,
+  kardex: History,
   ventas: ShoppingCart,
   pedidos: ClipboardList,
   retiros: Warehouse,
