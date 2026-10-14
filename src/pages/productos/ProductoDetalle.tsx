@@ -1,7 +1,13 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { Package, ArrowLeft } from "lucide-react";
+import { Package, ArrowLeft, PackagePlus, PackageMinus, ClipboardCheck, History } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
+import { useAuth } from "../../context/AuthContext";
+import { useProductKardex } from "../../hooks/useInventory";
+import { useProfileNames } from "../../hooks/useProfileNames";
+import RegistrarEntradaModal from "../../components/inventario/RegistrarEntradaModal";
+import RegistrarSalidaModal from "../../components/inventario/RegistrarSalidaModal";
+import ConteoFisicoModal from "../../components/inventario/ConteoFisicoModal";
 import { ROTACION_LABELS, PRODUCT_UNIT_LABELS, productoId, type Product } from "../../types";
 
 const ROTACION_BADGE: Record<string, string> = {
@@ -13,13 +19,26 @@ const ROTACION_BADGE: Record<string, string> = {
   incorporacion: "bg-purple-100 text-purple-700",
 };
 
+type ModalAbierto = "entrada" | "salida" | "conteo" | null;
+
 export default function ProductoDetalle() {
   const { id } = useParams<{ id: string }>();
+  const { profile } = useAuth();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [modal, setModal] = useState<ModalAbierto>(null);
 
-  useEffect(() => {
+  const { entries: kardex, loading: loadingKardex, reload: reloadKardex } = useProductKardex(id ?? null);
+  const { nameFor } = useProfileNames();
+
+  // Gerencia y Almacén (los "almacenistas") pueden registrar movimientos
+  // y ven el historial completo del Kardex. El resto de roles que
+  // pueden escanear el QR solo ven la ficha de precio/existencia.
+  const puedeOperar = profile?.role === "gerencia" || profile?.role === "almacen";
+  const puedeVerKardex = puedeOperar || profile?.role === "ventas";
+
+  function cargarProducto() {
     if (!id) return;
     setLoading(true);
     supabase
@@ -33,7 +52,18 @@ export default function ProductoDetalle() {
         else setProduct(data as Product);
         setLoading(false);
       });
+  }
+
+  useEffect(() => {
+    cargarProducto();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  function onSuccess() {
+    setModal(null);
+    cargarProducto();
+    reloadKardex();
+  }
 
   if (loading) {
     return <p className="text-sm text-gigante-muted">Cargando producto...</p>;
@@ -111,7 +141,100 @@ export default function ProductoDetalle() {
             <p className="text-base font-semibold text-gigante-navy">{disponible}</p>
           </div>
         </div>
+
+        {product.last_counted_at && (
+          <p className="text-xs text-gigante-muted mt-3 text-center">
+            Último conteo físico: {new Date(product.last_counted_at).toLocaleString("es-MX")}
+          </p>
+        )}
       </div>
+
+      {/* Kardex digital: reemplaza la hoja blanca de papel detrás de la
+          etiqueta amarilla. Se accede escaneando el QR del producto. */}
+      {puedeOperar && (
+        <div className="grid grid-cols-3 gap-2 mt-4">
+          <button
+            onClick={() => setModal("entrada")}
+            className="flex flex-col items-center gap-1 bg-white border border-gigante-border rounded-xl py-3 text-xs font-medium text-gigante-navy hover:bg-gigante-bg"
+          >
+            <PackagePlus size={18} /> Entrada
+          </button>
+          <button
+            onClick={() => setModal("salida")}
+            className="flex flex-col items-center gap-1 bg-white border border-gigante-border rounded-xl py-3 text-xs font-medium text-gigante-navy hover:bg-gigante-bg"
+          >
+            <PackageMinus size={18} /> Salida
+          </button>
+          <button
+            onClick={() => setModal("conteo")}
+            className="flex flex-col items-center gap-1 bg-white border border-gigante-border rounded-xl py-3 text-xs font-medium text-gigante-navy hover:bg-gigante-bg"
+          >
+            <ClipboardCheck size={18} /> Conteo
+          </button>
+        </div>
+      )}
+
+      {puedeVerKardex && (
+        <div className="bg-white border border-gigante-border rounded-2xl p-5 mt-4">
+          <h2 className="text-sm font-bold text-gigante-navy flex items-center gap-2 mb-3">
+            <History size={16} /> Kardex — historial de movimientos
+          </h2>
+          {loadingKardex ? (
+            <p className="text-xs text-gigante-muted">Cargando historial...</p>
+          ) : kardex.length === 0 ? (
+            <p className="text-xs text-gigante-muted">Este producto todavía no tiene movimientos registrados.</p>
+          ) : (
+            <ul className="space-y-3 max-h-96 overflow-y-auto">
+              {kardex.map((e) => (
+                <li key={e.id} className="text-xs border-b border-gigante-border/60 pb-2 last:border-0">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-gigante-navy">{e.detalle}</span>
+                    {e.cantidad !== null && (
+                      <span
+                        className={`font-semibold ${
+                          e.signo > 0 ? "text-emerald-700" : e.signo < 0 ? "text-gigante-red" : "text-gigante-muted"
+                        }`}
+                      >
+                        {e.signo > 0 ? "+" : e.signo < 0 ? "−" : ""}
+                        {e.cantidad}
+                      </span>
+                    )}
+                  </div>
+                  {e.referencia && <p className="text-gigante-muted mt-0.5">{e.referencia}</p>}
+                  <p className="text-gigante-muted mt-0.5">
+                    {new Date(e.fecha).toLocaleString("es-MX")} · {nameFor(e.created_by)}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {modal === "entrada" && (
+        <RegistrarEntradaModal
+          products={[product]}
+          initialProductId={product.id}
+          onClose={() => setModal(null)}
+          onSuccess={onSuccess}
+        />
+      )}
+      {modal === "salida" && (
+        <RegistrarSalidaModal
+          products={[product]}
+          initialProductId={product.id}
+          onClose={() => setModal(null)}
+          onSuccess={onSuccess}
+        />
+      )}
+      {modal === "conteo" && (
+        <ConteoFisicoModal
+          products={[product]}
+          initialProductId={product.id}
+          onClose={() => setModal(null)}
+          onSuccess={onSuccess}
+        />
+      )}
     </div>
   );
 }

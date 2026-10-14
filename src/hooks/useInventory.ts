@@ -73,6 +73,135 @@ export async function registerInventoryEntry(
   return { error: error?.message ?? null };
 }
 
+/** Registra una salida MANUAL de almacén (muestra, traspaso, corrección...).
+ * Las salidas por venta, merma o exhibición ya se registran solas; esta es
+ * para todo lo demás, parte del Kardex digital. */
+export async function registerInventorySalida(
+  productId: string,
+  quantity: number,
+  reference: string
+) {
+  const { error } = await supabase.rpc("register_inventory_salida", {
+    p_product_id: productId,
+    p_quantity: quantity,
+    p_reference: reference || null,
+  });
+  return { error: error?.message ?? null };
+}
+
+/** Línea de tiempo del Kardex de UN producto: junta sus movimientos
+ * (entradas/salidas/ajustes/merma/exhibición) y sus conteos físicos en
+ * un solo historial, más reciente primero. Es lo que se ve al escanear
+ * el código QR de la etiqueta amarilla del producto. */
+export interface KardexEntry {
+  id: string;
+  fecha: string;
+  tipo: "movimiento" | "conteo";
+  detalle: string;
+  cantidad: number | null;
+  signo: 1 | -1 | 0;
+  referencia: string | null;
+  created_by: string | null;
+}
+
+export function useProductKardex(productId: string | null) {
+  const [entries, setEntries] = useState<KardexEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const reload = useCallback(async () => {
+    if (!productId) {
+      setEntries([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+
+    const [movRes, countRes] = await Promise.all([
+      supabase
+        .from("inventory_movements")
+        .select("id, type, quantity, reference, created_by, created_at")
+        .eq("product_id", productId)
+        .order("created_at", { ascending: false })
+        .limit(200),
+      supabase
+        .from("inventory_counts")
+        .select("id, sistema, contado, diferencia, notas, created_by, created_at")
+        .eq("product_id", productId)
+        .order("created_at", { ascending: false })
+        .limit(100),
+    ]);
+
+    if (movRes.error) {
+      setError(movRes.error.message);
+      setLoading(false);
+      return;
+    }
+    if (countRes.error) {
+      setError(countRes.error.message);
+      setLoading(false);
+      return;
+    }
+    setError(null);
+
+    const movs: KardexEntry[] = (movRes.data ?? []).map((m) => ({
+      id: `mov-${m.id}`,
+      fecha: m.created_at,
+      tipo: "movimiento",
+      detalle: MOVEMENT_KARDEX_LABELS[m.type as string] ?? m.type,
+      cantidad: m.quantity,
+      signo: MOVEMENT_KARDEX_SIGNO[m.type as string] ?? 0,
+      referencia: m.reference,
+      created_by: m.created_by,
+    }));
+
+    const counts: KardexEntry[] = (countRes.data ?? []).map((c) => ({
+      id: `conteo-${c.id}`,
+      fecha: c.created_at,
+      tipo: "conteo",
+      detalle:
+        c.diferencia === 0
+          ? "Conteo físico: coincidió con el sistema"
+          : `Conteo físico: contaron ${c.contado} (sistema decía ${c.sistema})`,
+      cantidad: Math.abs(c.diferencia),
+      signo: c.diferencia === 0 ? 0 : c.diferencia > 0 ? 1 : -1,
+      referencia: c.notas,
+      created_by: c.created_by,
+    }));
+
+    setEntries(
+      [...movs, ...counts].sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
+    );
+    setLoading(false);
+  }, [productId]);
+
+  useEffect(() => {
+    reload();
+  }, [reload]);
+
+  return { entries, loading, error, reload };
+}
+
+const MOVEMENT_KARDEX_LABELS: Record<string, string> = {
+  entrada: "Entrada de mercancía",
+  salida: "Salida manual",
+  ajuste: "Ajuste de inventario",
+  merma: "Merma (material dañado)",
+  exhibicion: "Salió a exhibición",
+  regreso_exhibicion: "Regresó de exhibición",
+  conteo: "Ajuste por conteo físico",
+};
+
+const MOVEMENT_KARDEX_SIGNO: Record<string, 1 | -1> = {
+  entrada: 1,
+  salida: -1,
+  ajuste: 1,
+  merma: -1,
+  exhibicion: -1,
+  regreso_exhibicion: 1,
+  conteo: 1,
+};
+
 /** Actualiza el precio, la rotación y/o los datos de etiqueta de un
  * producto (Gerencia y Almacén). */
 export async function updateProductComercial(

@@ -59,7 +59,8 @@ export default function CodigoQrModal({ product, onClose }: Props) {
 
         <p className="text-xs text-gigante-muted mt-3">
           Al escanearlo, cualquier colaborador con sesión iniciada ve el precio, el descuento y la
-          existencia de este producto.
+          existencia de este producto. Gerencia y Almacén además ven el Kardex (historial de entradas,
+          salidas y conteos) y pueden registrar movimientos ahí mismo.
         </p>
 
         <div className="flex gap-3 pt-4">

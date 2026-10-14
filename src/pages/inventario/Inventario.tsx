@@ -13,6 +13,7 @@ import {
 import { usePurchaseInvoices, useWriteOffs } from "../../hooks/usePurchases";
 import { useProfileNames } from "../../hooks/useProfileNames";
 import RegistrarEntradaModal from "../../components/inventario/RegistrarEntradaModal";
+import RegistrarSalidaModal from "../../components/inventario/RegistrarSalidaModal";
 import RegistrarFacturaModal from "../../components/inventario/RegistrarFacturaModal";
 import RegistrarMermaModal from "../../components/inventario/RegistrarMermaModal";
 import EditarProductoComercialModal from "../../components/inventario/EditarProductoComercialModal";
@@ -134,6 +135,7 @@ export default function Inventario() {
     setSearchParams({});
   }
   const [showEntradaModal, setShowEntradaModal] = useState(false);
+  const [showSalidaModal, setShowSalidaModal] = useState(false);
   const [showFacturaModal, setShowFacturaModal] = useState(false);
   const [showMermaModal, setShowMermaModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -184,6 +186,11 @@ export default function Inventario() {
 
   function handleEntradaSuccess() {
     setShowEntradaModal(false);
+    reload();
+    reloadMovements();
+  }
+  function handleSalidaSuccess() {
+    setShowSalidaModal(false);
     reload();
     reloadMovements();
   }
@@ -313,6 +320,12 @@ export default function Inventario() {
               className="flex items-center gap-2 border border-gigante-border text-gigante-navy text-sm font-semibold rounded-lg px-4 py-2.5"
             >
               <ClipboardCheck size={16} /> Conteo físico
+            </button>
+            <button
+              onClick={() => setShowSalidaModal(true)}
+              className="flex items-center gap-2 border border-gigante-border text-gigante-navy text-sm font-semibold rounded-lg px-4 py-2.5"
+            >
+              <Boxes size={16} /> Registrar salida
             </button>
             <button
               onClick={() => setShowEntradaModal(true)}
@@ -1170,6 +1183,13 @@ export default function Inventario() {
           products={products}
           onClose={() => setShowEntradaModal(false)}
           onSuccess={handleEntradaSuccess}
+        />
+      )}
+      {showSalidaModal && (
+        <RegistrarSalidaModal
+          products={products}
+          onClose={() => setShowSalidaModal(false)}
+          onSuccess={handleSalidaSuccess}
         />
       )}
       {showFacturaModal && (

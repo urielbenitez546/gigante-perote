@@ -6,12 +6,14 @@ import { registerInventoryEntry } from "../../hooks/useInventory";
 
 interface Props {
   products: Product[];
+  initialProductId?: string;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export default function RegistrarEntradaModal({ products, onClose, onSuccess }: Props) {
-  const [productId, setProductId] = useState("");
+export default function RegistrarEntradaModal({ products, initialProductId = "", onClose, onSuccess }: Props) {
+  const [productId, setProductId] = useState(initialProductId);
+  const lockProduct = products.length === 1 && !!initialProductId;
   const [quantity, setQuantity] = useState("");
   const [reference, setReference] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -55,7 +57,13 @@ export default function RegistrarEntradaModal({ products, onClose, onSuccess }: 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gigante-navy mb-1">Producto</label>
-            <ProductSearchSelect products={products} value={productId} onChange={setProductId} />
+            {lockProduct ? (
+              <p className="text-sm text-gigante-navy bg-gigante-bg rounded-lg px-3 py-2.5">
+                {products[0].code} — {products[0].name}
+              </p>
+            ) : (
+              <ProductSearchSelect products={products} value={productId} onChange={setProductId} />
+            )}
           </div>
 
           <div>
