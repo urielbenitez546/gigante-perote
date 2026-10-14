@@ -1,10 +1,22 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { X, Plus, Trash2 } from "lucide-react";
-import type { Product, DeliveryType } from "../../types";
+import type { Product, DeliveryType, TipoPrecio } from "../../types";
 import { calcularSemaforo, PRODUCT_UNIT_LABELS } from "../../types";
 import ProductSearchSelect from "../common/ProductSearchSelect";
 import { DELIVERY_TYPE_LABELS } from "../../types";
 import { registerSale, type SaleItemInput } from "../../hooks/useSales";
+
+const money = (n: number) => `$${n.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+/** Precio final de un producto según el tipo de precio elegido (igual
+ * que calcula register_sale en el servidor, para que el total mostrado
+ * aquí coincida con lo que de verdad se va a cobrar). */
+function precioSegunTipo(p: Product, tipo: TipoPrecio): number {
+  if (tipo === "promocion") {
+    return Math.round(p.unit_price * (1 - (p.descuento_porcentaje ?? 0) / 100) * 100) / 100;
+  }
+  return p.unit_price;
+}
 
 interface Props {
   products: Product[];
@@ -17,6 +29,7 @@ interface DraftItem {
   product_id: string;
   quantity: number;
   delivery_type: DeliveryType | ""; // "" = usa el tipo general de la venta
+  tipo_precio: TipoPrecio;
 }
 
 export default function NuevaVentaModal({ products, onClose, onSuccess }: Props) {
@@ -26,7 +39,7 @@ export default function NuevaVentaModal({ products, onClose, onSuccess }: Props)
   const [deliveryType, setDeliveryType] = useState<DeliveryType>("inmediata");
   const [pickupDate, setPickupDate] = useState("");
   const [items, setItems] = useState<DraftItem[]>([
-    { key: crypto.randomUUID(), product_id: "", quantity: 1, delivery_type: "" },
+    { key: crypto.randomUUID(), product_id: "", quantity: 1, delivery_type: "", tipo_precio: "publico" },
   ]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,14 +55,14 @@ export default function NuevaVentaModal({ products, onClose, onSuccess }: Props)
   const total = useMemo(() => {
     return items.reduce((sum, item) => {
       const p = products.find((prod) => prod.id === item.product_id);
-      return sum + (p ? p.unit_price * item.quantity : 0);
+      return sum + (p ? precioSegunTipo(p, item.tipo_precio) * item.quantity : 0);
     }, 0);
   }, [items, products]);
 
   function addItem() {
     setItems((prev) => [
       ...prev,
-      { key: crypto.randomUUID(), product_id: "", quantity: 1, delivery_type: "" },
+      { key: crypto.randomUUID(), product_id: "", quantity: 1, delivery_type: "", tipo_precio: "publico" },
     ]);
   }
 
@@ -85,9 +98,10 @@ export default function NuevaVentaModal({ products, onClose, onSuccess }: Props)
       }
     }
 
-    const payloadItems: SaleItemInput[] = items.map(({ product_id, quantity, delivery_type }) => ({
+    const payloadItems: SaleItemInput[] = items.map(({ product_id, quantity, delivery_type, tipo_precio }) => ({
       product_id,
       quantity,
+      tipo_precio,
       ...(delivery_type ? { delivery_type } : {}),
     }));
 
@@ -248,6 +262,28 @@ export default function NuevaVentaModal({ products, onClose, onSuccess }: Props)
                         {item.product_id ? `disp: ${disponible}` : ""}
                       </span>
                     </div>
+                    {(() => {
+                      const p = products.find((prod) => prod.id === item.product_id);
+                      if (!p || !p.descuento_porcentaje) return null;
+                      return (
+                        <div className="mt-1.5 flex items-center gap-2">
+                          <select
+                            value={item.tipo_precio}
+                            onChange={(e) => updateItem(item.key, { tipo_precio: e.target.value as TipoPrecio })}
+                            className={`text-[11px] rounded-lg border px-2 py-1.5 font-medium ${
+                              item.tipo_precio === "promocion"
+                                ? "border-gigante-red text-gigante-red bg-gigante-red/5"
+                                : "border-gigante-border text-gigante-navy"
+                            }`}
+                          >
+                            <option value="publico">Precio Público — {money(p.unit_price)}</option>
+                            <option value="promocion">
+                              Precio Promoción (-{p.descuento_porcentaje}%) — {money(precioSegunTipo(p, "promocion"))}
+                            </option>
+                          </select>
+                        </div>
+                      );
+                    })()}
                     {(() => {
                       const p = products.find((prod) => prod.id === item.product_id);
                       if (!p) return null;

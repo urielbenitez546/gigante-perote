@@ -31,6 +31,7 @@ import {
   repartirEtiquetas,
   reasignarEtiquetas,
   asignarTamanoEtiqueta,
+  revertirLote,
   type FilaActualizacion,
 } from "../../hooks/useEtiquetas";
 import { leerExcel, detectarColumnas, type CampoExcel, type HojaLeida } from "../../lib/excel";
@@ -48,6 +49,7 @@ import {
   productoId,
   productoCoincide,
   type LabelQueueItem,
+  type LabelBatch,
   type Product,
   type ProductRotacion,
   type ResultadoActualizacion,
@@ -1000,26 +1002,73 @@ function Reglas({ onAplicado }: { onAplicado: () => void }) {
 }
 
 // ============================================================ Historial
-function Historial() {
-  const { lotes } = useLabelBatches();
+function Historial({ esGerencia, onRevertido }: { esGerencia: boolean; onRevertido: () => void }) {
+  const { lotes, reload } = useLabelBatches();
   const { nameFor } = useProfileNames();
+  const [trabajando, setTrabajando] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function revertir(l: LabelBatch) {
+    if (!confirm(`¿Revertir "${l.nombre}"? Los productos que no se hayan vuelto a tocar después regresarán a su precio, descuento y rotación de antes.`)) return;
+    setErr(null);
+    setMsg(null);
+    setTrabajando(l.id);
+    const { resultado, error } = await revertirLote(l.id);
+    setTrabajando(null);
+    if (error) return setErr(error);
+    setMsg(
+      `✅ "${l.nombre}": ${resultado?.revertidos ?? 0} producto(s) regresaron a como estaban antes` +
+        (resultado && resultado.omitidos > 0 ? ` (${resultado.omitidos} no se tocaron porque ya habían cambiado después).` : ".")
+    );
+    reload();
+    onRevertido();
+  }
+
   return (
-    <div className="bg-white border border-gigante-border rounded-xl overflow-hidden max-w-3xl">
-      {lotes.length === 0 ? (
-        <p className="p-6 text-sm text-gigante-muted">Todavía no se ha subido ninguna actualización.</p>
-      ) : (
-        <ul className="divide-y divide-gigante-border">
-          {lotes.map((l) => (
-            <li key={l.id} className="px-4 py-3 text-sm">
-              <p className="text-gigante-navy font-medium">{l.nombre}</p>
-              <p className="text-xs text-gigante-muted">
-                {new Date(l.created_at).toLocaleString("es-MX")} · {nameFor(l.created_by)} · {l.filas > 0 && `${l.filas} filas · `}
-                {l.actualizados} cambiaron
-                {l.no_encontrados.length > 0 && ` · ${l.no_encontrados.length} ID no encontrados`}
-              </p>
-            </li>
-          ))}
-        </ul>
+    <div className="space-y-3 max-w-3xl">
+      {err && <p className="text-sm text-gigante-red bg-gigante-red/10 rounded-lg px-3 py-2">{err}</p>}
+      {msg && <p className="text-sm text-emerald-800 bg-emerald-50 rounded-lg px-3 py-2">{msg}</p>}
+      <div className="bg-white border border-gigante-border rounded-xl overflow-hidden">
+        {lotes.length === 0 ? (
+          <p className="p-6 text-sm text-gigante-muted">Todavía no se ha subido ninguna actualización.</p>
+        ) : (
+          <ul className="divide-y divide-gigante-border">
+            {lotes.map((l) => (
+              <li key={l.id} className="px-4 py-3 text-sm flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-gigante-navy font-medium">{l.nombre}</p>
+                  <p className="text-xs text-gigante-muted">
+                    {new Date(l.created_at).toLocaleString("es-MX")} · {nameFor(l.created_by)} · {l.filas > 0 && `${l.filas} filas · `}
+                    {l.actualizados} cambiaron
+                    {l.no_encontrados.length > 0 && ` · ${l.no_encontrados.length} ID no encontrados`}
+                  </p>
+                  {l.revertido_at && (
+                    <p className="text-xs text-amber-700 mt-0.5">
+                      <RotateCcw size={11} className="inline -mt-0.5" /> Revertido el {new Date(l.revertido_at).toLocaleString("es-MX")}
+                      {" "}por {nameFor(l.revertido_por)}
+                    </p>
+                  )}
+                </div>
+                {esGerencia && l.actualizados > 0 && !l.revertido_at && (
+                  <button
+                    onClick={() => revertir(l)}
+                    disabled={trabajando === l.id}
+                    className="shrink-0 inline-flex items-center gap-1 text-xs font-semibold text-gigante-red border border-gigante-red/40 bg-white rounded-lg px-3 py-1.5 disabled:opacity-50"
+                  >
+                    <RotateCcw size={13} /> {trabajando === l.id ? "Revirtiendo..." : "Revertir"}
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      {esGerencia && (
+        <p className="text-[11px] text-gigante-muted">
+          "Revertir" regresa precio, descuento y rotación al valor de antes de ese lote — úsalo cuando termine la
+          temporada de una promoción. Solo afecta a los productos que no se hayan vuelto a tocar después de ese lote.
+        </p>
       )}
     </div>
   );
@@ -1074,7 +1123,7 @@ export default function PreciosEtiquetas() {
         {tab === "cambiar" && <PorCambiar esGerencia={esGerencia} />}
         {tab === "excel" && esGerencia && <SubirExcel onAplicado={() => undefined} />}
         {tab === "reglas" && esGerencia && <Reglas onAplicado={() => undefined} />}
-        {tab === "historial" && <Historial />}
+        {tab === "historial" && <Historial esGerencia={esGerencia} onRevertido={() => setVersion((v) => v + 1)} />}
       </div>
     </div>
   );

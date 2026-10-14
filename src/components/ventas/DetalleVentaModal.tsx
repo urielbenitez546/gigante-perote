@@ -123,6 +123,14 @@ export default function DetalleVentaModal({ sale, onClose, onUpdated }: Props) {
                   </p>
                   <span className="text-[11px] text-gigante-muted">{DELIVERY_TYPE_LABELS[type]}</span>
                 </div>
+                <p className="text-[11px] mt-0.5">
+                  <span className="text-gigante-muted">
+                    ${item.unit_price.toLocaleString("es-MX", { minimumFractionDigits: 2 })} c/u
+                  </span>
+                  {item.tipo_precio === "promocion" && (
+                    <span className="ml-1.5 font-semibold text-gigante-red">Precio Promoción</span>
+                  )}
+                </p>
                 {canChangeItems && pending > 0 && (
                   <button
                     onClick={() => setChangingItem(item)}

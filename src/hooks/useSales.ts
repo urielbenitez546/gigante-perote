@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
-import type { SaleWithItems, DeliveryType, ResumenPedidos } from "../types";
+import type { SaleWithItems, DeliveryType, ResumenPedidos, TipoPrecio } from "../types";
 
 export function useSales() {
   const [sales, setSales] = useState<SaleWithItems[]>([]);
@@ -35,6 +35,8 @@ export interface SaleItemInput {
   product_id: string;
   quantity: number;
   delivery_type?: DeliveryType;
+  /** 'publico' (precio normal, default) o 'promocion' (aplica el % de descuento del producto). */
+  tipo_precio?: TipoPrecio;
 }
 
 export async function registerSale(

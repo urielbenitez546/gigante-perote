@@ -182,6 +182,13 @@ export interface Sale {
   scheduled_pickup_date: string | null;
 }
 
+export type TipoPrecio = "publico" | "promocion";
+
+export const TIPO_PRECIO_LABELS: Record<TipoPrecio, string> = {
+  publico: "Precio Público",
+  promocion: "Precio Promoción",
+};
+
 export interface SaleItem {
   id: string;
   sale_id: string;
@@ -190,6 +197,7 @@ export interface SaleItem {
   unit_price: number;
   delivery_type: DeliveryType | null;
   delivered_quantity: number;
+  tipo_precio: TipoPrecio;
   product?: Pick<Product, "code" | "name" | "unit">;
 }
 
@@ -567,6 +575,8 @@ export interface LabelBatch {
   no_encontrados: string[];
   created_by: string | null;
   created_at: string;
+  revertido_at: string | null;
+  revertido_por: string | null;
 }
 
 export interface ResultadoActualizacion {

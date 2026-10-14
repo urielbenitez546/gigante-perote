@@ -131,3 +131,14 @@ export async function aplicarActualizacion(nombre: string, filas: FilaActualizac
   });
   return { resultado: (data as ResultadoActualizacion | null) ?? null, error: error?.message ?? null };
 }
+
+/** Revierte un lote de Excel/reglas: regresa precio, rotación y descuento
+ * a como estaban antes de ese lote (solo en los productos que no se hayan
+ * vuelto a tocar después). Solo Gerencia. */
+export async function revertirLote(loteId: string) {
+  const { data, error } = await supabase.rpc("revertir_lote_etiquetas", { p_lote_id: loteId });
+  return {
+    resultado: (data as { revertidos: number; omitidos: number; nombre: string } | null) ?? null,
+    error: error?.message ?? null,
+  };
+}
