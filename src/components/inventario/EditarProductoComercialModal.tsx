@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { X } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { updateProductComercial, updateProductDescuento } from "../../hooks/useInventory";
-import { ROTACION_LABELS, PRODUCT_UNIT_LABELS, type Product, type ProductRotacion } from "../../types";
+import { ROTACION_LABELS, PRODUCT_UNIT_LABELS, tienePermiso, type Product, type ProductRotacion } from "../../types";
 
 interface Props {
   product: Product;
@@ -16,7 +16,7 @@ export default function EditarProductoComercialModal({ product, onClose, onSucce
   const { profile } = useAuth();
   // Precio, Rotación y datos de etiqueta: Gerencia y Almacén.
   // % de Descuento: Gerencia y Ventas.
-  const canEditPrecioRotacion = profile?.role === "gerencia" || profile?.role === "almacen";
+  const canEditPrecioRotacion = tienePermiso(profile, "editar_precios");
   const canEditDescuento = profile?.role === "gerencia" || profile?.role === "ventas";
 
   const [precio, setPrecio] = useState(String(product.unit_price));

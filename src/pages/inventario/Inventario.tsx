@@ -26,6 +26,7 @@ import {
   PRODUCT_UNIT_LABELS,
   SEMAFORO_LABELS,
   calcularSemaforo,
+  tienePermiso,
   productoCoincide,
   productoId,
   estadoExhibicion,
@@ -105,7 +106,7 @@ export default function Inventario() {
   const [revision, setRevision] = useState<{ id: string; comentario: string } | null>(null);
   const [exhError, setExhError] = useState<string | null>(null);
   const [exhMsg, setExhMsg] = useState<string | null>(null);
-  const puedeExhibir = profile?.role === "gerencia" || profile?.role === "ventas" || profile?.role === "almacen";
+  const puedeExhibir = tienePermiso(profile, "pedir_exhibicion");
   const esGerencia = profile?.role === "gerencia";
   const [conteoModal, setConteoModal] = useState<{ productId?: string } | null>(null);
 
@@ -141,9 +142,9 @@ export default function Inventario() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [qrProduct, setQrProduct] = useState<Product | null>(null);
 
-  const canManage = profile?.role === "gerencia" || profile?.role === "almacen";
+  const canManage = tienePermiso(profile, "operar_almacen");
   const canEditProduct =
-    profile?.role === "gerencia" || profile?.role === "almacen" || profile?.role === "ventas";
+    profile?.role === "gerencia" || profile?.role === "ventas" || tienePermiso(profile, "editar_precios");
 
   const categories = useMemo(
     () => ["Todas", ...Array.from(new Set(products.map((p) => p.category)))],

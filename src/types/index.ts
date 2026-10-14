@@ -4,6 +4,80 @@
 // "Auxiliar de Almacén", "Chofer") se mapean a estos roles funcionales.
 export type AppRole = "gerencia" | "ventas" | "caja" | "almacen" | "reparto";
 
+// Nivel dentro del rol "almacen". El rol del sistema es el mismo para los tres
+// (para no tocar todos los permisos de la base de datos); el nivel decide cuánto
+// puede modificar cada quien:
+//  - jefe:        todo lo que hace Almacén hoy (incluye editar precio/rotación).
+//  - auxiliar:    opera el almacén (entradas, salidas, conteos, facturas, merma,
+//                 retiros) pero NO edita precio/rotación ni datos del producto.
+//  - almacenista: solo consulta (inventario, pedidos, retiros, calculadora) y
+//                 actualiza el Kardex (entrada/salida/conteo). No modifica nada más.
+export type NivelAlmacen = "jefe" | "auxiliar" | "almacenista";
+
+export const NIVEL_ALMACEN_LABELS: Record<NivelAlmacen, string> = {
+  jefe: "Jefe de almacén",
+  auxiliar: "Auxiliar de almacén",
+  almacenista: "Almacenista / cargador",
+};
+
+/** Nivel efectivo de una persona de Almacén (si no tiene, se asume jefe, como era antes). */
+export function nivelAlmacen(p: Pick<Profile, "role" | "nivel_almacen"> | null | undefined): NivelAlmacen | null {
+  if (!p || p.role !== "almacen") return null;
+  return p.nivel_almacen ?? "jefe";
+}
+
+// ----- Permisos por persona -------------------------------------------------
+// Cada persona parte de lo que le toca por su rol/nivel; Gerencia puede
+// prender o apagar permisos sueltos (se guardan en profiles.permisos).
+// OJO: los valores por defecto de abajo deben coincidir con la función
+// tiene_permiso() de Supabase (migración 0022).
+export type PermisoKey =
+  | "editar_precios"
+  | "operar_almacen"
+  | "kardex"
+  | "confirmar_retiros"
+  | "pedir_exhibicion";
+
+export const PERMISOS: { key: PermisoKey; label: string; ayuda: string }[] = [
+  { key: "editar_precios", label: "Editar precio, rotación y datos del producto", ayuda: "Botón de lápiz en Inventario." },
+  { key: "operar_almacen", label: "Operar almacén desde Inventario", ayuda: "Registrar entradas, salidas, facturas, dar de baja material y conteos." },
+  { key: "kardex", label: "Actualizar el Kardex", ayuda: "Registrar entrada, salida y conteo desde la ficha del producto." },
+  { key: "confirmar_retiros", label: "Confirmar retiros en sucursal", ayuda: "Marcar que el cliente ya recogió su mercancía." },
+  { key: "pedir_exhibicion", label: "Pedir exhibir o retirar producto de piso", ayuda: "Solicitudes de exhibición en Inventario." },
+];
+
+export function permisoPorDefecto(
+  role: AppRole,
+  nivel: NivelAlmacen | null | undefined,
+  key: PermisoKey
+): boolean {
+  if (role === "gerencia") return true;
+  const n = role === "almacen" ? (nivel ?? "jefe") : null;
+  const operativo = n === "jefe" || n === "auxiliar";
+  switch (key) {
+    case "editar_precios":
+      return n === "jefe";
+    case "operar_almacen":
+      return operativo;
+    case "kardex":
+      return role === "almacen";
+    case "confirmar_retiros":
+    case "pedir_exhibicion":
+      return role === "ventas" || operativo;
+  }
+}
+
+export function tienePermiso(
+  p: Pick<Profile, "role" | "nivel_almacen" | "permisos"> | null | undefined,
+  key: PermisoKey
+): boolean {
+  if (!p) return false;
+  if (p.role === "gerencia") return true;
+  const o = p.permisos?.[key];
+  if (typeof o === "boolean") return o;
+  return permisoPorDefecto(p.role, p.nivel_almacen, key);
+}
+
 export interface Profile {
   id: string; // = auth.users.id
   full_name: string;
@@ -12,6 +86,8 @@ export interface Profile {
   // Puesto real de la persona (ej. "Jefe de Almacén"), distinto del
   // rol del sistema — solo es informativo, no afecta permisos.
   puesto: string | null;
+  nivel_almacen?: NivelAlmacen | null;
+  permisos?: Partial<Record<PermisoKey, boolean>> | null;
   active: boolean;
   created_at: string;
 }

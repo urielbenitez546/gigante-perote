@@ -8,7 +8,7 @@ import { useProfileNames } from "../../hooks/useProfileNames";
 import RegistrarEntradaModal from "../../components/inventario/RegistrarEntradaModal";
 import RegistrarSalidaModal from "../../components/inventario/RegistrarSalidaModal";
 import ConteoFisicoModal from "../../components/inventario/ConteoFisicoModal";
-import { ROTACION_LABELS, PRODUCT_UNIT_LABELS, productoId, type Product } from "../../types";
+import { ROTACION_LABELS, PRODUCT_UNIT_LABELS, productoId, tienePermiso, type Product } from "../../types";
 
 const ROTACION_BADGE: Record<string, string> = {
   rapido: "bg-emerald-100 text-emerald-700",
@@ -37,7 +37,7 @@ export default function ProductoDetalle({ productId }: { productId?: string } = 
   // Gerencia y Almacén (los "almacenistas") pueden registrar movimientos
   // y ven el historial completo del Kardex. El resto de roles que
   // pueden escanear el QR solo ven la ficha de precio/existencia.
-  const puedeOperar = profile?.role === "gerencia" || profile?.role === "almacen";
+  const puedeOperar = tienePermiso(profile, "kardex");
   const puedeVerKardex = puedeOperar || profile?.role === "ventas";
 
   function cargarProducto() {

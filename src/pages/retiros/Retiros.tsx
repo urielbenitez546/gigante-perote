@@ -5,7 +5,7 @@ import { useSales, registerRetiro } from "../../hooks/useSales";
 import { pendingLinesFor } from "../../lib/pendingLines";
 import ConfirmarEntregaParcialModal from "../../components/ventas/ConfirmarEntregaParcialModal";
 import type { SaleWithItems } from "../../types";
-import { SALE_STATUS_LABELS, DIAS_AVISO_APARTADO, diasRestantesApartado } from "../../types";
+import { SALE_STATUS_LABELS, DIAS_AVISO_APARTADO, diasRestantesApartado, tienePermiso } from "../../types";
 
 const STATUS_BADGE: Record<string, string> = {
   pendiente: "bg-amber-100 text-amber-700",
@@ -19,8 +19,7 @@ export default function Retiros() {
   const [activeSale, setActiveSale] = useState<SaleWithItems | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const canConfirm =
-    profile?.role === "gerencia" || profile?.role === "ventas" || profile?.role === "almacen";
+  const canConfirm = tienePermiso(profile, "confirmar_retiros");
 
   // Ventas que tienen al menos un renglón pendiente de retiro en sucursal
   const withRetiroLines = useMemo(

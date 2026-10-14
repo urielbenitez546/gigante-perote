@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
-import type { AppRole, Profile } from "../types";
+import type { AppRole, NivelAlmacen, PermisoKey, Profile } from "../types";
 
 export function useProfiles() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -34,6 +34,8 @@ export interface UpdateProfileInput {
   fullName?: string;
   puesto?: string | null;
   role?: AppRole;
+  nivelAlmacen?: NivelAlmacen | null;
+  permisos?: Partial<Record<PermisoKey, boolean>>;
   active?: boolean;
 }
 
@@ -42,6 +44,8 @@ export async function updateProfile(profileId: string, input: UpdateProfileInput
   if (input.fullName !== undefined) patch.full_name = input.fullName;
   if (input.puesto !== undefined) patch.puesto = input.puesto;
   if (input.role !== undefined) patch.role = input.role;
+  if (input.nivelAlmacen !== undefined) patch.nivel_almacen = input.nivelAlmacen;
+  if (input.permisos !== undefined) patch.permisos = input.permisos;
   if (input.active !== undefined) patch.active = input.active;
 
   const { error } = await supabase.from("profiles").update(patch).eq("id", profileId);
