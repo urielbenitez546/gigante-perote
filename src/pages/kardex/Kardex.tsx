@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { History } from "lucide-react";
 import { useProducts } from "../../hooks/useInventory";
 import ProductSearchSelect from "../../components/common/ProductSearchSelect";
@@ -9,7 +10,15 @@ import ProductoDetalle from "../productos/ProductoDetalle";
  * entradas, salidas y conteos. Reemplaza la hoja blanca de papel. */
 export default function Kardex() {
   const { products, loading, error } = useProducts();
-  const [productId, setProductId] = useState("");
+  const [params] = useSearchParams();
+  // Al escanear el QR de la etiqueta llegamos con ?producto=<id>.
+  const [productId, setProductId] = useState(params.get("producto") ?? "");
+
+  // Si ya estás en el Kardex y escaneas otro producto, cambia solo.
+  const desdeQr = params.get("producto");
+  useEffect(() => {
+    if (desdeQr) setProductId(desdeQr);
+  }, [desdeQr]);
 
   return (
     <div className="max-w-3xl">

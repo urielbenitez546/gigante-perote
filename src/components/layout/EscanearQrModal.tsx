@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import jsQR from "jsqr";
 import { X, ScanLine, ExternalLink } from "lucide-react";
+import { supabase } from "../../lib/supabaseClient";
+import { useAuth } from "../../context/AuthContext";
+import { tienePermiso } from "../../types";
 
 interface Props {
   onClose: () => void;
@@ -11,12 +14,16 @@ type Estado = "iniciando" | "escaneando" | "sin_permiso" | "no_disponible";
 
 export default function EscanearQrModal({ onClose }: Props) {
   const navigate = useNavigate();
+  const { profile } = useAuth();
+  // Quien trabaja con el Kardex va directo a él; el resto ve la ficha del producto.
+  const iraKardex = tienePermiso(profile, "kardex") || tienePermiso(profile, "kardex_entradas");
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const frameRef = useRef<number>(0);
   const [estado, setEstado] = useState<Estado>("iniciando");
   const [resultadoAjeno, setResultadoAjeno] = useState<string | null>(null);
+  const [encontrado, setEncontrado] = useState<{ id: string; nombre: string } | null>(null);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -82,8 +89,21 @@ export default function EscanearQrModal({ onClose }: Props) {
       const marcador = `${window.location.origin}/producto/`;
       if (texto.startsWith(marcador)) {
         const id = texto.slice(marcador.length).split(/[/?#]/)[0];
-        onClose();
-        navigate(`/producto/${id}`);
+        if (!iraKardex) {
+          onClose();
+          navigate(`/producto/${id}`);
+          return;
+        }
+        // Quien trabaja con el Kardex elige: solo consultar o abrir el Kardex.
+        setEncontrado({ id, nombre: "" });
+        supabase
+          .from("products")
+          .select("name, code")
+          .eq("id", id)
+          .maybeSingle()
+          .then(({ data }) => {
+            if (data) setEncontrado({ id, nombre: `${data.code} — ${data.name}` });
+          });
       } else {
         setResultadoAjeno(texto);
       }
@@ -128,7 +148,34 @@ export default function EscanearQrModal({ onClose }: Props) {
           </button>
         </div>
 
-        {resultadoAjeno ? (
+        {encontrado ? (
+          <div className="text-center">
+            <p className="text-xs text-gigante-muted mb-1">Producto escaneado</p>
+            <p className="text-sm font-semibold text-gigante-navy mb-4 min-h-[1.25rem]">
+              {encontrado.nombre || "Cargando..."}
+            </p>
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={() => {
+                  onClose();
+                  navigate(`/kardex?producto=${encontrado.id}`);
+                }}
+                className="bg-gigante-red hover:bg-gigante-redDark text-white rounded-lg py-3 text-sm font-semibold"
+              >
+                Abrir Kardex
+              </button>
+              <button
+                onClick={() => {
+                  onClose();
+                  navigate(`/inventario?producto=${encontrado.id}`);
+                }}
+                className="border border-gigante-border text-gigante-navy rounded-lg py-3 text-sm font-semibold"
+              >
+                Ver inventario
+              </button>
+            </div>
+          </div>
+        ) : resultadoAjeno ? (
           <div>
             <p className="text-sm text-gigante-navy mb-2">
               Esto no es un producto de tu sistema, pero esto es lo que decía el código:

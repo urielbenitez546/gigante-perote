@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ClipboardCheck } from "lucide-react";
+import { ClipboardCheck, Tag } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import {
   registerInventoryEntry,
@@ -8,6 +8,7 @@ import {
 } from "../../hooks/useInventory";
 import { useProfileNames } from "../../hooks/useProfileNames";
 import ConteoFisicoModal from "./ConteoFisicoModal";
+import EtiquetaKardexModal from "./EtiquetaKardexModal";
 import { PRODUCT_UNIT_LABELS, productoId, tienePermiso, type Product } from "../../types";
 
 interface Props {
@@ -46,6 +47,7 @@ export default function KardexFormato({ product, onChanged }: Props) {
   const [guardando, setGuardando] = useState(false);
   const [msg, setMsg] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null);
   const [conteoAbierto, setConteoAbierto] = useState(false);
+  const [etiquetaAbierta, setEtiquetaAbierta] = useState(false);
 
   const unidad = PRODUCT_UNIT_LABELS[product.unit];
   const stock = Number(product.physical_stock);
@@ -116,12 +118,20 @@ export default function KardexFormato({ product, onChanged }: Props) {
           <p className="text-[11px] text-gigante-muted">FO-GIGANTE-KAR-00</p>
         </div>
         {puedeEntrada && (
-          <button
-            onClick={() => setConteoAbierto(true)}
-            className="flex items-center gap-1.5 border border-gigante-border text-gigante-navy text-xs font-medium rounded-lg px-3 py-2 hover:bg-gigante-bg"
-          >
-            <ClipboardCheck size={14} /> Conteo físico
-          </button>
+          <div className="flex gap-2 flex-wrap justify-end">
+            <button
+              onClick={() => setEtiquetaAbierta(true)}
+              className="flex items-center gap-1.5 border border-gigante-border text-gigante-navy text-xs font-medium rounded-lg px-3 py-2 hover:bg-gigante-bg"
+            >
+              <Tag size={14} /> Etiqueta amarilla
+            </button>
+            <button
+              onClick={() => setConteoAbierto(true)}
+              className="flex items-center gap-1.5 border border-gigante-border text-gigante-navy text-xs font-medium rounded-lg px-3 py-2 hover:bg-gigante-bg"
+            >
+              <ClipboardCheck size={14} /> Conteo físico
+            </button>
+          </div>
         )}
       </div>
 
@@ -265,6 +275,8 @@ export default function KardexFormato({ product, onChanged }: Props) {
       {!puedeAnotar && (
         <p className="text-xs text-gigante-muted mt-3">Solo consulta: tu usuario no puede anotar renglones en el Kardex.</p>
       )}
+
+      {etiquetaAbierta && <EtiquetaKardexModal product={product} onClose={() => setEtiquetaAbierta(false)} />}
 
       {conteoAbierto && (
         <ConteoFisicoModal
