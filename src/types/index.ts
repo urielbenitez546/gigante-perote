@@ -209,6 +209,16 @@ export function precioPublico(p: Pick<Product, "unit_price" | "precio_lista">): 
   return p.precio_lista != null ? Number(p.precio_lista) : Number(p.unit_price);
 }
 
+/** Precio de promoción: para productos con lista de precios es el de SIGAM
+ * tal cual (sin descuento extra); para los demás, el de siempre
+ * (unit_price menos el % de descuento). */
+export function precioPromocion(
+  p: Pick<Product, "unit_price" | "precio_lista" | "descuento_porcentaje">
+): number {
+  if (p.precio_lista != null) return Number(p.unit_price);
+  return Number(p.unit_price) * (1 - Number(p.descuento_porcentaje ?? 0) / 100);
+}
+
 export type SemaforoStatus = "verde" | "amarillo" | "rojo";
 
 export const SEMAFORO_LABELS: Record<SemaforoStatus, string> = {

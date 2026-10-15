@@ -92,15 +92,16 @@ export default function ProductoDetalle({ productId }: { productId?: string } = 
 
         <div className="mt-4">
           {product.precio_lista != null ? (
-            <div className="flex items-baseline gap-3 flex-wrap">
-              <span className="text-2xl font-bold text-gigante-navy">
+            <div className="flex items-baseline gap-2">
+              <span className="text-lg text-gigante-muted line-through">
                 ${precioPublico(product).toLocaleString("es-MX", { minimumFractionDigits: 2 })}
               </span>
-              <span className="text-sm text-gigante-muted">precio público</span>
-              <span className="text-lg font-bold text-emerald-700">
-                ${precioFinal.toLocaleString("es-MX", { minimumFractionDigits: 2 })}
+              <span className="text-2xl font-bold text-emerald-700">
+                ${Number(product.unit_price).toLocaleString("es-MX", { minimumFractionDigits: 2 })}
               </span>
-              <span className="text-sm text-gigante-muted">promoción</span>
+              <span className="text-xs font-semibold bg-emerald-100 text-emerald-700 rounded-full px-2 py-0.5">
+                Promoción
+              </span>
             </div>
           ) : tieneDescuento ? (
             <div className="flex items-baseline gap-2">

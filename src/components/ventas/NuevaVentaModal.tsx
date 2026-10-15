@@ -13,6 +13,7 @@ const money = (n: number) => `$${n.toLocaleString("es-MX", { minimumFractionDigi
  * aquí coincida con lo que de verdad se va a cobrar). */
 function precioSegunTipo(p: Product, tipo: TipoPrecio): number {
   if (tipo === "promocion") {
+    if (p.precio_lista != null) return Math.round(Number(p.unit_price) * 100) / 100;
     return Math.round(p.unit_price * (1 - (p.descuento_porcentaje ?? 0) / 100) * 100) / 100;
   }
   return precioPublico(p);
@@ -278,7 +279,7 @@ export default function NuevaVentaModal({ products, onClose, onSuccess }: Props)
                           >
                             <option value="publico">Precio Público — {money(precioPublico(p))}</option>
                             <option value="promocion">
-                              Precio Promoción (-{p.descuento_porcentaje}%) — {money(precioSegunTipo(p, "promocion"))}
+                              Precio Promoción{p.precio_lista != null ? "" : ` (-${p.descuento_porcentaje}%)`} — {money(precioSegunTipo(p, "promocion"))}
                             </option>
                           </select>
                         </div>

@@ -31,6 +31,7 @@ import {
   productoId,
   estadoExhibicion,
   precioPublico,
+  precioPromocion,
   type DisplayRequest,
   type EstadoExhibicion,
   type Product,
@@ -54,7 +55,7 @@ const ROTACION_BADGE: Record<ProductRotacion, string> = {
 };
 
 function precioConDescuento(p: Product): number {
-  return p.unit_price * (1 - (p.descuento_porcentaje ?? 0) / 100);
+  return precioPromocion(p);
 }
 
 const MOVEMENT_LABELS: Record<string, string> = {
@@ -544,11 +545,11 @@ export default function Inventario() {
                         <td className="px-4 py-3 text-right text-gigante-navy">
                           {p.precio_lista != null ? (
                             <>
-                              <span className="font-semibold">
+                              <span className="line-through text-gigante-muted text-xs mr-1">
                                 ${precioPublico(p).toLocaleString("es-MX", { minimumFractionDigits: 2 })}
                               </span>
-                              <span className="block text-[11px] text-emerald-700">
-                                Promo ${precioConDescuento(p).toLocaleString("es-MX", { minimumFractionDigits: 2 })}
+                              <span className="font-semibold text-emerald-700">
+                                ${precioConDescuento(p).toLocaleString("es-MX", { minimumFractionDigits: 2 })}
                               </span>
                             </>
                           ) : p.descuento_porcentaje > 0 ? (
@@ -647,11 +648,11 @@ export default function Inventario() {
                         </span>
                         {p.precio_lista != null ? (
                           <span className="text-xs">
-                            <span className="font-semibold text-gigante-navy mr-1">
+                            <span className="line-through text-gigante-muted mr-1">
                               ${precioPublico(p).toLocaleString("es-MX", { minimumFractionDigits: 2 })}
                             </span>
-                            <span className="text-emerald-700">
-                              Promo ${precioConDescuento(p).toLocaleString("es-MX", { minimumFractionDigits: 2 })}
+                            <span className="font-semibold text-emerald-700">
+                              ${precioConDescuento(p).toLocaleString("es-MX", { minimumFractionDigits: 2 })}
                             </span>
                           </span>
                         ) : p.descuento_porcentaje > 0 ? (

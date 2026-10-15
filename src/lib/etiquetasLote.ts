@@ -33,18 +33,22 @@ export interface EtiquetaLote {
 }
 
 export function etiquetaDesdeProducto(p: Product): EtiquetaLote {
-  const desc = Number(p.descuento_porcentaje ?? 0);
-  const final = p.unit_price * (1 - desc / 100);
+  // Con lista de precios: tachado = precio público de la lista, final = precio SIGAM (promoción).
+  const conLista = p.precio_lista != null;
+  const desc = conLista
+    ? Math.max(0, Math.round((1 - Number(p.unit_price) / Number(p.precio_lista)) * 100))
+    : Number(p.descuento_porcentaje ?? 0);
+  const final = conLista ? Number(p.unit_price) : p.unit_price * (1 - desc / 100);
   return {
     productId: p.id,
     nombre: p.name,
     id: productoId(p) || p.code,
     marca: p.brand || "PORCELANITE",
     precio: final.toFixed(2),
-    precioAntes: desc > 0 ? Number(p.unit_price).toFixed(2) : "",
+    precioAntes: conLista ? Number(p.precio_lista).toFixed(2) : desc > 0 ? Number(p.unit_price).toFixed(2) : "",
     descuento: desc,
     unidadPrecio: UNIDAD[p.unit] ?? "",
-    headerColor: desc > 0 ? "red" : "navy",
+    headerColor: desc > 0 || conLista ? "red" : "navy",
     color: p.color ?? "",
     medida: p.medida ?? "",
     tipo: p.tipo ?? "",

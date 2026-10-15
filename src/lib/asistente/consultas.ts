@@ -5,6 +5,8 @@ import {
   diasRestantesApartado,
   DIAS_AVISO_APARTADO,
   SALE_STATUS_LABELS,
+  precioPromocion,
+  precioPublico,
   type AppRole,
   type Product,
   type ProductUnit,
@@ -125,7 +127,7 @@ function respuestaStock(productos: Product[], quierePrecio: boolean): RespuestaD
     const p = productos[0];
     const disp = p.physical_stock - p.sold_pending;
     const estado = calcularSemaforo(p);
-    const precioFinal = p.unit_price * (1 - (p.descuento_porcentaje ?? 0) / 100);
+    const precioFinal = precioPromocion(p);
     const lineas = [
       `• Disponible para vender: ${fmt(Math.max(disp, 0))} ${unidad(p.unit, disp)} (${SEMAFORO_TXT[estado]})`,
       `• Existencia física en almacén: ${fmt(p.physical_stock)}`,
@@ -133,7 +135,9 @@ function respuestaStock(productos: Product[], quierePrecio: boolean): RespuestaD
     ];
     if ((p.exhibition_stock ?? 0) > 0) lineas.push(`• En exhibición (tienda): ${fmt(p.exhibition_stock)}`);
     lineas.push(
-      p.descuento_porcentaje > 0
+      p.precio_lista != null
+        ? `• Precio público: ${money(precioPublico(p))} · Promoción: ${money(precioFinal)} por ${unidad(p.unit, 1)}`
+        : p.descuento_porcentaje > 0
         ? `• Precio: ${money(precioFinal)} por ${unidad(p.unit, 1)} (${p.descuento_porcentaje}% de descuento; lista ${money(p.unit_price)})`
         : `• Precio: ${money(p.unit_price)} por ${unidad(p.unit, 1)}`
     );
@@ -160,7 +164,7 @@ function respuestaStock(productos: Product[], quierePrecio: boolean): RespuestaD
         const disp = p.physical_stock - p.sold_pending;
         const e = calcularSemaforo(p);
         const dot = e === "verde" ? "🟢" : e === "amarillo" ? "🟡" : "🔴";
-        const precio = p.unit_price * (1 - (p.descuento_porcentaje ?? 0) / 100);
+        const precio = precioPromocion(p);
         return [String(p.external_id ?? "—"), p.code, p.name, `${dot} ${fmt(Math.max(disp, 0))} ${unidad(p.unit, disp)}`, money(precio)];
       }),
     },
