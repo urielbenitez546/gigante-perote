@@ -15,6 +15,7 @@ import {
   Receipt,
   GraduationCap,
   History,
+  FileSpreadsheet,
   type LucideIcon,
 } from "lucide-react";
 
@@ -33,6 +34,7 @@ export const MODULE_ICONS: Record<string, LucideIcon> = {
   asistente: MessageCircle,
   calculadora: Calculator,
   precios: Tags,
+  "lista-precios": FileSpreadsheet,
   etiquetas: Tag,
   administracion: Settings,
 };

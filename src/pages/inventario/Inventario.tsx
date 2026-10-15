@@ -30,6 +30,7 @@ import {
   productoCoincide,
   productoId,
   estadoExhibicion,
+  precioPublico,
   type DisplayRequest,
   type EstadoExhibicion,
   type Product,
@@ -541,7 +542,16 @@ export default function Inventario() {
                           })()}
                         </td>
                         <td className="px-4 py-3 text-right text-gigante-navy">
-                          {p.descuento_porcentaje > 0 ? (
+                          {p.precio_lista != null ? (
+                            <>
+                              <span className="font-semibold">
+                                ${precioPublico(p).toLocaleString("es-MX", { minimumFractionDigits: 2 })}
+                              </span>
+                              <span className="block text-[11px] text-emerald-700">
+                                Promo ${precioConDescuento(p).toLocaleString("es-MX", { minimumFractionDigits: 2 })}
+                              </span>
+                            </>
+                          ) : p.descuento_porcentaje > 0 ? (
                             <>
                               <span className="line-through text-gigante-muted text-xs mr-1">
                                 ${p.unit_price.toLocaleString("es-MX")}
@@ -635,7 +645,16 @@ export default function Inventario() {
                         <span className={`text-xs rounded-full px-2 py-0.5 ${ROTACION_BADGE[p.rotacion]}`}>
                           {ROTACION_LABELS[p.rotacion]}
                         </span>
-                        {p.descuento_porcentaje > 0 ? (
+                        {p.precio_lista != null ? (
+                          <span className="text-xs">
+                            <span className="font-semibold text-gigante-navy mr-1">
+                              ${precioPublico(p).toLocaleString("es-MX", { minimumFractionDigits: 2 })}
+                            </span>
+                            <span className="text-emerald-700">
+                              Promo ${precioConDescuento(p).toLocaleString("es-MX", { minimumFractionDigits: 2 })}
+                            </span>
+                          </span>
+                        ) : p.descuento_porcentaje > 0 ? (
                           <span className="text-xs">
                             <span className="line-through text-gigante-muted mr-1">
                               ${p.unit_price.toLocaleString("es-MX")}

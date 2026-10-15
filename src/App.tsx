@@ -20,6 +20,7 @@ import PedidosPendientes from "./pages/pedidos/PedidosPendientes";
 import Gastos from "./pages/gastos/Gastos";
 import Capacitacion from "./pages/capacitacion/Capacitacion";
 import Kardex from "./pages/kardex/Kardex";
+import ListaPrecios from "./pages/listaprecios/ListaPrecios";
 import PreciosEtiquetas from "./pages/precios/PreciosEtiquetas";
 
 export default function App() {
@@ -55,6 +56,14 @@ export default function App() {
               element={
                 <ProtectedRoute allowedRoles={["gerencia", "almacen"]}>
                   <Kardex />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/lista-precios"
+              element={
+                <ProtectedRoute allowedRoles={["gerencia"]}>
+                  <ListaPrecios />
                 </ProtectedRoute>
               }
             />

@@ -4,7 +4,7 @@ import { Package, ArrowLeft } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
 import { useAuth } from "../../context/AuthContext";
 import KardexFormato from "../../components/inventario/KardexFormato";
-import { ROTACION_LABELS, PRODUCT_UNIT_LABELS, productoId, tienePermiso, type Product } from "../../types";
+import { ROTACION_LABELS, PRODUCT_UNIT_LABELS, productoId, precioPublico, tienePermiso, type Product } from "../../types";
 
 const ROTACION_BADGE: Record<string, string> = {
   rapido: "bg-emerald-100 text-emerald-700",
@@ -91,7 +91,18 @@ export default function ProductoDetalle({ productId }: { productId?: string } = 
         </p>
 
         <div className="mt-4">
-          {tieneDescuento ? (
+          {product.precio_lista != null ? (
+            <div className="flex items-baseline gap-3 flex-wrap">
+              <span className="text-2xl font-bold text-gigante-navy">
+                ${precioPublico(product).toLocaleString("es-MX", { minimumFractionDigits: 2 })}
+              </span>
+              <span className="text-sm text-gigante-muted">precio público</span>
+              <span className="text-lg font-bold text-emerald-700">
+                ${precioFinal.toLocaleString("es-MX", { minimumFractionDigits: 2 })}
+              </span>
+              <span className="text-sm text-gigante-muted">promoción</span>
+            </div>
+          ) : tieneDescuento ? (
             <div className="flex items-baseline gap-2">
               <span className="text-lg text-gigante-muted line-through">
                 ${product.unit_price.toLocaleString("es-MX", { minimumFractionDigits: 2 })}

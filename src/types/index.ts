@@ -139,6 +139,7 @@ export const NAV_MODULES: NavModule[] = [
   { key: "asistente", label: "Asistente de Consulta", path: "/asistente", roles: ["gerencia", "ventas", "caja", "almacen", "reparto"] },
   { key: "calculadora", label: "Calculadora", path: "/calculadora", roles: ["gerencia", "ventas", "caja", "almacen", "reparto"] },
   { key: "precios", label: "Precios y Etiquetas", path: "/precios-etiquetas", roles: ["gerencia", "ventas"] },
+  { key: "lista-precios", label: "Lista de precios público", path: "/lista-precios", roles: ["gerencia"] },
   { key: "etiquetas", label: "Generador de Etiquetas", path: "/etiquetas", roles: ["gerencia", "ventas", "caja"] },
   { key: "administracion", label: "Administración", path: "/administracion", roles: ["gerencia"] },
 ];
@@ -177,6 +178,10 @@ export interface Product {
   physical_stock: number;
   sold_pending: number;
   unit_price: number;
+  /** Precio público con IVA de una lista aparte (Helvex, Proyecta...). null = no aplica. */
+  precio_lista?: number | null;
+  precio_lista_fuente?: string | null;
+  precio_lista_at?: string | null;
   rotacion: ProductRotacion;
   descuento_porcentaje: number;
   stock_minimo: number;
@@ -196,6 +201,12 @@ export interface Product {
   external_id: string | null;
   active: boolean;
   created_at: string;
+}
+
+/** Precio público de un producto: el de su lista (Excel de la marca) si la
+ * tiene; si no, el de SIGAM. Igual que cobra register_sale en el servidor. */
+export function precioPublico(p: Pick<Product, "unit_price" | "precio_lista">): number {
+  return p.precio_lista != null ? Number(p.precio_lista) : Number(p.unit_price);
 }
 
 export type SemaforoStatus = "verde" | "amarillo" | "rojo";

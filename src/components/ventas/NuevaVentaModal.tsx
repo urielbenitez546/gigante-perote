@@ -1,7 +1,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { X, Plus, Trash2 } from "lucide-react";
 import type { Product, DeliveryType, TipoPrecio } from "../../types";
-import { calcularSemaforo, PRODUCT_UNIT_LABELS } from "../../types";
+import { calcularSemaforo, PRODUCT_UNIT_LABELS, precioPublico } from "../../types";
 import ProductSearchSelect from "../common/ProductSearchSelect";
 import { DELIVERY_TYPE_LABELS } from "../../types";
 import { registerSale, type SaleItemInput } from "../../hooks/useSales";
@@ -15,7 +15,7 @@ function precioSegunTipo(p: Product, tipo: TipoPrecio): number {
   if (tipo === "promocion") {
     return Math.round(p.unit_price * (1 - (p.descuento_porcentaje ?? 0) / 100) * 100) / 100;
   }
-  return p.unit_price;
+  return precioPublico(p);
 }
 
 interface Props {
@@ -276,7 +276,7 @@ export default function NuevaVentaModal({ products, onClose, onSuccess }: Props)
                                 : "border-gigante-border text-gigante-navy"
                             }`}
                           >
-                            <option value="publico">Precio Público — {money(p.unit_price)}</option>
+                            <option value="publico">Precio Público — {money(precioPublico(p))}</option>
                             <option value="promocion">
                               Precio Promoción (-{p.descuento_porcentaje}%) — {money(precioSegunTipo(p, "promocion"))}
                             </option>
