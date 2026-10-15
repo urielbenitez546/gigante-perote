@@ -100,6 +100,8 @@ export interface KardexEntry {
   detalle: string;
   cantidad: number | null;
   signo: 1 | -1 | 0;
+  /** Cuánto cambió la existencia física con este renglón (+ entra, − sale). */
+  delta: number;
   referencia: string | null;
   created_by: string | null;
 }
@@ -144,16 +146,24 @@ export function useProductKardex(productId: string | null) {
     }
     setError(null);
 
-    const movs: KardexEntry[] = (movRes.data ?? []).map((m) => ({
-      id: `mov-${m.id}`,
-      fecha: m.created_at,
-      tipo: "movimiento",
-      detalle: MOVEMENT_KARDEX_LABELS[m.type as string] ?? m.type,
-      cantidad: m.quantity,
-      signo: MOVEMENT_KARDEX_SIGNO[m.type as string] ?? 0,
-      referencia: m.reference,
-      created_by: m.created_by,
-    }));
+    // Los movimientos tipo "conteo" se omiten: el conteo ya viene completo
+    // (sistema / contado / diferencia) desde inventory_counts y saldría doble.
+    const movs: KardexEntry[] = (movRes.data ?? [])
+      .filter((m) => (m.type as string) !== "conteo")
+      .map((m) => {
+        const signo = MOVEMENT_KARDEX_SIGNO[m.type as string] ?? 0;
+        return {
+          id: `mov-${m.id}`,
+          fecha: m.created_at,
+          tipo: "movimiento" as const,
+          detalle: MOVEMENT_KARDEX_LABELS[m.type as string] ?? (m.type as string),
+          cantidad: m.quantity as number,
+          signo,
+          delta: signo * Number(m.quantity),
+          referencia: m.reference as string | null,
+          created_by: m.created_by as string | null,
+        };
+      });
 
     const counts: KardexEntry[] = (countRes.data ?? []).map((c) => ({
       id: `conteo-${c.id}`,
@@ -165,6 +175,7 @@ export function useProductKardex(productId: string | null) {
           : `Conteo físico: contaron ${c.contado} (sistema decía ${c.sistema})`,
       cantidad: Math.abs(c.diferencia),
       signo: c.diferencia === 0 ? 0 : c.diferencia > 0 ? 1 : -1,
+      delta: Number(c.diferencia),
       referencia: c.notas,
       created_by: c.created_by,
     }));

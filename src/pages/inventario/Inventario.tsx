@@ -14,6 +14,7 @@ import { usePurchaseInvoices, useWriteOffs } from "../../hooks/usePurchases";
 import { useProfileNames } from "../../hooks/useProfileNames";
 import RegistrarEntradaModal from "../../components/inventario/RegistrarEntradaModal";
 import RegistrarSalidaModal from "../../components/inventario/RegistrarSalidaModal";
+import ReportarIncidenteModal from "../../components/inventario/ReportarIncidenteModal";
 import RegistrarFacturaModal from "../../components/inventario/RegistrarFacturaModal";
 import RegistrarMermaModal from "../../components/inventario/RegistrarMermaModal";
 import EditarProductoComercialModal from "../../components/inventario/EditarProductoComercialModal";
@@ -139,6 +140,7 @@ export default function Inventario() {
   const [showSalidaModal, setShowSalidaModal] = useState(false);
   const [showFacturaModal, setShowFacturaModal] = useState(false);
   const [showMermaModal, setShowMermaModal] = useState(false);
+  const [showIncidenteModal, setShowIncidenteModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [qrProduct, setQrProduct] = useState<Product | null>(null);
 
@@ -298,18 +300,29 @@ export default function Inventario() {
         </div>
         {canManage && (
           <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => setShowFacturaModal(true)}
-              className="flex items-center gap-2 border border-gigante-border text-gigante-navy text-sm font-semibold rounded-lg px-4 py-2.5"
-            >
-              <FileText size={16} /> Registrar factura
-            </button>
-            <button
-              onClick={() => setShowMermaModal(true)}
-              className="flex items-center gap-2 border border-gigante-border text-gigante-navy text-sm font-semibold rounded-lg px-4 py-2.5"
-            >
-              <AlertTriangle size={16} /> Dar de baja
-            </button>
+            {tienePermiso(profile, "registrar_facturas") && (
+              <button
+                onClick={() => setShowFacturaModal(true)}
+                className="flex items-center gap-2 border border-gigante-border text-gigante-navy text-sm font-semibold rounded-lg px-4 py-2.5"
+              >
+                <FileText size={16} /> Registrar factura
+              </button>
+            )}
+            {tienePermiso(profile, "dar_de_baja") ? (
+              <button
+                onClick={() => setShowMermaModal(true)}
+                className="flex items-center gap-2 border border-gigante-border text-gigante-navy text-sm font-semibold rounded-lg px-4 py-2.5"
+              >
+                <AlertTriangle size={16} /> Dar de baja
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowIncidenteModal(true)}
+                className="flex items-center gap-2 border border-gigante-border text-gigante-navy text-sm font-semibold rounded-lg px-4 py-2.5"
+              >
+                <AlertTriangle size={16} /> Reportar incidente
+              </button>
+            )}
             <button
               onClick={() => setTab("exhibicion")}
               className="flex items-center gap-2 border border-gigante-border text-gigante-navy text-sm font-semibold rounded-lg px-4 py-2.5"
@@ -1202,6 +1215,9 @@ export default function Inventario() {
           onClose={() => setShowEntradaModal(false)}
           onSuccess={handleEntradaSuccess}
         />
+      )}
+      {showIncidenteModal && (
+        <ReportarIncidenteModal products={products} onClose={() => setShowIncidenteModal(false)} />
       )}
       {showSalidaModal && (
         <RegistrarSalidaModal

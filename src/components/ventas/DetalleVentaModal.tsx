@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { X, CheckCircle2, Trash2, ArrowLeftRight, CalendarClock } from "lucide-react";
 import type { SaleItem, SaleWithItems } from "../../types";
-import { DELIVERY_TYPE_LABELS, SALE_STATUS_LABELS, DIAS_AVISO_APARTADO, diasRestantesApartado } from "../../types";
+import { DELIVERY_TYPE_LABELS, SALE_STATUS_LABELS, DIAS_AVISO_APARTADO, diasRestantesApartado, tienePermiso } from "../../types";
 import CambiarProductoModal from "./CambiarProductoModal";
 import { useAuth } from "../../context/AuthContext";
 import { useProfileNames } from "../../hooks/useProfileNames";
@@ -17,6 +17,7 @@ export default function DetalleVentaModal({ sale, onClose, onUpdated }: Props) {
   const { profile } = useAuth();
   const { nameFor } = useProfileNames();
   const canRegisterPayment = profile?.role === "gerencia" || profile?.role === "caja";
+  const canCorrectPayment = tienePermiso(profile, "corregir_cobros");
   const canDelete = profile?.role === "gerencia";
   const canChangeItems = profile?.role === "gerencia" || profile?.role === "ventas";
   const [changingItem, setChangingItem] = useState<SaleItem | null>(null);
@@ -200,7 +201,13 @@ export default function DetalleVentaModal({ sale, onClose, onUpdated }: Props) {
               </p>
             )}
 
-            {canRegisterPayment && (
+            {canRegisterPayment && hasPayment && !canCorrectPayment && (
+              <p className="text-[11px] text-gigante-muted mt-3">
+                El cobro ya quedó registrado. Solo Gerencia puede corregir el monto cobrado.
+              </p>
+            )}
+
+            {canRegisterPayment && (!hasPayment || canCorrectPayment) && (
               <div className="mt-3">
                 {editing ? (
                   <div className="flex items-center gap-2">

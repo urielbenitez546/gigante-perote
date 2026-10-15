@@ -12,7 +12,7 @@ export default function Kardex() {
   const [productId, setProductId] = useState("");
 
   return (
-    <div className="max-w-md">
+    <div className="max-w-3xl">
       <h1 className="text-xl font-bold text-gigante-navy flex items-center gap-2">
         <History size={22} /> Kardex
       </h1>

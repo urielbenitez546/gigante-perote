@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import { Truck, CheckCircle2, Clock, XCircle } from "lucide-react";
 import { useDeliveries } from "../../hooks/useDeliveries";
 import { DELIVERY_STATUS_LABELS } from "../../types";
-import RepartosMap from "../../components/repartos/RepartosMap";
 
 const STATUS_BADGE: Record<string, string> = {
   pendiente: "bg-gigante-bg text-gigante-navy",
@@ -23,11 +22,6 @@ export default function Repartos() {
     return { hoy, completados, enCamino, pendientes };
   }, [deliveries]);
 
-  const mapDeliveries = useMemo(
-    () => deliveries.filter((d) => d.status === "pendiente" || d.status === "en_camino"),
-    [deliveries]
-  );
-
   return (
     <div className="max-w-6xl">
       <h1 className="text-xl font-bold text-gigante-navy flex items-center gap-2">
@@ -35,10 +29,6 @@ export default function Repartos() {
       </h1>
       <p className="text-sm text-gigante-muted mt-1">Controla y da seguimiento a las entregas</p>
 
-      <div className="mt-4 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-lg px-3 py-2">
-        Las ubicaciones del mapa son aproximadas (DEMO) — el prototipo todavía no geocodifica
-        direcciones reales. Una versión futura podría incorporar un servicio de rutas más avanzado.
-      </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
         <div className="bg-white border border-gigante-border rounded-xl p-4">
@@ -74,10 +64,6 @@ export default function Repartos() {
       {error && (
         <p className="mt-4 text-sm text-gigante-red bg-gigante-red/10 rounded-lg px-3 py-2">{error}</p>
       )}
-
-      <div className="mt-5">
-        <RepartosMap deliveries={mapDeliveries} />
-      </div>
 
       <div className="mt-5 bg-white border border-gigante-border rounded-xl overflow-hidden">
         {loading ? (

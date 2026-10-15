@@ -35,13 +35,21 @@ export type PermisoKey =
   | "editar_precios"
   | "operar_almacen"
   | "kardex"
+  | "kardex_entradas"
+  | "registrar_facturas"
+  | "dar_de_baja"
+  | "corregir_cobros"
   | "confirmar_retiros"
   | "pedir_exhibicion";
 
 export const PERMISOS: { key: PermisoKey; label: string; ayuda: string }[] = [
   { key: "editar_precios", label: "Editar precio, rotación y datos del producto", ayuda: "Botón de lápiz en Inventario." },
   { key: "operar_almacen", label: "Operar almacén desde Inventario", ayuda: "Registrar entradas, salidas, facturas, dar de baja material y conteos." },
-  { key: "kardex", label: "Actualizar el Kardex", ayuda: "Registrar entrada, salida y conteo desde la ficha del producto." },
+  { key: "kardex", label: "Kardex: registrar salidas", ayuda: "Anotar lo que sale de almacén (ej. ventas que se cargan a la camioneta) en el formato del Kardex." },
+  { key: "kardex_entradas", label: "Kardex: registrar entradas y conteos", ayuda: "Anotar entradas de mercancía y conteos físicos en el Kardex." },
+  { key: "registrar_facturas", label: "Registrar facturas de compra", ayuda: "Botón Registrar factura en Inventario." },
+  { key: "dar_de_baja", label: "Dar de baja material dañado", ayuda: "Sin este permiso, la persona solo puede reportar el incidente al Jefe de almacén y a Gerencia." },
+  { key: "corregir_cobros", label: "Corregir el monto cobrado de una venta", ayuda: "Caja solo registra el cobro la primera vez; corregirlo es de Gerencia." },
   { key: "confirmar_retiros", label: "Confirmar retiros en sucursal", ayuda: "Marcar que el cliente ya recogió su mercancía." },
   { key: "pedir_exhibicion", label: "Pedir exhibir o retirar producto de piso", ayuda: "Solicitudes de exhibición en Inventario." },
 ];
@@ -61,6 +69,13 @@ export function permisoPorDefecto(
       return operativo;
     case "kardex":
       return role === "almacen";
+    case "kardex_entradas":
+      return operativo;
+    case "registrar_facturas":
+    case "dar_de_baja":
+      return n === "jefe";
+    case "corregir_cobros":
+      return false;
     case "confirmar_retiros":
     case "pedir_exhibicion":
       return role === "ventas" || operativo;

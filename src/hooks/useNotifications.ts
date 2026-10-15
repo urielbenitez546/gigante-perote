@@ -56,3 +56,14 @@ export async function reportIssue(message: string) {
   const { error } = await supabase.rpc("report_issue", { p_message: message });
   return { error: error?.message ?? null };
 }
+
+/** Reporta un incidente de material dañado: le llega al Jefe de almacén y a
+ * Gerencia, que son quienes deciden si se da de baja. */
+export async function reportIncidenteMaterial(productId: string, quantity: number | null, description: string) {
+  const { error } = await supabase.rpc("reportar_incidente_material", {
+    p_product_id: productId,
+    p_quantity: quantity,
+    p_description: description,
+  });
+  return { error: error?.message ?? null };
+}
