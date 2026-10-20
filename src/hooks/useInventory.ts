@@ -89,6 +89,36 @@ export async function registerInventorySalida(
   return { error: error?.message ?? null };
 }
 
+/** Id del último renglón (entrada o salida) que esta persona registró de un producto:
+ * sirve para colgarle la foto de apoyo justo después de guardarlo. */
+export async function ultimoMovimientoPropio(productId: string, tipo: "entrada" | "salida", userId: string) {
+  const { data, error } = await supabase
+    .from("inventory_movements")
+    .select("id")
+    .eq("product_id", productId)
+    .eq("type", tipo)
+    .eq("created_by", userId)
+    .order("created_at", { ascending: false })
+    .limit(1);
+  if (error || !data || data.length === 0) return null;
+  return data[0].id as string;
+}
+
+/** Cuelga una foto (ya subida a "kardex-soporte") a un renglón del Kardex. Solo si no tenía. */
+export async function adjuntarFotoKardex(movementId: string, path: string) {
+  const { error } = await supabase.rpc("kardex_adjuntar_foto", { p_movement_id: movementId, p_path: path });
+  return { error: error?.message ?? null };
+}
+
+/** Anula un renglón del Kardex (queda tachado con el motivo). Jefe de almacén y Gerencia. */
+export async function anularMovimientoKardex(movementId: string, motivo: string) {
+  const { error } = await supabase.rpc("anular_movimiento_kardex", {
+    p_movement_id: movementId,
+    p_motivo: motivo,
+  });
+  return { error: error?.message ?? null };
+}
+
 /** Línea de tiempo del Kardex de UN producto: junta sus movimientos
  * (entradas/salidas/ajustes/merma/exhibición) y sus conteos físicos en
  * un solo historial, más reciente primero. Es lo que se ve al escanear
@@ -104,6 +134,16 @@ export interface KardexEntry {
   delta: number;
   referencia: string | null;
   created_by: string | null;
+  /** Id real del movimiento (para anularlo); null en los conteos. */
+  movId: string | null;
+  /** Tipo original del movimiento (entrada, salida...). */
+  tipoMov: string | null;
+  /** Si el renglón fue anulado: quién, cuándo y por qué. */
+  anulado: { fecha: string; por: string | null; motivo: string } | null;
+  /** Foto de apoyo (ruta en el bucket privado "kardex-soporte"); solo entradas y salidas. */
+  fotoPath: string | null;
+  /** Sucursal a la que se trasladó (si el renglón es un traslado). */
+  destino: string | null;
 }
 
 export function useProductKardex(productId: string | null) {
@@ -122,7 +162,7 @@ export function useProductKardex(productId: string | null) {
     const [movRes, countRes] = await Promise.all([
       supabase
         .from("inventory_movements")
-        .select("id, type, quantity, reference, created_by, created_at")
+        .select("id, type, quantity, reference, created_by, created_at, anulado_at, anulado_por, anulado_motivo, foto_path, destino")
         .eq("product_id", productId)
         .order("created_at", { ascending: false })
         .limit(200),
@@ -152,16 +192,27 @@ export function useProductKardex(productId: string | null) {
       .filter((m) => (m.type as string) !== "conteo")
       .map((m) => {
         const signo = MOVEMENT_KARDEX_SIGNO[m.type as string] ?? 0;
+        const anulado = m.anulado_at
+          ? { fecha: m.anulado_at as string, por: (m.anulado_por as string | null) ?? null, motivo: (m.anulado_motivo as string | null) ?? "" }
+          : null;
         return {
           id: `mov-${m.id}`,
           fecha: m.created_at,
           tipo: "movimiento" as const,
-          detalle: MOVEMENT_KARDEX_LABELS[m.type as string] ?? (m.type as string),
+          detalle: m.destino
+            ? `Traslado a ${m.destino as string}`
+            : MOVEMENT_KARDEX_LABELS[m.type as string] ?? (m.type as string),
           cantidad: m.quantity as number,
           signo,
-          delta: signo * Number(m.quantity),
+          // Un renglón anulado ya no mueve la existencia (la anulación la corrigió).
+          delta: anulado ? 0 : signo * Number(m.quantity),
           referencia: m.reference as string | null,
           created_by: m.created_by as string | null,
+          movId: m.id as string,
+          tipoMov: m.type as string,
+          anulado,
+          fotoPath: (m.foto_path as string | null) ?? null,
+          destino: (m.destino as string | null) ?? null,
         };
       });
 
@@ -178,6 +229,11 @@ export function useProductKardex(productId: string | null) {
       delta: Number(c.diferencia),
       referencia: c.notas,
       created_by: c.created_by,
+      movId: null,
+      tipoMov: null,
+      anulado: null,
+      fotoPath: null,
+      destino: null,
     }));
 
     setEntries(

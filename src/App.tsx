@@ -20,6 +20,11 @@ import PedidosPendientes from "./pages/pedidos/PedidosPendientes";
 import Gastos from "./pages/gastos/Gastos";
 import Capacitacion from "./pages/capacitacion/Capacitacion";
 import Kardex from "./pages/kardex/Kardex";
+import Kilometraje from "./pages/kilometraje/Kilometraje";
+import PorProgramar from "./pages/programacion/PorProgramar";
+import Traslados from "./pages/traslados/Traslados";
+import Combustible from "./pages/combustible/Combustible";
+import Cotizaciones from "./pages/cotizaciones/Cotizaciones";
 import ListaPrecios from "./pages/listaprecios/ListaPrecios";
 import PreciosEtiquetas from "./pages/precios/PreciosEtiquetas";
 
@@ -54,8 +59,48 @@ export default function App() {
             <Route
               path="/kardex"
               element={
-                <ProtectedRoute allowedRoles={["gerencia", "almacen"]}>
+                <ProtectedRoute allowedRoles={["gerencia", "almacen", "reparto"]}>
                   <Kardex />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/kilometraje"
+              element={
+                <ProtectedRoute allowedRoles={["gerencia", "almacen"]}>
+                  <Kilometraje />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/por-programar"
+              element={
+                <ProtectedRoute allowedRoles={["gerencia", "almacen"]}>
+                  <PorProgramar />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/traslados"
+              element={
+                <ProtectedRoute allowedRoles={["gerencia", "ventas", "almacen"]}>
+                  <Traslados />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/combustible"
+              element={
+                <ProtectedRoute allowedRoles={["gerencia", "reparto", "almacen"]}>
+                  <Combustible />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/cotizaciones"
+              element={
+                <ProtectedRoute allowedRoles={["gerencia", "ventas", "caja"]}>
+                  <Cotizaciones />
                 </ProtectedRoute>
               }
             />

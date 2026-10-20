@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import { NAV_MODULES } from "../../types";
+import { NAV_MODULES, tienePermiso } from "../../types";
 import { useAuth } from "../../context/AuthContext";
 import { MODULE_ICONS } from "./navIcons";
 
@@ -7,7 +7,9 @@ export default function Sidebar() {
   const { profile } = useAuth();
   if (!profile) return null;
 
-  const visibleModules = NAV_MODULES.filter((m) => m.roles.includes(profile.role));
+  const visibleModules = NAV_MODULES.filter(
+    (m) => m.roles.includes(profile.role) && (!m.permiso || tienePermiso(profile, m.permiso))
+  );
 
   return (
     <aside className="hidden md:flex md:flex-col w-64 shrink-0 bg-gigante-navy text-white h-screen sticky top-0">

@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ShoppingCart, Plus } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useProducts } from "../../hooks/useInventory";
 import { useSales } from "../../hooks/useSales";
 import { useProfileNames } from "../../hooks/useProfileNames";
-import { DELIVERY_TYPE_LABELS, SALE_STATUS_LABELS } from "../../types";
+import { DELIVERY_TYPE_LABELS, SALE_STATUS_LABELS, ESTADO_PAGO_LABELS, TIPO_DOCUMENTO_LABELS } from "../../types";
 import NuevaVentaModal from "../../components/ventas/NuevaVentaModal";
 import DetalleVentaModal from "../../components/ventas/DetalleVentaModal";
+import { ESTADO_PAGO_BADGE } from "../../components/ventas/CobroCajaPanel";
 
 const STATUS_BADGE: Record<string, string> = {
   pendiente: "bg-amber-100 text-amber-700",
@@ -14,6 +15,8 @@ const STATUS_BADGE: Record<string, string> = {
   entregada: "bg-emerald-100 text-emerald-700",
   cancelada: "bg-gigante-red/10 text-gigante-red",
 };
+
+type FiltroVentas = "todas" | "caja" | "almacen";
 
 export default function Ventas() {
   const { profile } = useAuth();
@@ -24,6 +27,15 @@ export default function Ventas() {
   const [successFolio, setSuccessFolio] = useState<string | null>(null);
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
   const selectedSale = selectedSaleId ? sales.find((s) => s.id === selectedSaleId) ?? null : null;
+  const esCaja = profile?.role === "caja";
+  const [filtro, setFiltro] = useState<FiltroVentas>(esCaja ? "caja" : "todas");
+
+  const enCaja = useMemo(() => sales.filter((s) => !s.liberada_almacen_at && s.status !== "cancelada"), [sales]);
+  const visibles = useMemo(() => {
+    if (filtro === "caja") return enCaja;
+    if (filtro === "almacen") return sales.filter((s) => !!s.liberada_almacen_at);
+    return sales;
+  }, [sales, enCaja, filtro]);
 
   const canRegisterSale = profile?.role === "gerencia" || profile?.role === "ventas";
 
@@ -64,11 +76,41 @@ export default function Ventas() {
         </p>
       )}
 
-      <div className="mt-5 bg-white border border-gigante-border rounded-xl overflow-hidden">
+      {enCaja.length > 0 && (profile?.role === "caja" || profile?.role === "gerencia") && (
+        <p className="mt-4 text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+          Hay <strong>{enCaja.length}</strong> venta(s) esperando cobro en Caja. Abre el folio, registra el pago y se pasa a almacén.
+        </p>
+      )}
+
+      <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
+        {(
+          [
+            ["todas", "Todas"],
+            ["caja", `Esperando Caja (${enCaja.length})`],
+            ["almacen", "Ya pasaron a almacén"],
+          ] as [FiltroVentas, string][]
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => setFiltro(key)}
+            className={`whitespace-nowrap text-xs rounded-full px-3 py-1.5 border ${
+              filtro === key
+                ? "bg-gigante-navy text-white border-gigante-navy"
+                : "border-gigante-border text-gigante-navy bg-white"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-3 bg-white border border-gigante-border rounded-xl overflow-hidden">
         {loading ? (
           <p className="p-6 text-sm text-gigante-muted">Cargando ventas...</p>
-        ) : sales.length === 0 ? (
-          <p className="p-6 text-sm text-gigante-muted">Todavía no hay ventas registradas.</p>
+        ) : visibles.length === 0 ? (
+          <p className="p-6 text-sm text-gigante-muted">
+            {sales.length === 0 ? "Todavía no hay ventas registradas." : "No hay ventas con este filtro."}
+          </p>
         ) : (
           <>
             <table className="w-full text-sm hidden md:table">
@@ -80,12 +122,13 @@ export default function Ventas() {
                   <th className="text-left font-medium px-4 py-3">Tipo de entrega</th>
                   <th className="text-left font-medium px-4 py-3">Estado</th>
                   <th className="text-right font-medium px-4 py-3">Total</th>
-                  <th className="text-right font-medium px-4 py-3">Cobro</th>
+                  <th className="text-left font-medium px-4 py-3">Documento</th>
+                  <th className="text-left font-medium px-4 py-3">Pago</th>
                   <th className="text-left font-medium px-4 py-3">Fecha</th>
                 </tr>
               </thead>
               <tbody>
-                {sales.map((s) => {
+                {visibles.map((s) => {
                   const pending = Math.max(s.total - s.amount_paid, 0);
                   return (
                   <tr key={s.id} className="border-t border-gigante-border">
@@ -108,13 +151,21 @@ export default function Ventas() {
                     <td className="px-4 py-3 text-right text-gigante-navy">
                       ${s.total.toLocaleString("es-MX", { minimumFractionDigits: 2 })}
                     </td>
-                    <td className="px-4 py-3 text-right whitespace-nowrap">
-                      {pending > 0 ? (
-                        <span className="text-xs text-gigante-red">
+                    <td className="px-4 py-3 text-xs text-gigante-muted whitespace-nowrap">
+                      {TIPO_DOCUMENTO_LABELS[s.tipo_documento]}
+                      {s.numero_orden && <span className="block">Orden {s.numero_orden}</span>}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className={`text-xs rounded-full px-2 py-1 ${ESTADO_PAGO_BADGE[s.estado_pago]}`}>
+                        {ESTADO_PAGO_LABELS[s.estado_pago]}
+                      </span>
+                      {pending > 0 && s.liberada_almacen_at && (
+                        <span className="block text-[11px] text-gigante-red mt-0.5">
                           Faltan ${pending.toLocaleString("es-MX")}
                         </span>
-                      ) : (
-                        <span className="text-xs text-emerald-700">Pagado</span>
+                      )}
+                      {!s.liberada_almacen_at && (
+                        <span className="block text-[11px] text-amber-700 mt-0.5">En Caja</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-gigante-muted whitespace-nowrap">
@@ -127,7 +178,7 @@ export default function Ventas() {
             </table>
 
             <div className="md:hidden divide-y divide-gigante-border">
-              {sales.map((s) => {
+              {visibles.map((s) => {
                 const pending = Math.max(s.total - s.amount_paid, 0);
                 return (
                 <div key={s.id} className="p-4">
@@ -150,11 +201,9 @@ export default function Ventas() {
                     <p className="text-sm font-semibold text-gigante-navy">
                       ${s.total.toLocaleString("es-MX", { minimumFractionDigits: 2 })}
                     </p>
-                    {pending > 0 ? (
-                      <span className="text-xs text-gigante-red">Faltan ${pending.toLocaleString("es-MX")}</span>
-                    ) : (
-                      <span className="text-xs text-emerald-700">Pagado</span>
-                    )}
+                    <span className={`text-xs rounded-full px-2 py-1 ${ESTADO_PAGO_BADGE[s.estado_pago]}`}>
+                      {!s.liberada_almacen_at ? "En Caja" : pending > 0 ? `Faltan $${pending.toLocaleString("es-MX")}` : ESTADO_PAGO_LABELS[s.estado_pago]}
+                    </span>
                   </div>
                 </div>
                 );

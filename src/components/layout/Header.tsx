@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, ChevronDown, LogOut, MessageSquareWarning, CheckCheck, ScanLine } from "lucide-react";
+import { Bell, ChevronDown, LogOut, MessageSquareWarning, CheckCheck, ScanLine, Volume2, VolumeX } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useNotifications } from "../../hooks/useNotifications";
 import { ROLE_LABELS } from "../../types";
 import ReportarProblemaModal from "./ReportarProblemaModal";
 import EscanearQrModal from "./EscanearQrModal";
+import { guardarSonidoActivo, sonarAviso, sonidoActivo } from "../../lib/sonido";
 
 function timeAgo(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -26,6 +27,7 @@ export default function Header() {
   const [notifOpen, setNotifOpen] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [showScanModal, setShowScanModal] = useState(false);
+  const [sonido, setSonido] = useState(sonidoActivo());
 
   if (!profile) return null;
 
@@ -81,6 +83,19 @@ export default function Header() {
             <div className="fixed left-3 right-3 top-16 sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 w-auto sm:w-80 max-h-[70vh] sm:max-h-96 overflow-y-auto bg-white rounded-lg shadow-lg border border-gigante-border z-50">
               <div className="flex items-center justify-between px-3 py-2 border-b border-gigante-border sticky top-0 bg-white">
                 <p className="text-sm font-semibold text-gigante-navy">Notificaciones</p>
+                <button
+                  onClick={() => {
+                    const nuevo = !sonido;
+                    setSonido(nuevo);
+                    guardarSonidoActivo(nuevo);
+                    if (nuevo) sonarAviso();
+                  }}
+                  className="flex items-center gap-1 text-[11px] text-gigante-muted hover:text-gigante-navy"
+                  title="Sonido para entregas inmediatas, ventas por programar y solicitudes de traslado"
+                >
+                  {sonido ? <Volume2 size={13} /> : <VolumeX size={13} />}
+                  {sonido ? "Sonido" : "Sin sonido"}
+                </button>
                 {unreadCount > 0 && (
                   <button
                     onClick={markAllAsRead}

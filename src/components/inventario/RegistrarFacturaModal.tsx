@@ -157,7 +157,8 @@ export default function RegistrarFacturaModal({ products, onClose, onSuccess }: 
                     </div>
                     <input
                       type="number"
-                      min="1"
+                      min="0.01"
+                      step="any"
                       value={item.quantity}
                       onChange={(e) => updateItem(item.key, { quantity: Number(e.target.value) })}
                       className="w-20 rounded-lg border border-gigante-border px-2 py-2 text-xs"

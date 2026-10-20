@@ -1,4 +1,4 @@
-import type { AppRole } from "../types";
+import type { AppRole, NivelAlmacen } from "../types";
 
 // ============================================================
 // Capacitación Express
@@ -18,6 +18,8 @@ export interface Lesson {
   key: string;
   title: string;
   roles: AppRole[];
+  /** Solo para rol Almacén: qué niveles la ven (jefe, auxiliar, almacenista). Sin esto la ven todos. */
+  niveles?: NivelAlmacen[];
   minutos: number;
   path: string;
   paraQue: string;
@@ -122,24 +124,27 @@ export const LESSONS: Lesson[] = [
     roles: ["ventas", "gerencia"],
     minutos: 3,
     path: "/ventas",
-    paraQue: "Dejar la venta en el sistema para que Caja cobre, Almacén aparte el material y Reparto lo entregue.",
+    paraQue:
+      "Dejar la venta en el sistema. Primero pasa a Caja; cuando Caja la cobra, llega a Almacén para entregarla.",
     pasos: [
       "En “Ventas y Entregas” toca “Nueva venta”.",
       "Escribe el nombre del cliente y elige el tipo de entrega: se lo lleva ya, recoge en sucursal o a domicilio.",
-      "Busca cada producto por código o nombre; a un lado ves el semáforo y cuánto hay disponible.",
+      "Elige si es Nota sencilla o Factura, y escribe el número de orden si lo tienes.",
+      "Elige el método de pago: efectivo, tarjeta de débito o crédito, transferencia o “A meses” (ahí solo anotas los meses; Caja ve los intereses).",
+      "Busca cada producto por código o nombre; a un lado ves el semáforo y cuánto hay disponible. Las cantidades pueden llevar decimales.",
       "Si una parte se la lleva hoy y otra se le entrega después, cambia el tipo de entrega de ESE producto.",
-      "Registra la venta y dale al cliente su folio para pasar a Caja.",
+      "Registra la venta y manda al cliente a Caja con su folio. Almacén no la ve hasta que Caja cobre.",
     ],
     tip: "Usa la Calculadora para saber cuántas cajas necesita el cliente según sus m².",
     pregunta: {
-      texto: "El cliente se lleva el monomando hoy y los pisos se los llevamos mañana. ¿Cómo lo registras?",
+      texto: "Registraste una venta y el cliente quiere que el almacén la prepare ya. ¿Qué falta?",
       opciones: [
-        "Dos ventas separadas",
-        "Una venta; el monomando “se lo lleva ya” y los pisos “a domicilio”",
-        "Todo a domicilio",
+        "Nada, almacén la ve de inmediato",
+        "Que pase por Caja y Caja registre el pago",
+        "Avisarle a Gerencia",
       ],
       correcta: 1,
-      explicacion: "Cada producto puede tener su propio tipo de entrega dentro de la misma venta.",
+      explicacion: "Toda venta pasa primero por Caja. Cuando Caja registra el pago, la venta llega a Almacén.",
     },
   },
   {
@@ -187,22 +192,30 @@ export const LESSONS: Lesson[] = [
   // ---------------- Caja ----------------
   {
     key: "caja-cobro",
-    title: "Registrar el cobro en caja",
+    title: "Cobrar y pasar la venta a almacén",
     roles: ["caja", "gerencia"],
-    minutos: 2,
+    minutos: 3,
     path: "/ventas",
-    paraQue: "Dejar registrado cuánto pagó el cliente al momento de la venta (total o anticipo).",
+    paraQue:
+      "Registrar cuánto pagó el cliente. Al hacerlo, la venta llega a Almacén (y, si es entrega inmediata, les suena el aviso para cargar).",
     pasos: [
-      "El cliente llega con su folio. Búscalo en “Ventas y Entregas” y ábrelo.",
-      "Toca “Registrar cobro en caja” y escribe cuánto pagó.",
-      "Si pagó solo una parte, el resto queda “Pendiente de cobro” para la entrega.",
+      "En “Ventas y Entregas” entra al filtro “Esperando Caja” y abre el folio del cliente.",
+      "Escribe cuánto pagó (el total o un anticipo) y confirma el método de pago. Si es “A meses”, anota los meses.",
+      "Si la venta es con factura, escribe el folio de la factura.",
+      "Toca “Registrar pago y pasar a almacén”.",
+      "Excepción: si el cliente pagará todo al recibir en su domicilio, usa “Pasar a almacén sin cobro”. El chofer cobrará el total.",
+      "Lo que falte por pagar queda como saldo: el chofer lo ve en su reparto para cobrarlo.",
     ],
-    tip: "Si una venta se modifica después de cobrada, te llega aviso a la campanita con la diferencia.",
+    tip: "El cobro solo se registra una vez; si hay que corregirlo, lo hace Gerencia.",
     pregunta: {
-      texto: "El total es $1,000 y el cliente deja $700. ¿Qué registras?",
-      opciones: ["$1,000", "$700", "Nada hasta que pague todo"],
+      texto: "El total es $1,000, el cliente deja $700 y el resto lo paga al recibir. ¿Qué pasa al registrar $700?",
+      opciones: [
+        "La venta se queda en Caja hasta que pague todo",
+        "La venta pasa a almacén y el chofer verá $300 por cobrar",
+        "La venta se cancela",
+      ],
       correcta: 1,
-      explicacion: "Se registra lo que realmente pagó; el resto queda pendiente.",
+      explicacion: "Con un pago parcial la venta ya pasa a almacén, y el saldo se calcula solo para el chofer.",
     },
   },
   {
@@ -225,87 +238,417 @@ export const LESSONS: Lesson[] = [
     },
   },
 
-  // ---------------- Almacén ----------------
+  // ---------------- Almacén: para todos (jefe, auxiliar y almacenistas) ----------------
   {
-    key: "almacen-entradas",
-    title: "Entradas, facturas y merma",
+    key: "almacen-escanear",
+    title: "Escanear la etiqueta de un producto",
     roles: ["almacen", "gerencia"],
-    minutos: 3,
-    path: "/inventario",
-    paraQue: "Que el sistema sepa exactamente qué entra y qué se daña.",
+    minutos: 1,
+    path: "/kardex",
+    paraQue: "Llegar al producto en un segundo, sin escribir nada: solo apuntas la cámara al código QR de la etiqueta amarilla.",
     pasos: [
-      "Cuando llega mercancía con factura: “Registrar factura”, captura productos y sube foto de la factura.",
-      "Entrada sin factura: “Registrar entrada”.",
-      "Material roto o dañado: “Dar de baja”, con motivo y foto.",
+      "Arriba a la derecha toca “Escanear” y permite la cámara.",
+      "Apunta al cuadro QR de la etiqueta amarilla del producto.",
+      "Elige: “Abrir Kardex” (para anotar lo que sale) o “Ver inventario” (solo para ver).",
     ],
-    tip: "Captura en el momento: lo que se deja “para al rato” es lo que luego descuadra.",
+    tip: "Si el QR no lee, acércate un poco y que no le dé reflejo de luz.",
     pregunta: {
-      texto: "Se rompieron 2 cajas al descargar. ¿Qué registras?",
-      opciones: ["Nada", "Dar de baja (merma) con foto", "Una venta"],
+      texto: "Solo quieres ver cuántas piezas hay de un producto. ¿Qué eliges al escanear?",
+      opciones: ["Abrir Kardex", "Ver inventario", "Reportar"],
       correcta: 1,
-      explicacion: "Lo dañado va como merma con evidencia.",
+      explicacion: "“Ver inventario” solo te muestra el producto, sin tocar nada.",
     },
   },
   {
-    key: "almacen-exhibicion",
-    title: "Exhibición: todo lo que hay debe estar en la tienda",
-    roles: ["almacen", "ventas", "gerencia"],
-    minutos: 3,
-    path: "/inventario?tab=exhibicion",
-    paraQue:
-      "Que todo producto con existencia esté exhibido y que lo que se acabó se quite, para no ofrecer algo que no hay. Es auditable: queda foto e historial.",
+    key: "almacen-kardex",
+    title: "Kardex: anota lo que sale de almacén",
+    roles: ["almacen", "gerencia"],
+    minutos: 2,
+    path: "/kardex",
+    paraQue: "Es la hoja blanca del Kardex, pero en la página. Cada vez que sacas material para cargarlo a la camioneta, lo anotas aquí y la existencia se actualiza sola.",
     pasos: [
-      "Entra a Inventario → pestaña “Exhibición”. Arriba ves: falta exhibir, quitar de exhibición y por confirmar.",
-      "Cuando coloques un producto en la tienda: “Ya lo exhibí” → toma la foto, escribe dónde quedó y cuánto material tomaste del almacén (0 si es muestrario del proveedor).",
-      "Cuando se acabe un producto exhibido te llega aviso: quítalo y registra “Ya lo quité”.",
-      "Gerencia revisa la foto y confirma o rechaza. Si lo rechaza, te llega el motivo a la campanita.",
+      "En el menú azul entra a “Kardex” y busca el producto (por ID, código o nombre) o escanéalo.",
+      "Abajo de la tabla está el renglón amarillo. En “Salida” escribe cuánto sacas.",
+      "En el cuadro de abajo escribe el folio de la venta (ejemplo: V-1004) o el motivo.",
+      "Toca “Guardar renglón”. Listo: la columna “Existencia” ya se actualizó.",
     ],
-    tip: "Cuando llega mercancía de algo que no está exhibido, a todos les llega el aviso “Exhibir producto”.",
+    tip: "No te deja sacar más de lo que hay. Si te sale un error rojo, léelo: dice qué falta.",
     pregunta: {
-      texto: "Un producto exhibido se quedó sin existencia. ¿Qué haces?",
-      opciones: ["Lo dejo en la tienda", "Lo quito y registro “Ya lo quité”", "Lo marco como merma"],
+      texto: "Vas a cargar 5 cajas a la camioneta. ¿Qué escribes?",
+      opciones: ["5 en “Entrada”", "5 en “Salida” y el folio de la venta", "Nada, se hace solo"],
       correcta: 1,
-      explicacion: "Lo que no tiene existencia se quita para no ofrecerlo, y queda registrado.",
+      explicacion: "Lo que sale va en “Salida” con el folio, para que cuadre con la venta.",
+    },
+  },
+  {
+    key: "almacen-ver",
+    title: "Ver el inventario (sin modificar nada)",
+    roles: ["almacen", "gerencia"],
+    minutos: 2,
+    path: "/inventario",
+    paraQue: "Saber qué hay, cuánto hay y qué se está acabando.",
+    pasos: [
+      "Entra a “Inventario” y escribe en el buscador el ID, código o nombre.",
+      "“Existencia física” es lo que hay en bodega. “Disponibles” es lo que se puede vender (ya sin lo apartado).",
+      "El puntito de color te avisa: verde = hay suficiente, amarillo = se está acabando, rojo = se acabó.",
+    ],
+    tip: "El relojito de cada renglón abre el historial (Kardex) de ese producto.",
+    pregunta: {
+      texto: "El puntito de un producto está en rojo. ¿Qué significa?",
+      opciones: ["Hay de sobra", "Se acabó", "Está en oferta"],
+      correcta: 1,
+      explicacion: "Rojo = ya no queda nada disponible para vender.",
+    },
+  },
+  {
+    key: "almacen-calculadora",
+    title: "La calculadora de metros y cajas",
+    roles: ["almacen", "gerencia"],
+    minutos: 1,
+    path: "/calculadora",
+    paraQue: "Hacer cuentas de cajas, piezas y metros sin errores, por ejemplo al contar o preparar un pedido.",
+    pasos: [
+      "Entra a “Calculadora” y toca el botón “Almacén”.",
+      "Escribe cuántos m² trae cada caja (viene en la etiqueta).",
+      "Escribe las cajas y piezas sueltas que tienes. Te da el total en m².",
+    ],
+    pregunta: {
+      texto: "Tienes 10 cajas y 3 piezas sueltas. ¿Cómo sacas el total en m²?",
+      opciones: ["A ojo", "Con la calculadora, modo “Almacén”", "Preguntando al cliente"],
+      correcta: 1,
+      explicacion: "La calculadora suma cajas y piezas por ti.",
+    },
+  },
+
+  // ---------------- Almacén: jefe y auxiliar ----------------
+  {
+    key: "almacen-entradas",
+    title: "Registrar una entrada (llegó mercancía)",
+    roles: ["almacen", "gerencia"],
+    niveles: ["jefe", "auxiliar"],
+    minutos: 2,
+    path: "/inventario",
+    paraQue: "Que el sistema sepa cuánto material llegó.",
+    pasos: [
+      "En “Inventario” toca el botón rojo “Registrar entrada”.",
+      "Elige el producto y escribe la cantidad que llegó.",
+      "En referencia escribe de dónde viene (ejemplo: número de remisión). Toca guardar.",
+    ],
+    tip: "También puedes anotarla en el Kardex del producto, en la columna “Entrada”.",
+    pregunta: {
+      texto: "Llegó un camión con 20 cajas. ¿Dónde lo anotas?",
+      opciones: ["En “Registrar entrada”", "En “Salida” del Kardex", "No se anota"],
+      correcta: 0,
+      explicacion: "Lo que llega es una entrada.",
     },
   },
   {
     key: "almacen-conteo",
-    title: "Conteo físico diario (adiós al descuadre)",
+    title: "Conteo físico: contar lo que de verdad hay",
     roles: ["almacen", "gerencia"],
-    minutos: 3,
+    niveles: ["jefe", "auxiliar"],
+    minutos: 2,
     path: "/inventario?tab=conteos",
-    paraQue: "Que lo que dice el sistema sea lo que de verdad hay, para que Ventas pueda confiar en él.",
+    paraQue: "Que lo que dice la página sea lo que hay en bodega.",
     pasos: [
-      "Cada día entra a Inventario → pestaña “Conteos físicos”.",
-      "Ahí está la lista “Sugeridos para contar hoy” (unos 10 productos).",
-      "Toca “Contar”, ve a bodega, cuenta y escribe lo que contaste. No te mostramos lo que dice el sistema, para que el conteo sea honesto.",
-      "Si no cuadra, el sistema se corrige solo y le avisa a Gerencia.",
+      "En “Inventario” entra a la pestaña “Conteos físicos”.",
+      "Toca “Contar” en uno de los productos sugeridos de hoy.",
+      "Ve a bodega, cuenta y escribe lo que contaste. No te mostramos lo que dice el sistema, para que el conteo sea honesto.",
     ],
-    tip: "La “Confiabilidad” de arriba es el % de conteos que cuadraron. La meta es 90% o más.",
+    tip: "Si no cuadra, el sistema se corrige solo y le avisa a Gerencia. No pasa nada: sirve para encontrar errores.",
     pregunta: {
       texto: "¿Por qué no te muestra lo que dice el sistema antes de contar?",
-      opciones: ["Por un error", "Para contar “a ciegas” y no copiar el número", "Porque no importa"],
+      opciones: ["Por un error", "Para que cuentes de verdad y no copies el número", "Porque no importa"],
       correcta: 1,
-      explicacion: "Contar a ciegas evita escribir el mismo número sin contar de verdad.",
+      explicacion: "Contar “a ciegas” evita escribir el mismo número sin contar.",
+    },
+  },
+  {
+    key: "almacen-exhibicion",
+    title: "Exhibición: lo que hay debe estar en la tienda",
+    roles: ["almacen", "ventas", "gerencia"],
+    niveles: ["jefe", "auxiliar"],
+    minutos: 2,
+    path: "/inventario?tab=exhibicion",
+    paraQue: "Que todo producto con existencia esté exhibido, y que lo que se acabó se quite.",
+    pasos: [
+      "En “Inventario” entra a la pestaña “Exhibición”. Ahí ves qué falta exhibir y qué hay que quitar.",
+      "Cuando pongas un producto en la tienda: “Ya lo exhibí”, toma la foto y escribe dónde quedó.",
+      "Cuando se acabe un producto exhibido, quítalo y toca “Ya lo quité”.",
+    ],
+    tip: "Gerencia revisa tu foto. Si la rechaza, te llega el motivo a la campanita.",
+    pregunta: {
+      texto: "Un producto exhibido se quedó sin existencia. ¿Qué haces?",
+      opciones: ["Lo dejo en la tienda", "Lo quito y toco “Ya lo quité”", "Lo marco como dañado"],
+      correcta: 1,
+      explicacion: "Lo que ya no hay se quita de la tienda y queda registrado.",
+    },
+  },
+  {
+    key: "almacen-programar",
+    title: "Programar entregas: día y hora",
+    roles: ["almacen", "gerencia"],
+    niveles: ["jefe", "auxiliar"],
+    minutos: 3,
+    path: "/por-programar",
+    paraQue: "Asignar día y hora aproximada a las ventas que Caja ya pasó a almacén, y moverlas cuando algo cambie.",
+    pasos: [
+      "Abre “Entregas por programar”. Te suena la campanita cuando llega una venta nueva.",
+      "En “Sin fecha asignada” toca “Asignar día y hora” y elige el día y la hora aproximada.",
+      "Cada venta muestra lo que el chofer debe cobrar: si ya está pagada dice “nada que cobrar”.",
+      "Si el cliente pidió material que no hay en almacén, toca “Esperando proveedor” y anota qué se pidió. Cuando llegue, toca “Ya llegó el material”.",
+      "Para cambiar un día u hora, toca “Cambiar día/hora” y escribe el motivo: queda guardado en el historial.",
+      "Usa “Lista por día” o “Semana” para ver cómo viene la carga de entregas.",
+    ],
+    tip: "Las entregas atrasadas salen en rojo con la palabra “Atrasada”.",
+    pregunta: {
+      texto: "Vas a mover una entrega de martes a jueves. ¿Qué te pide el sistema?",
+      opciones: ["Nada, solo guardas", "El motivo del cambio", "Autorización de Caja"],
+      correcta: 1,
+      explicacion: "Todo cambio de fecha u hora lleva un motivo, y queda en el historial.",
+    },
+  },
+  {
+    key: "almacen-inmediata",
+    title: "Entrega inmediata: cargar y confirmar",
+    roles: ["almacen", "gerencia"],
+    minutos: 2,
+    path: "/por-programar",
+    paraQue: "Cuando el cliente se lleva el material hoy, cargarlo y dejar el descuento en el Kardex.",
+    pasos: [
+      "Cuando Caja cobra una entrega inmediata, suena la campanita: toca el aviso para abrir “Entregas por programar”.",
+      "En el filtro “Entrega inmediata” ves qué material hay que buscar y cargar.",
+      "Ya cargado, toca “Confirmar carga”. Puedes confirmar solo una parte si no se llevó todo.",
+      "Al confirmar, el material se descuenta del inventario y queda en el Kardex.",
+    ],
+    tip: "Hasta que no confirmes la carga, el material sigue contando como apartado en almacén.",
+    pregunta: {
+      texto: "¿Cuándo se descuenta del inventario una entrega inmediata?",
+      opciones: ["Cuando Ventas registra la venta", "Cuando almacén confirma la carga", "Cuando Caja cobra"],
+      correcta: 1,
+      explicacion: "El descuento se hace al confirmar la carga, para que el Kardex refleje lo que de verdad salió.",
+    },
+  },
+  {
+    key: "ventas-traslado-responder",
+    title: "Responder cuando una sucursal pide material",
+    roles: ["ventas", "gerencia"],
+    minutos: 2,
+    path: "/traslados",
+    paraQue: "Avisar a almacén si ya vendiste o prometiste material que otra sucursal está pidiendo, para no quedar mal con tu cliente.",
+    pasos: [
+      "Cuando una sucursal pide material suena la campanita: toca el aviso para abrir “Traslados a sucursales”.",
+      "Abre la solicitud y toca “Responder”.",
+      "Elige “Ya vendí”, “Ya comprometí” o “No tengo nada comprometido”, y escribe cuánto.",
+      "Anota solo lo que todavía NO registraste como venta en el sistema: lo ya registrado se descuenta solo.",
+      "Puedes cambiar tu respuesta mientras la solicitud siga abierta.",
+    ],
+    tip: "Contestar aunque no tengas nada (“No tengo nada comprometido”) le ahorra a almacén esperar.",
+    pregunta: {
+      texto: "Ya registraste la venta de 20 cajas en el sistema. Una sucursal pide ese material. ¿Qué respondes?",
+      opciones: [
+        "Ya vendí 20 cajas",
+        "No tengo nada comprometido (esas 20 ya están apartadas en el sistema)",
+        "Nada, no es mi problema",
+      ],
+      correcta: 1,
+      explicacion: "Lo ya registrado se descuenta solo del disponible; contarlo otra vez lo restaría doble.",
+    },
+  },
+  {
+    key: "almacen-traslados",
+    title: "Traslados a otras sucursales",
+    roles: ["almacen", "gerencia"],
+    niveles: ["jefe", "auxiliar"],
+    minutos: 3,
+    path: "/traslados",
+    paraQue: "Mandar material a otra sucursal sin descuadrar el inventario ni quitarle a un cliente lo que ya se vendió.",
+    pasos: [
+      "Si una sucursal te pide material, toca “Nueva solicitud”: elige sucursal, producto y cantidad. Les llega un aviso a los vendedores.",
+      "Los vendedores responden si ya vendieron o comprometieron algo. En la tarjeta ves Existencia, Apartado, Comprometido y lo que queda “Libre para trasladar”.",
+      "Cuando vayas a enviar, toca “Enviar traslado”, confirma la cantidad y, si quieres, agrega una foto.",
+      "El traslado sale del inventario y queda en el Kardex como “Traslado a …”.",
+      "Si ya no se necesita, “Cancelar solicitud” con un motivo. Para un envío sin solicitud previa usa “Traslado directo”.",
+    ],
+    tip: "El sistema no te deja enviar más de lo disponible (lo apartado en ventas no cuenta).",
+    pregunta: {
+      texto: "Hay 200 en existencia, 20 apartados en ventas y los vendedores comprometieron 30. ¿Cuánto queda libre para trasladar?",
+      opciones: ["200", "180", "150"],
+      correcta: 2,
+      explicacion: "200 − 20 apartados − 30 comprometidos = 150.",
+    },
+  },
+  {
+    key: "almacen-foto-kardex",
+    title: "Foto de apoyo en el Kardex",
+    roles: ["almacen", "gerencia"],
+    niveles: ["jefe", "auxiliar"],
+    minutos: 2,
+    path: "/kardex",
+    paraQue: "Dejar como prueba la foto de la factura, remisión o del material junto al renglón del Kardex.",
+    pasos: [
+      "En el Kardex del producto, al anotar una entrada o salida, toca “Foto de apoyo (opcional)” y toma o elige la foto.",
+      "Guarda el renglón: la foto queda pegada a él (se comprime sola para no gastar espacio).",
+      "Si olvidaste la foto, en el renglón toca “+ Agregar foto”. Solo se puede agregar si no tenía una.",
+      "Para verla toca “Ver foto de apoyo”. Solo jefe, auxiliar y Gerencia la ven.",
+    ],
+    pregunta: {
+      texto: "Guardaste una entrada sin foto. ¿Qué haces?",
+      opciones: ["Nada, ya no se puede", "En ese renglón tocas “+ Agregar foto”", "Anulas el renglón y lo capturas otra vez"],
+      correcta: 1,
+      explicacion: "Un renglón sin foto permite agregarla después; una vez puesta, ya no se cambia.",
+    },
+  },
+  {
+    key: "combustible-registrar",
+    title: "Registrar una carga de combustible",
+    roles: ["reparto", "almacen", "gerencia"],
+    minutos: 2,
+    path: "/combustible",
+    paraQue: "Llevar la bitácora de gasolina (vehículos) y del montacargas con la foto del ticket y del tablero.",
+    pasos: [
+      "Entra a “Combustible y montacargas”. Reparto registra vehículos y Almacén registra el montacargas.",
+      "Escribe la unidad (placas, número o nombre; si ya la usaste, te la sugiere), los litros y el importe.",
+      "Escribe el kilometraje (vehículo) o las horas (montacargas) que marca el tablero.",
+      "Toma la foto del ticket y la del tablero y toca “Registrar carga”.",
+      "Si te equivocas de capturista, avisa a Gerencia: solo ella puede anular un registro.",
+    ],
+    tip: "El sistema no deja capturar un kilometraje menor al último de esa unidad: si te marca error, revisa el tablero.",
+    pregunta: {
+      texto: "Cargaste gasolina y el sistema dice que tu kilometraje es menor al último registro. ¿Qué haces?",
+      opciones: ["Cambias el número hasta que lo acepte", "Revisas el tablero y la unidad que elegiste", "Dejas de registrar"],
+      correcta: 1,
+      explicacion: "Puede ser un error de captura o que elegiste otra unidad; la bitácora solo sirve si los números son reales.",
+    },
+  },
+  {
+    key: "ventas-cotizaciones",
+    title: "Hacer una cotización y convertirla en venta",
+    roles: ["ventas", "gerencia"],
+    minutos: 2,
+    path: "/cotizaciones",
+    paraQue: "Darle al cliente un presupuesto por escrito sin apartar material, y registrarlo como venta si decide comprar.",
+    pasos: [
+      "En “Cotizaciones” toca “Nueva cotización”, escribe el cliente y los productos (precio público o promoción).",
+      "Elige la vigencia en días y, si quieres, una nota para el cliente.",
+      "Toca “Imprimir” para entregársela (también puedes guardarla como PDF desde el diálogo de impresión).",
+      "Si el cliente compra, toca “Convertir en venta”: se llena sola la venta; completa entrega, documento y pago, y regístrala.",
+      "Si ya no compra, “Cancelar” con un motivo.",
+    ],
+    tip: "Una cotización NO aparta el material ni baja el inventario; hasta que se convierte en venta, el disponible sigue siendo de todos.",
+    pregunta: {
+      texto: "Hiciste una cotización de 100 cajas. ¿Esas cajas quedan apartadas para el cliente?",
+      opciones: ["Sí, desde que la creas", "No, hasta que se convierte en venta", "Solo si Caja la cobra"],
+      correcta: 1,
+      explicacion: "La cotización es solo un presupuesto; el material se aparta al registrar la venta.",
     },
   },
   {
     key: "almacen-retiros",
     title: "Entregar en mostrador (retiros en sucursal)",
     roles: ["almacen", "ventas", "gerencia"],
+    niveles: ["jefe", "auxiliar"],
     minutos: 2,
     path: "/retiros",
-    paraQue: "Registrar cuando el cliente viene a recoger su material, aunque se lleve solo una parte.",
+    paraQue: "Anotar cuando el cliente viene a recoger su material, aunque se lleve solo una parte.",
     pasos: [
       "Entra a “Retiros en Sucursal” y busca el folio del cliente.",
-      "Toca “Confirmar retiro”. Por defecto se marca todo; baja la cantidad si solo se lleva una parte.",
+      "Toca “Confirmar retiro”. Baja la cantidad si solo se lleva una parte.",
       "Lo que falte queda pendiente para su siguiente visita.",
     ],
     pregunta: {
-      texto: "El cliente compró 40 cajas y hoy se lleva 10. ¿Qué haces?",
-      opciones: ["Confirmo las 40", "Confirmo 10 y quedan 30 pendientes", "Espero a que se lleve todo"],
+      texto: "El cliente compró 40 cajas y hoy se lleva 10. ¿Qué confirmas?",
+      opciones: ["Las 40", "Solo 10, y quedan 30 pendientes", "Ninguna"],
       correcta: 1,
-      explicacion: "Se confirma solo lo que se lleva; el resto queda pendiente.",
+      explicacion: "Se confirma solo lo que se lleva.",
+    },
+  },
+  {
+    key: "almacen-etiqueta",
+    title: "Imprimir la etiqueta amarilla",
+    roles: ["almacen", "gerencia"],
+    niveles: ["jefe", "auxiliar"],
+    minutos: 2,
+    path: "/kardex",
+    paraQue: "Sacar una etiqueta nueva de un producto, ya con sus datos y su código QR, sin escribirla a mano.",
+    pasos: [
+      "Entra a “Kardex”, busca el producto y toca “Etiqueta amarilla”.",
+      "El ID, la descripción, el código y la marca ya vienen llenos. Escribe solo “Cajas por tarima” y “M² por pieza” si los sabes.",
+      "Elige cuántas copias quieres. Si vas a usar la hoja amarilla, deja apagado “Imprimir fondo amarillo”.",
+      "Toca “Imprimir”, mete la hoja amarilla en la impresora y listo.",
+    ],
+    pregunta: {
+      texto: "Vas a imprimir en hoja amarilla. ¿Qué haces con “Imprimir fondo amarillo”?",
+      opciones: ["Lo dejo apagado", "Lo prendo", "Da igual"],
+      correcta: 0,
+      explicacion: "La hoja ya es amarilla; si lo prendes, gastas tinta.",
+    },
+  },
+
+  // ---------------- Almacén: solo jefe ----------------
+  {
+    key: "almacen-facturas",
+    title: "Registrar una factura de compra",
+    roles: ["almacen", "gerencia"],
+    niveles: ["jefe"],
+    minutos: 2,
+    path: "/inventario",
+    paraQue: "Dejar guardada la factura del proveedor junto con lo que llegó.",
+    pasos: [
+      "En “Inventario” toca “Registrar factura”.",
+      "Captura los productos y las cantidades que vienen en la factura.",
+      "Sube la foto de la factura y guarda.",
+    ],
+    tip: "Hazlo en el momento de recibir; lo que se deja para después es lo que luego no cuadra.",
+    pregunta: {
+      texto: "¿Quién registra las facturas de compra?",
+      opciones: ["El jefe de almacén", "Cualquiera", "El chofer"],
+      correcta: 0,
+      explicacion: "Es una tarea del jefe de almacén (y Gerencia).",
+    },
+  },
+  {
+    key: "almacen-baja",
+    title: "Dar de baja material dañado",
+    roles: ["almacen", "gerencia"],
+    niveles: ["jefe"],
+    minutos: 2,
+    path: "/inventario",
+    paraQue: "Quitar del sistema el material que se rompió o ya no sirve.",
+    pasos: [
+      "Cuando el auxiliar reporta un incidente, te llega un aviso a la campanita. Revisa qué pasó.",
+      "En “Inventario” toca “Dar de baja”, elige el producto y la cantidad.",
+      "Escribe el motivo y guarda. Queda registrado quién lo dio de baja.",
+    ],
+    tip: "Solo el jefe de almacén y Gerencia dan de baja. Los demás reportan.",
+    pregunta: {
+      texto: "Se rompieron 2 cajas. ¿Quién las da de baja en el sistema?",
+      opciones: ["El almacenista", "El jefe de almacén o Gerencia", "Caja"],
+      correcta: 1,
+      explicacion: "El resto del equipo reporta; la baja la hace el jefe o Gerencia.",
+    },
+  },
+
+  // ---------------- Almacén: solo auxiliar ----------------
+  {
+    key: "almacen-incidente",
+    title: "Reportar material dañado",
+    roles: ["almacen", "gerencia"],
+    niveles: ["auxiliar"],
+    minutos: 1,
+    path: "/inventario",
+    paraQue: "Avisarle al jefe de almacén y a Gerencia cuando algo se rompió o no está bien.",
+    pasos: [
+      "En “Inventario” toca “Reportar incidente”.",
+      "Elige el producto, la cantidad y escribe qué pasó.",
+      "Toca enviar. Le llega al jefe de almacén y a Gerencia; ellos hacen la baja.",
+    ],
+    tip: "Tú no das de baja: solo avisas. Entre más claro escribas qué pasó, mejor.",
+    pregunta: {
+      texto: "Se cayó una caja y se rompió. ¿Qué haces en la página?",
+      opciones: ["“Dar de baja”", "“Reportar incidente”", "Nada"],
+      correcta: 1,
+      explicacion: "El auxiliar reporta; el jefe o Gerencia hacen la baja.",
     },
   },
 
@@ -329,6 +672,26 @@ export const LESSONS: Lesson[] = [
       opciones: ["Por WhatsApp al gerente", "En el reparto, dentro de la página", "No hace falta"],
       correcta: 1,
       explicacion: "La evidencia va en la página para que quede ligada al pedido.",
+    },
+  },
+
+  {
+    key: "reparto-incidencia",
+    title: "Si no pudiste entregar",
+    roles: ["reparto", "gerencia"],
+    minutos: 1,
+    path: "/repartos",
+    paraQue: "Avisar cuando una entrega no se pudo hacer, para que no se pierda el pedido.",
+    pasos: [
+      "Abre el pedido en “Repartos”.",
+      "Cambia el estado a “Incidencia”.",
+      "En notas escribe qué pasó (no estaba el cliente, faltó material, etc.) y guarda.",
+    ],
+    pregunta: {
+      texto: "Llegaste y no había nadie. ¿Qué haces?",
+      opciones: ["Marco “Entregado”", "Marco “Incidencia” y escribo qué pasó", "No hago nada"],
+      correcta: 1,
+      explicacion: "Nunca marques entregado algo que no se entregó.",
     },
   },
 
@@ -374,6 +737,11 @@ export const LESSONS: Lesson[] = [
   },
 ];
 
-export function lessonsForRole(role: AppRole): Lesson[] {
-  return LESSONS.filter((l) => l.roles.includes(role));
+/** Lecciones de una persona: por rol y, en Almacén, por nivel (jefe, auxiliar, almacenista). */
+export function lessonsForRole(role: AppRole, nivel?: NivelAlmacen | null): Lesson[] {
+  return LESSONS.filter((l) => {
+    if (!l.roles.includes(role)) return false;
+    if (role === "almacen" && l.niveles) return l.niveles.includes(nivel ?? "jefe");
+    return true;
+  });
 }

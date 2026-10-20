@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
-import type { SaleWithItems, DeliveryType, ResumenPedidos, TipoPrecio } from "../types";
+import type { SaleWithItems, DeliveryType, ResumenPedidos, TipoPrecio, TipoDocumento, MetodoPagoVenta } from "../types";
 
 export function useSales() {
   const [sales, setSales] = useState<SaleWithItems[]>([]);
@@ -39,13 +39,22 @@ export interface SaleItemInput {
   tipo_precio?: TipoPrecio;
 }
 
+export interface DatosVentaExtra {
+  tipoDocumento: TipoDocumento;
+  numeroOrden: string;
+  metodoPago: MetodoPagoVenta | "";
+  /** Solo si el método es "a meses": anotación libre (ej. "6 meses sin intereses"). */
+  mesesNota: string;
+}
+
 export async function registerSale(
   customerName: string,
   customerPhone: string,
   customerAddress: string,
   deliveryType: DeliveryType,
   items: SaleItemInput[],
-  scheduledPickupDate?: string
+  scheduledPickupDate: string | undefined,
+  extra: DatosVentaExtra
 ) {
   const { data, error } = await supabase.rpc("register_sale", {
     p_customer_name: customerName,
@@ -54,6 +63,10 @@ export async function registerSale(
     p_delivery_type: deliveryType,
     p_items: items,
     p_scheduled_pickup_date: scheduledPickupDate || null,
+    p_tipo_documento: extra.tipoDocumento,
+    p_numero_orden: extra.numeroOrden.trim() || null,
+    p_metodo_pago: extra.metodoPago || null,
+    p_meses_nota: extra.metodoPago === "a_meses" ? extra.mesesNota.trim() || null : null,
   });
   return { folio: data as string | null, error: error?.message ?? null };
 }
@@ -85,6 +98,86 @@ export async function registerSalePayment(saleId: string, amount: number) {
     p_amount: amount,
   });
   return { error: error?.message ?? null };
+}
+
+export interface CobroCajaInput {
+  amount: number;
+  metodoPago?: MetodoPagoVenta | "";
+  numeroFactura?: string;
+  mesesNota?: string;
+  /** Excepción: pasa a almacén aunque el cliente todavía no pague nada (paga en su domicilio). */
+  pasarSinCobro?: boolean;
+}
+
+/** Caja registra lo que pagó el cliente (total o parcial) y PASA la venta
+ * a almacén. La primera vez es de Caja; corregirlo después es de Gerencia. */
+export async function cajaCobrarVenta(saleId: string, c: CobroCajaInput) {
+  const { error } = await supabase.rpc("caja_cobrar_venta", {
+    p_sale_id: saleId,
+    p_amount: c.amount,
+    p_metodo_pago: c.metodoPago || null,
+    p_numero_factura: c.numeroFactura?.trim() || null,
+    p_meses_nota: c.mesesNota?.trim() || null,
+    p_pasar_sin_cobro: c.pasarSinCobro ?? false,
+  });
+  return { error: error?.message ?? null };
+}
+
+export async function guardarFolioFactura(saleId: string, folio: string) {
+  const { error } = await supabase.rpc("guardar_folio_factura", { p_sale_id: saleId, p_folio: folio });
+  return { error: error?.message ?? null };
+}
+
+/** Jefe, auxiliar y Gerencia: día y hora aproximada de entrega. Si ya tenía
+ * fecha, cambiarla exige un motivo (queda en el historial). */
+export async function programarEntrega(saleId: string, fecha: string, hora: string, motivo: string) {
+  const { error } = await supabase.rpc("programar_entrega", {
+    p_sale_id: saleId,
+    p_fecha: fecha,
+    p_hora: hora || null,
+    p_motivo: motivo.trim() || null,
+  });
+  return { error: error?.message ?? null };
+}
+
+export async function marcarEsperandoProveedor(saleId: string, activo: boolean, nota?: string) {
+  const { error } = await supabase.rpc("marcar_esperando_proveedor", {
+    p_sale_id: saleId,
+    p_activo: activo,
+    p_nota: nota?.trim() || null,
+  });
+  return { error: error?.message ?? null };
+}
+
+/** Almacén confirma que ya cargó el material de una entrega inmediata:
+ * se descuenta del inventario y queda en el Kardex. */
+export async function confirmarEntregaInmediata(saleId: string, items?: RetiroItemInput[]) {
+  const { error } = await supabase.rpc("confirmar_entrega_inmediata", {
+    p_sale_id: saleId,
+    p_items: items ?? null,
+  });
+  return { error: error?.message ?? null };
+}
+
+export interface ProgramacionLogEntry {
+  id: string;
+  sale_id: string;
+  fecha_anterior: string | null;
+  hora_anterior: string | null;
+  fecha_nueva: string | null;
+  hora_nueva: string | null;
+  motivo: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export async function cargarHistorialProgramacion(saleId: string) {
+  const { data, error } = await supabase
+    .from("sale_programacion_log")
+    .select("*")
+    .eq("sale_id", saleId)
+    .order("created_at", { ascending: false });
+  return { entries: (data as ProgramacionLogEntry[] | null) ?? [], error: error?.message ?? null };
 }
 
 /** Elimina una venta por completo (solo Gerencia, y solo si todavía

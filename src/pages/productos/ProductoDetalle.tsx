@@ -29,6 +29,7 @@ export default function ProductoDetalle({ productId }: { productId?: string } = 
   const puedeVerKardex =
     profile?.role === "gerencia" ||
     profile?.role === "ventas" ||
+    profile?.role === "reparto" ||
     tienePermiso(profile, "kardex") ||
     tienePermiso(profile, "kardex_entradas");
 

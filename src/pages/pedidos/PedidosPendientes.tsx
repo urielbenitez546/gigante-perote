@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { ClipboardList, Package, Truck, CheckCircle2, CalendarClock, RefreshCw } from "lucide-react";
 import { useOpenSales, useResumenPedidos } from "../../hooks/useSales";
+import { useAuth } from "../../context/AuthContext";
 import DetalleVentaModal from "../../components/ventas/DetalleVentaModal";
 import {
   DELIVERY_TYPE_LABELS,
@@ -26,7 +27,13 @@ function tiposPendientes(sale: SaleWithItems): DeliveryType[] {
 
 export default function PedidosPendientes() {
   const { resumen, loading: loadingResumen, error: errorResumen, reload: reloadResumen } = useResumenPedidos();
-  const { sales, loading, error, reload } = useOpenSales();
+  const { profile } = useAuth();
+  const { sales: todasLasVentas, loading, error, reload } = useOpenSales();
+  // Almacén solo ve lo que Caja ya le pasó; Ventas, Caja y Gerencia ven todo.
+  const sales = useMemo(
+    () => (profile?.role === "almacen" ? todasLasVentas.filter((s) => !!s.liberada_almacen_at) : todasLasVentas),
+    [todasLasVentas, profile?.role]
+  );
   const [filtro, setFiltro] = useState<Filtro>("todos");
   const [selectedId, setSelectedId] = useState<string | null>(null);
 

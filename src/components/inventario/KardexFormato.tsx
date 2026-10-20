@@ -1,11 +1,15 @@
-import { useMemo, useState } from "react";
-import { ClipboardCheck, Tag } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { Camera, ClipboardCheck, Paperclip, Tag } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import {
   registerInventoryEntry,
   registerInventorySalida,
+  anularMovimientoKardex,
+  adjuntarFotoKardex,
+  ultimoMovimientoPropio,
   useProductKardex,
 } from "../../hooks/useInventory";
+import { signedPhotoUrl, uploadPhoto } from "../../lib/storage";
 import { useProfileNames } from "../../hooks/useProfileNames";
 import ConteoFisicoModal from "./ConteoFisicoModal";
 import EtiquetaKardexModal from "./EtiquetaKardexModal";
@@ -40,6 +44,9 @@ export default function KardexFormato({ product, onChanged }: Props) {
   const puedeSalida = tienePermiso(profile, "kardex");
   const puedeEntrada = tienePermiso(profile, "kardex_entradas");
   const puedeAnotar = puedeSalida || puedeEntrada;
+  const puedeAnular = tienePermiso(profile, "anular_kardex");
+  // Foto de apoyo: solo jefe, auxiliar y Gerencia la suben y la ven.
+  const puedeFoto = tienePermiso(profile, "operar_almacen");
 
   const [entrada, setEntrada] = useState("");
   const [salida, setSalida] = useState("");
@@ -48,6 +55,10 @@ export default function KardexFormato({ product, onChanged }: Props) {
   const [msg, setMsg] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null);
   const [conteoAbierto, setConteoAbierto] = useState(false);
   const [etiquetaAbierta, setEtiquetaAbierta] = useState(false);
+  const [foto, setFoto] = useState<File | null>(null);
+  const fotoNuevaRef = useRef<HTMLInputElement>(null);
+  const fotoFilaRef = useRef<HTMLInputElement>(null);
+  const [movParaFoto, setMovParaFoto] = useState<string | null>(null);
 
   const unidad = PRODUCT_UNIT_LABELS[product.unit];
   const stock = Number(product.physical_stock);
@@ -68,6 +79,46 @@ export default function KardexFormato({ product, onChanged }: Props) {
   const nEntrada = Number(entrada) || 0;
   const nSalida = Number(salida) || 0;
   const previa = r3(stock + nEntrada - nSalida);
+
+  async function anular(movId: string) {
+    const motivo = window.prompt(
+      "¿Por qué se anula este renglón? (ejemplo: me equivoqué en la cantidad)\n\nQuedará tachado en el Kardex y la existencia se corrige sola. Si era una salida de una venta, la venta no cambia."
+    );
+    if (motivo === null) return;
+    if (motivo.trim().length < 3) {
+      return setMsg({ tipo: "error", texto: "Escribe el motivo para poder anular el renglón." });
+    }
+    const { error: err } = await anularMovimientoKardex(movId, motivo.trim());
+    if (err) return setMsg({ tipo: "error", texto: err });
+    setMsg({ tipo: "ok", texto: "Renglón anulado." });
+    reload();
+    onChanged();
+  }
+
+  async function abrirFoto(path: string) {
+    const ventana = window.open("", "_blank");
+    const url = await signedPhotoUrl("kardex-soporte", path, 600);
+    if (!url) {
+      ventana?.close();
+      return setMsg({ tipo: "error", texto: "No se pudo abrir la foto." });
+    }
+    if (ventana) ventana.location.href = url;
+    else window.location.href = url;
+  }
+
+  async function adjuntarAFila(file: File | undefined) {
+    const movId = movParaFoto;
+    setMovParaFoto(null);
+    if (fotoFilaRef.current) fotoFilaRef.current.value = "";
+    if (!file || !movId) return;
+    setMsg(null);
+    const { path, error: errSubida } = await uploadPhoto("kardex-soporte", file);
+    if (errSubida || !path) return setMsg({ tipo: "error", texto: errSubida ?? "No se pudo subir la foto." });
+    const { error: errAdjuntar } = await adjuntarFotoKardex(movId, path);
+    if (errAdjuntar) return setMsg({ tipo: "error", texto: errAdjuntar });
+    setMsg({ tipo: "ok", texto: "Foto agregada al renglón." });
+    reload();
+  }
 
   async function guardar() {
     setMsg(null);
@@ -91,17 +142,44 @@ export default function KardexFormato({ product, onChanged }: Props) {
     }
 
     setGuardando(true);
+    // La foto se sube primero: si falla, el renglón no se guarda a medias.
+    let fotoPath: string | null = null;
+    if (foto && puedeFoto) {
+      const sub = await uploadPhoto("kardex-soporte", foto);
+      if (sub.error || !sub.path) {
+        setGuardando(false);
+        return setMsg({ tipo: "error", texto: `No se pudo subir la foto: ${sub.error ?? "error desconocido"}` });
+      }
+      fotoPath = sub.path;
+    }
+    const tipoMov = nSalida > 0 ? "salida" : "entrada";
     const { error: err } =
       nSalida > 0
         ? await registerInventorySalida(product.id, nSalida, referencia.trim())
         : await registerInventoryEntry(product.id, nEntrada, referencia.trim());
+    if (err) {
+      setGuardando(false);
+      return setMsg({ tipo: "error", texto: err });
+    }
+
+    let avisoFoto: string | null = null;
+    if (fotoPath && profile) {
+      const movId = await ultimoMovimientoPropio(product.id, tipoMov, profile.id);
+      const adj = movId ? await adjuntarFotoKardex(movId, fotoPath) : { error: "no se encontró el renglón" };
+      if (adj.error) avisoFoto = adj.error;
+    }
     setGuardando(false);
-    if (err) return setMsg({ tipo: "error", texto: err });
 
     setEntrada("");
     setSalida("");
     setReferencia("");
-    setMsg({ tipo: "ok", texto: "Renglón guardado." });
+    setFoto(null);
+    if (fotoNuevaRef.current) fotoNuevaRef.current.value = "";
+    setMsg(
+      avisoFoto
+        ? { tipo: "error", texto: `Renglón guardado, pero la foto no se pudo adjuntar (${avisoFoto}). Agrégala desde el renglón.` }
+        : { tipo: "ok", texto: "Renglón guardado." }
+    );
     reload();
     onChanged();
   }
@@ -147,7 +225,7 @@ export default function KardexFormato({ product, onChanged }: Props) {
       {error && <p className="text-xs text-gigante-red mb-2">No se pudo cargar el historial: {error}</p>}
 
       <div className="overflow-x-auto">
-        <table className="w-full text-xs border-collapse min-w-[560px]">
+        <table className="w-full text-xs border-collapse min-w-[600px]">
           <thead>
             <tr className="bg-gigante-bg text-gigante-navy">
               <th className={`${celda} text-left w-24`}>Fecha</th>
@@ -155,12 +233,13 @@ export default function KardexFormato({ product, onChanged }: Props) {
               <th className={`${celda} text-right w-20`}>Entrada</th>
               <th className={`${celda} text-right w-20`}>Salida</th>
               <th className={`${celda} text-right w-24`}>Existencia</th>
+              {puedeAnular && <th className={`${celda} w-16`}></th>}
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={5} className={`${celda} text-gigante-muted`}>
+                <td colSpan={puedeAnular ? 6 : 5} className={`${celda} text-gigante-muted`}>
                   Cargando historial...
                 </td>
               </tr>
@@ -172,16 +251,43 @@ export default function KardexFormato({ product, onChanged }: Props) {
                   <td className={celda}></td>
                   <td className={celda}></td>
                   <td className={`${celda} text-right font-semibold`}>{fmt(inicial)}</td>
+                  {puedeAnular && <td className={celda}></td>}
                 </tr>
                 {filas.map(({ e, existencia }) => (
-                  <tr key={e.id}>
-                    <td className={celda}>{fechaCorta(e.fecha)}</td>
+                  <tr key={e.id} className={e.anulado ? "bg-gigante-bg text-gigante-muted" : ""}>
+                    <td className={`${celda} ${e.anulado ? "line-through" : ""}`}>{fechaCorta(e.fecha)}</td>
                     <td className={celda}>
-                      <span className="font-medium text-gigante-navy">{nameFor(e.created_by)}</span>
-                      <span className="block text-[11px] text-gigante-muted">
+                      <span className={`font-medium ${e.anulado ? "line-through" : "text-gigante-navy"}`}>
+                        {nameFor(e.created_by)}
+                      </span>
+                      <span className={`block text-[11px] text-gigante-muted ${e.anulado ? "line-through" : ""}`}>
                         {e.detalle}
                         {e.referencia ? ` · ${e.referencia}` : ""}
                       </span>
+                      {puedeFoto && e.fotoPath && (
+                        <button
+                          onClick={() => abrirFoto(e.fotoPath as string)}
+                          className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-gigante-navy underline"
+                        >
+                          <Paperclip size={11} /> Ver foto de apoyo
+                        </button>
+                      )}
+                      {puedeFoto && !e.fotoPath && e.movId && !e.anulado && (e.tipoMov === "entrada" || e.tipoMov === "salida") && (
+                        <button
+                          onClick={() => {
+                            setMovParaFoto(e.movId);
+                            fotoFilaRef.current?.click();
+                          }}
+                          className="mt-0.5 ml-0 block text-[11px] text-gigante-muted underline"
+                        >
+                          + Agregar foto
+                        </button>
+                      )}
+                      {e.anulado && (
+                        <span className="block text-[11px] text-gigante-red">
+                          Anulado por {nameFor(e.anulado.por)} el {fechaCorta(e.anulado.fecha)}: {e.anulado.motivo}
+                        </span>
+                      )}
                     </td>
                     <td className={`${celda} text-right text-emerald-700 font-semibold`}>
                       {e.delta > 0 ? fmt(e.delta) : ""}
@@ -190,6 +296,18 @@ export default function KardexFormato({ product, onChanged }: Props) {
                       {e.delta < 0 ? fmt(Math.abs(e.delta)) : ""}
                     </td>
                     <td className={`${celda} text-right font-semibold text-gigante-navy`}>{fmt(existencia)}</td>
+                    {puedeAnular && (
+                      <td className={celda}>
+                        {e.movId && !e.anulado && (e.tipoMov === "entrada" || e.tipoMov === "salida") && (
+                          <button
+                            onClick={() => anular(e.movId as string)}
+                            className="text-[11px] text-gigante-red underline"
+                          >
+                            Anular
+                          </button>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </>
@@ -237,9 +355,10 @@ export default function KardexFormato({ product, onChanged }: Props) {
                   <td className={`${celda} text-right font-semibold ${previa < 0 ? "text-gigante-red" : "text-gigante-navy"}`}>
                     {fmt(previa)}
                   </td>
+                  {puedeAnular && <td className={celda}></td>}
                 </tr>
                 <tr>
-                  <td colSpan={5} className={celda}>
+                  <td colSpan={puedeAnular ? 6 : 5} className={celda}>
                     <input
                       value={referencia}
                       onChange={(e) => setReferencia(e.target.value)}
@@ -250,6 +369,39 @@ export default function KardexFormato({ product, onChanged }: Props) {
                       }
                       className="w-full rounded border border-gigante-border px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-gigante-navy/30"
                     />
+                    {puedeFoto && (
+                      <div className="mt-2 flex items-center gap-2 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => fotoNuevaRef.current?.click()}
+                          className="inline-flex items-center gap-1.5 text-xs font-medium border border-gigante-border rounded-lg px-2.5 py-1.5 text-gigante-navy bg-white"
+                        >
+                          <Camera size={13} /> {foto ? "Cambiar foto" : "Foto de apoyo (opcional)"}
+                        </button>
+                        {foto && (
+                          <>
+                            <span className="text-[11px] text-gigante-muted truncate max-w-[200px]">{foto.name}</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFoto(null);
+                                if (fotoNuevaRef.current) fotoNuevaRef.current.value = "";
+                              }}
+                              className="text-[11px] text-gigante-red underline"
+                            >
+                              Quitar
+                            </button>
+                          </>
+                        )}
+                        <input
+                          ref={fotoNuevaRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => setFoto(e.target.files?.[0] ?? null)}
+                        />
+                      </div>
+                    )}
                   </td>
                 </tr>
               </>
@@ -275,6 +427,14 @@ export default function KardexFormato({ product, onChanged }: Props) {
       {!puedeAnotar && (
         <p className="text-xs text-gigante-muted mt-3">Solo consulta: tu usuario no puede anotar renglones en el Kardex.</p>
       )}
+
+      <input
+        ref={fotoFilaRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => adjuntarAFila(e.target.files?.[0])}
+      />
 
       {etiquetaAbierta && <EtiquetaKardexModal product={product} onClose={() => setEtiquetaAbierta(false)} />}
 

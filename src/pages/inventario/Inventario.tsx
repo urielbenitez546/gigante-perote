@@ -205,11 +205,16 @@ export default function Inventario() {
     reloadWriteOffs();
   }
 
+  // Movimientos, Facturas y Merma son de trabajo interno: solo jefe, auxiliar y Gerencia.
   const TABS: { key: TabKey; label: string }[] = [
     { key: "productos", label: "Lista de productos" },
-    { key: "movimientos", label: "Movimientos" },
-    { key: "facturas", label: "Facturas" },
-    { key: "merma", label: "Merma" },
+    ...(canManage
+      ? ([
+          { key: "movimientos", label: "Movimientos" },
+          { key: "facturas", label: "Facturas" },
+          { key: "merma", label: "Merma" },
+        ] as { key: TabKey; label: string }[])
+      : []),
     { key: "exhibicion", label: "Exhibición" },
     { key: "conteos", label: "Conteos físicos" },
   ];
@@ -696,7 +701,7 @@ export default function Inventario() {
         </>
       )}
 
-      {tab === "movimientos" && (
+      {tab === "movimientos" && canManage && (
         <div className="mt-4 bg-white border border-gigante-border rounded-xl overflow-hidden">
           {loadingMovements ? (
             <p className="p-6 text-sm text-gigante-muted">Cargando movimientos...</p>
@@ -745,7 +750,7 @@ export default function Inventario() {
         </div>
       )}
 
-      {tab === "facturas" && (
+      {tab === "facturas" && canManage && (
         <div className="mt-4">
           <div className="bg-blue-50 border border-blue-200 text-blue-800 text-xs rounded-lg px-3 py-2 mb-4">
             Facturas registradas esta semana: <strong>{facturasEstaSemana.length}</strong>
@@ -802,7 +807,7 @@ export default function Inventario() {
         </div>
       )}
 
-      {tab === "merma" && (
+      {tab === "merma" && canManage && (
         <div className="mt-4 bg-white border border-gigante-border rounded-xl overflow-hidden">
           {loadingWriteOffs ? (
             <p className="p-6 text-sm text-gigante-muted">Cargando...</p>

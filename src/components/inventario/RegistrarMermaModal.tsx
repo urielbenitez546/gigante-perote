@@ -87,7 +87,8 @@ export default function RegistrarMermaModal({ products, onClose, onSuccess }: Pr
             <label className="block text-sm font-medium text-gigante-navy mb-1">Cantidad dañada</label>
             <input
               type="number"
-              min="1"
+              min="0.01"
+              step="any"
               value={quantity}
               onChange={(e) => setQuantity(e.target.value)}
               placeholder="Ej. 3"

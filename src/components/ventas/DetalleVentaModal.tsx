@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { X, CheckCircle2, Trash2, ArrowLeftRight, CalendarClock } from "lucide-react";
+import { X, Trash2, ArrowLeftRight, CalendarClock } from "lucide-react";
 import type { SaleItem, SaleWithItems } from "../../types";
-import { DELIVERY_TYPE_LABELS, SALE_STATUS_LABELS, DIAS_AVISO_APARTADO, diasRestantesApartado, tienePermiso } from "../../types";
+import { DELIVERY_TYPE_LABELS, SALE_STATUS_LABELS, DIAS_AVISO_APARTADO, diasRestantesApartado } from "../../types";
+import CobroCajaPanel from "./CobroCajaPanel";
 import CambiarProductoModal from "./CambiarProductoModal";
 import { useAuth } from "../../context/AuthContext";
 import { useProfileNames } from "../../hooks/useProfileNames";
-import { registerSalePayment, deleteSale } from "../../hooks/useSales";
+import { deleteSale } from "../../hooks/useSales";
 
 interface Props {
   sale: SaleWithItems;
@@ -16,8 +17,6 @@ interface Props {
 export default function DetalleVentaModal({ sale, onClose, onUpdated }: Props) {
   const { profile } = useAuth();
   const { nameFor } = useProfileNames();
-  const canRegisterPayment = profile?.role === "gerencia" || profile?.role === "caja";
-  const canCorrectPayment = tienePermiso(profile, "corregir_cobros");
   const canDelete = profile?.role === "gerencia";
   const canChangeItems = profile?.role === "gerencia" || profile?.role === "ventas";
   const [changingItem, setChangingItem] = useState<SaleItem | null>(null);
@@ -25,12 +24,7 @@ export default function DetalleVentaModal({ sale, onClose, onUpdated }: Props) {
   const diasRestantes = diasRestantesApartado(sale.created_at);
   const hasDeliveredItems = sale.sale_items.some((i) => i.delivered_quantity > 0);
   const hasPayment = sale.amount_paid > 0;
-  const pendingAmount = Math.max(sale.total - sale.amount_paid, 0);
 
-  const [amountInput, setAmountInput] = useState(String(sale.total));
-  const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [motivo, setMotivo] = useState("");
   const [deleting, setDeleting] = useState(false);
@@ -51,28 +45,6 @@ export default function DetalleVentaModal({ sale, onClose, onUpdated }: Props) {
     }
     onUpdated?.();
     onClose();
-  }
-
-  async function handleSavePayment() {
-    setError(null);
-    const amount = Number(amountInput);
-    if (Number.isNaN(amount) || amount < 0) {
-      setError("Escribe un monto válido.");
-      return;
-    }
-    if (amount > sale.total) {
-      setError(`No puede ser mayor al total ($${sale.total.toLocaleString("es-MX")}).`);
-      return;
-    }
-    setSaving(true);
-    const { error: err } = await registerSalePayment(sale.id, amount);
-    setSaving(false);
-    if (err) {
-      setError(err);
-      return;
-    }
-    setEditing(false);
-    onUpdated?.();
   }
 
   return (
@@ -173,85 +145,7 @@ export default function DetalleVentaModal({ sale, onClose, onUpdated }: Props) {
             </span>
           </div>
 
-          <div className="mt-2 bg-gigante-bg rounded-lg p-3">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <div>
-                <p className="text-xs text-gigante-muted">Pagado en caja</p>
-                <p className="text-sm font-semibold text-emerald-700">
-                  ${sale.amount_paid.toLocaleString("es-MX", { minimumFractionDigits: 2 })}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-gigante-muted">Pendiente de cobro</p>
-                <p className={`text-sm font-semibold ${pendingAmount > 0 ? "text-gigante-red" : "text-gigante-muted"}`}>
-                  ${pendingAmount.toLocaleString("es-MX", { minimumFractionDigits: 2 })}
-                </p>
-              </div>
-              {sale.payment_confirmed_at && !editing && (
-                <span className="flex items-center gap-1 text-[11px] text-emerald-700">
-                  <CheckCircle2 size={13} /> Registrado por {nameFor(sale.payment_confirmed_by)}
-                </span>
-              )}
-            </div>
-
-            {pendingAmount > 0 && (
-              <p className="text-[11px] text-gigante-muted mt-1">
-                Si el resto se cobra al entregar a domicilio, el chofer lo registra desde "Repartos" y
-                Caja lo confirma en "Evidencias y Cobros".
-              </p>
-            )}
-
-            {canRegisterPayment && hasPayment && !canCorrectPayment && (
-              <p className="text-[11px] text-gigante-muted mt-3">
-                El cobro ya quedó registrado. Solo Gerencia puede corregir el monto cobrado.
-              </p>
-            )}
-
-            {canRegisterPayment && (!hasPayment || canCorrectPayment) && (
-              <div className="mt-3">
-                {editing ? (
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      min="0"
-                      max={sale.total}
-                      step="0.01"
-                      value={amountInput}
-                      onChange={(e) => setAmountInput(e.target.value)}
-                      className="w-32 rounded-lg border border-gigante-border px-2 py-1.5 text-sm"
-                    />
-                    <button
-                      onClick={handleSavePayment}
-                      disabled={saving}
-                      className="bg-gigante-red hover:bg-gigante-redDark disabled:opacity-60 text-white text-xs font-semibold rounded-lg px-3 py-1.5"
-                    >
-                      {saving ? "Guardando..." : "Guardar"}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setEditing(false);
-                        setError(null);
-                      }}
-                      className="text-xs text-gigante-muted"
-                    >
-                      Cancelar
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => {
-                      setAmountInput(String(sale.total - sale.amount_paid > 0 ? sale.total : sale.amount_paid));
-                      setEditing(true);
-                    }}
-                    className="text-xs font-semibold text-gigante-red hover:underline"
-                  >
-                    {sale.amount_paid > 0 ? "Corregir monto cobrado" : "Registrar cobro en caja"}
-                  </button>
-                )}
-                {error && <p className="text-xs text-gigante-red mt-2">{error}</p>}
-              </div>
-            )}
-          </div>
+          <CobroCajaPanel sale={sale} onUpdated={onUpdated} />
         </div>
 
         <button

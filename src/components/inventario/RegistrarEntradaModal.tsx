@@ -72,8 +72,8 @@ export default function RegistrarEntradaModal({ products, initialProductId = "",
             </label>
             <input
               type="number"
-              min="1"
-              step="1"
+              min="0.01"
+              step="any"
               value={quantity}
               onChange={(e) => setQuantity(e.target.value)}
               placeholder="Ej. 50"

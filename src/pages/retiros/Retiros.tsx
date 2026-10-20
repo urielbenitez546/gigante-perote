@@ -25,6 +25,7 @@ export default function Retiros() {
   const withRetiroLines = useMemo(
     () =>
       sales
+        .filter((s) => !!s.liberada_almacen_at)
         .map((s) => ({ sale: s, lines: pendingLinesFor(s, "retiro_sucursal") }))
         .filter(({ sale, lines }) => lines.length > 0 || sale.sale_items.some((i) => (i.delivery_type ?? sale.delivery_type) === "retiro_sucursal")),
     [sales]
@@ -39,7 +40,8 @@ export default function Retiros() {
         <Warehouse size={22} /> Retiros en Sucursal
       </h1>
       <p className="text-sm text-gigante-muted mt-1">
-        Confirma que el cliente recogió su mercancía en la sucursal (puede ser parcial).
+        Confirma que el cliente recogió su mercancía en la sucursal (puede ser parcial). Solo aparecen las ventas que
+        Caja ya pasó a almacén.
       </p>
 
       <div className="grid grid-cols-2 gap-4 mt-5 max-w-sm">

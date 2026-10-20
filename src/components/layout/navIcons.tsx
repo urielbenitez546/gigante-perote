@@ -16,6 +16,11 @@ import {
   GraduationCap,
   History,
   FileSpreadsheet,
+  Gauge,
+  CalendarClock,
+  ArrowRightLeft,
+  Fuel,
+  FileText,
   type LucideIcon,
 } from "lucide-react";
 
@@ -23,6 +28,11 @@ export const MODULE_ICONS: Record<string, LucideIcon> = {
   inicio: Home,
   inventario: Package,
   kardex: History,
+  kilometraje: Gauge,
+  "por-programar": CalendarClock,
+  traslados: ArrowRightLeft,
+  combustible: Fuel,
+  cotizaciones: FileText,
   ventas: ShoppingCart,
   pedidos: ClipboardList,
   retiros: Warehouse,

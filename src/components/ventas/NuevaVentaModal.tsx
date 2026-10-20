@@ -1,28 +1,30 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { X, Plus, Trash2 } from "lucide-react";
-import type { Product, DeliveryType, TipoPrecio } from "../../types";
+import type { Product, DeliveryType, TipoPrecio, TipoDocumento, MetodoPagoVenta } from "../../types";
 import { calcularSemaforo, PRODUCT_UNIT_LABELS, precioPublico } from "../../types";
+import { precioSegunTipo } from "../../lib/precioVenta";
 import ProductSearchSelect from "../common/ProductSearchSelect";
-import { DELIVERY_TYPE_LABELS } from "../../types";
+import { DELIVERY_TYPE_LABELS, TIPO_DOCUMENTO_LABELS, METODO_PAGO_VENTA_LABELS } from "../../types";
 import { registerSale, type SaleItemInput } from "../../hooks/useSales";
+import { marcarCotizacionConvertida } from "../../hooks/useCotizaciones";
 
 const money = (n: number) => `$${n.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-/** Precio final de un producto según el tipo de precio elegido (igual
- * que calcula register_sale en el servidor, para que el total mostrado
- * aquí coincida con lo que de verdad se va a cobrar). */
-function precioSegunTipo(p: Product, tipo: TipoPrecio): number {
-  if (tipo === "promocion") {
-    if (p.precio_lista != null) return Math.round(Number(p.unit_price) * 100) / 100;
-    return Math.round(p.unit_price * (1 - (p.descuento_porcentaje ?? 0) / 100) * 100) / 100;
-  }
-  return precioPublico(p);
+/** Datos de una cotización para convertirla en venta (se precarga el formulario). */
+export interface DesdeCotizacion {
+  id: string;
+  folio: string;
+  customer_name: string;
+  customer_phone: string | null;
+  customer_address: string | null;
+  items: { product_id: string; quantity: number; tipo_precio: TipoPrecio }[];
 }
 
 interface Props {
   products: Product[];
   onClose: () => void;
   onSuccess: (folio: string) => void;
+  desdeCotizacion?: DesdeCotizacion;
 }
 
 interface DraftItem {
@@ -33,15 +35,27 @@ interface DraftItem {
   tipo_precio: TipoPrecio;
 }
 
-export default function NuevaVentaModal({ products, onClose, onSuccess }: Props) {
-  const [customerName, setCustomerName] = useState("");
-  const [customerPhone, setCustomerPhone] = useState("");
-  const [customerAddress, setCustomerAddress] = useState("");
+export default function NuevaVentaModal({ products, onClose, onSuccess, desdeCotizacion }: Props) {
+  const [customerName, setCustomerName] = useState(desdeCotizacion?.customer_name ?? "");
+  const [customerPhone, setCustomerPhone] = useState(desdeCotizacion?.customer_phone ?? "");
+  const [customerAddress, setCustomerAddress] = useState(desdeCotizacion?.customer_address ?? "");
   const [deliveryType, setDeliveryType] = useState<DeliveryType>("inmediata");
   const [pickupDate, setPickupDate] = useState("");
-  const [items, setItems] = useState<DraftItem[]>([
-    { key: crypto.randomUUID(), product_id: "", quantity: 1, delivery_type: "", tipo_precio: "publico" },
-  ]);
+  const [tipoDocumento, setTipoDocumento] = useState<TipoDocumento>("nota");
+  const [numeroOrden, setNumeroOrden] = useState("");
+  const [metodoPago, setMetodoPago] = useState<MetodoPagoVenta | "">("");
+  const [mesesNota, setMesesNota] = useState("");
+  const [items, setItems] = useState<DraftItem[]>(
+    desdeCotizacion && desdeCotizacion.items.length > 0
+      ? desdeCotizacion.items.map((i) => ({
+          key: crypto.randomUUID(),
+          product_id: i.product_id,
+          quantity: i.quantity,
+          delivery_type: "" as DeliveryType | "",
+          tipo_precio: i.tipo_precio,
+        }))
+      : [{ key: crypto.randomUUID(), product_id: "", quantity: 1, delivery_type: "", tipo_precio: "publico" }]
+  );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -113,13 +127,18 @@ export default function NuevaVentaModal({ products, onClose, onSuccess }: Props)
       customerAddress,
       deliveryType,
       payloadItems,
-      deliveryType === "retiro_sucursal" ? pickupDate : undefined
+      deliveryType === "retiro_sucursal" ? pickupDate : undefined,
+      { tipoDocumento, numeroOrden, metodoPago, mesesNota }
     );
     setSubmitting(false);
 
     if (rpcError || !folio) {
       setError(rpcError ?? "No se pudo registrar la venta.");
       return;
+    }
+    if (desdeCotizacion) {
+      // La venta ya quedó registrada; si esto falla, la cotización solo se queda abierta.
+      await marcarCotizacionConvertida(desdeCotizacion.id, folio);
     }
     onSuccess(folio);
   }
@@ -128,7 +147,9 @@ export default function NuevaVentaModal({ products, onClose, onSuccess }: Props)
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 overflow-y-auto">
       <div className="bg-white rounded-2xl w-full max-w-xl p-5 my-8">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold text-gigante-navy">Nueva venta</h2>
+          <h2 className="text-lg font-bold text-gigante-navy">
+            {desdeCotizacion ? `Venta desde cotización ${desdeCotizacion.folio}` : "Nueva venta"}
+          </h2>
           <button onClick={onClose} aria-label="Cerrar" className="text-gigante-muted">
             <X size={20} />
           </button>
@@ -170,6 +191,79 @@ export default function NuevaVentaModal({ products, onClose, onSuccess }: Props)
                 ))}
               </select>
             </div>
+          </div>
+
+
+          <div className="rounded-xl border border-gigante-border p-3 space-y-3 bg-gigante-bg/50">
+            <div>
+              <p className="block text-sm font-medium text-gigante-navy mb-1">Documento</p>
+              <div className="grid grid-cols-2 gap-2">
+                {(Object.keys(TIPO_DOCUMENTO_LABELS) as TipoDocumento[]).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setTipoDocumento(t)}
+                    className={`rounded-lg border px-3 py-2 text-sm font-medium ${
+                      tipoDocumento === t
+                        ? "border-gigante-navy bg-gigante-navy text-white"
+                        : "border-gigante-border bg-white text-gigante-navy"
+                    }`}
+                  >
+                    {TIPO_DOCUMENTO_LABELS[t]}
+                  </button>
+                ))}
+              </div>
+              {tipoDocumento === "factura" && (
+                <p className="text-[11px] text-gigante-muted mt-1">
+                  El folio de la factura lo captura Caja al cobrar.
+                </p>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gigante-navy mb-1">Número de orden</label>
+                <input
+                  value={numeroOrden}
+                  onChange={(e) => setNumeroOrden(e.target.value)}
+                  placeholder="Opcional"
+                  className="w-full rounded-lg border border-gigante-border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gigante-navy/30"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gigante-navy mb-1">Método de pago</label>
+                <select
+                  value={metodoPago}
+                  onChange={(e) => setMetodoPago(e.target.value as MetodoPagoVenta | "")}
+                  className="w-full rounded-lg border border-gigante-border px-3 py-2.5 text-sm bg-white"
+                >
+                  <option value="">Sin definir</option>
+                  {(Object.keys(METODO_PAGO_VENTA_LABELS) as MetodoPagoVenta[]).map((m) => (
+                    <option key={m} value={m}>
+                      {METODO_PAGO_VENTA_LABELS[m]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            {metodoPago === "a_meses" && (
+              <div>
+                <label className="block text-sm font-medium text-gigante-navy mb-1">
+                  Anotación de los meses (opcional)
+                </label>
+                <input
+                  value={mesesNota}
+                  onChange={(e) => setMesesNota(e.target.value)}
+                  placeholder="Ej. 6 meses sin intereses"
+                  className="w-full rounded-lg border border-gigante-border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gigante-navy/30"
+                />
+                <p className="text-[11px] text-gigante-muted mt-1">
+                  Es solo una nota para Caja: el sistema no calcula intereses ni mensualidades.
+                </p>
+              </div>
+            )}
+            <p className="text-[11px] text-gigante-muted">
+              Al registrar, la venta pasa primero a <strong>Caja</strong>. Almacén la ve hasta que Caja registre el pago.
+            </p>
           </div>
 
           {needsAddress && (
@@ -231,7 +325,8 @@ export default function NuevaVentaModal({ products, onClose, onSuccess }: Props)
                       </div>
                       <input
                         type="number"
-                        min="1"
+                        min="0.01"
+                        step="any"
                         value={item.quantity}
                         onChange={(e) => updateItem(item.key, { quantity: Number(e.target.value) })}
                         className="w-20 rounded-lg border border-gigante-border px-2 py-2 text-xs"

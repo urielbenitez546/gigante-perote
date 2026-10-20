@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
-import { NAV_MODULES } from "../../types";
+import { NAV_MODULES, tienePermiso } from "../../types";
 import { useAuth } from "../../context/AuthContext";
 import { MODULE_ICONS } from "./navIcons";
 import { MoreHorizontal, X } from "lucide-react";
@@ -10,7 +10,9 @@ export default function BottomNav() {
   const [moreOpen, setMoreOpen] = useState(false);
   if (!profile) return null;
 
-  const visibleModules = NAV_MODULES.filter((m) => m.roles.includes(profile.role));
+  const visibleModules = NAV_MODULES.filter(
+    (m) => m.roles.includes(profile.role) && (!m.permiso || tienePermiso(profile, m.permiso))
+  );
   const primary = visibleModules.slice(0, 3);
   const rest = visibleModules.slice(3);
 

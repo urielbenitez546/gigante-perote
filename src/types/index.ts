@@ -40,7 +40,10 @@ export type PermisoKey =
   | "dar_de_baja"
   | "corregir_cobros"
   | "confirmar_retiros"
-  | "pedir_exhibicion";
+  | "pedir_exhibicion"
+  | "anular_kardex"
+  | "ver_km"
+  | "programar_entregas";
 
 export const PERMISOS: { key: PermisoKey; label: string; ayuda: string }[] = [
   { key: "editar_precios", label: "Editar precio, rotación y datos del producto", ayuda: "Botón de lápiz en Inventario." },
@@ -52,6 +55,9 @@ export const PERMISOS: { key: PermisoKey; label: string; ayuda: string }[] = [
   { key: "corregir_cobros", label: "Corregir el monto cobrado de una venta", ayuda: "Caja solo registra el cobro la primera vez; corregirlo es de Gerencia." },
   { key: "confirmar_retiros", label: "Confirmar retiros en sucursal", ayuda: "Marcar que el cliente ya recogió su mercancía." },
   { key: "pedir_exhibicion", label: "Pedir exhibir o retirar producto de piso", ayuda: "Solicitudes de exhibición en Inventario." },
+  { key: "anular_kardex", label: "Anular renglones del Kardex", ayuda: "Corregir un error del Kardex: queda tachado con el motivo, no se borra." },
+  { key: "ver_km", label: "Ver kilometraje y repartos del día", ayuda: "Módulo Kilometraje: destinos y km de cada chofer." },
+  { key: "programar_entregas", label: "Programar día y hora de entregas", ayuda: "Pantalla Entregas por programar: asignar y cambiar fecha, hora y marcar “esperando proveedor”." },
 ];
 
 export function permisoPorDefecto(
@@ -79,6 +85,11 @@ export function permisoPorDefecto(
     case "confirmar_retiros":
     case "pedir_exhibicion":
       return role === "ventas" || operativo;
+    case "anular_kardex":
+      return n === "jefe";
+    case "ver_km":
+    case "programar_entregas":
+      return operativo;
   }
 }
 
@@ -122,14 +133,21 @@ export interface NavModule {
   label: string;
   path: string;
   roles: AppRole[]; // roles que pueden ver este módulo
+  /** Si se indica, además del rol hace falta este permiso (por ejemplo, jefe y auxiliar pero no almacenistas). */
+  permiso?: PermisoKey;
 }
 
 export const NAV_MODULES: NavModule[] = [
   { key: "inicio", label: "Inicio", path: "/", roles: ["gerencia", "ventas", "caja", "almacen", "reparto"] },
   { key: "inventario", label: "Inventario", path: "/inventario", roles: ["gerencia", "ventas", "almacen"] },
-  { key: "kardex", label: "Kardex", path: "/kardex", roles: ["gerencia", "almacen"] },
+  { key: "kardex", label: "Kardex", path: "/kardex", roles: ["gerencia", "almacen", "reparto"] },
+  { key: "kilometraje", label: "Kilometraje", path: "/kilometraje", roles: ["gerencia", "almacen"], permiso: "ver_km" },
   { key: "ventas", label: "Ventas y Entregas", path: "/ventas", roles: ["gerencia", "ventas", "caja"] },
   { key: "pedidos", label: "Pedidos Pendientes", path: "/pedidos", roles: ["gerencia", "ventas", "almacen", "caja"] },
+  { key: "por-programar", label: "Entregas por programar", path: "/por-programar", roles: ["gerencia", "almacen"] },
+  { key: "traslados", label: "Traslados a sucursales", path: "/traslados", roles: ["gerencia", "ventas", "almacen"] },
+  { key: "combustible", label: "Combustible y montacargas", path: "/combustible", roles: ["gerencia", "reparto", "almacen"] },
+  { key: "cotizaciones", label: "Cotizaciones", path: "/cotizaciones", roles: ["gerencia", "ventas", "caja"] },
   { key: "retiros", label: "Retiros en Sucursal", path: "/retiros", roles: ["gerencia", "ventas", "almacen"] },
   { key: "repartos", label: "Repartos", path: "/repartos", roles: ["gerencia", "reparto"] },
   { key: "evidencias", label: "Evidencias y Cobros", path: "/evidencias-cobros", roles: ["gerencia", "caja"] },
@@ -293,7 +311,46 @@ export interface Sale {
   created_at: string;
   delivered_at: string | null;
   scheduled_pickup_date: string | null;
+  // Etapa 2: documento, pago, paso por Caja y programación
+  tipo_documento: TipoDocumento;
+  numero_orden: string | null;
+  numero_factura: string | null;
+  metodo_pago: MetodoPagoVenta | null;
+  meses_nota: string | null;
+  estado_pago: EstadoPago;
+  liberada_almacen_at: string | null;
+  liberada_almacen_por: string | null;
+  liberada_sin_cobro: boolean;
+  fecha_programada: string | null; // yyyy-mm-dd
+  hora_programada: string | null; // HH:MM:SS
+  programada_por: string | null;
+  programada_at: string | null;
+  esperando_proveedor: boolean;
+  proveedor_nota: string | null;
+  proveedor_desde: string | null;
 }
+
+export type TipoDocumento = "nota" | "factura";
+export const TIPO_DOCUMENTO_LABELS: Record<TipoDocumento, string> = {
+  nota: "Nota sencilla",
+  factura: "Factura",
+};
+
+export type MetodoPagoVenta = "efectivo" | "tarjeta_debito" | "tarjeta_credito" | "transferencia" | "a_meses";
+export const METODO_PAGO_VENTA_LABELS: Record<MetodoPagoVenta, string> = {
+  efectivo: "Efectivo",
+  tarjeta_debito: "Tarjeta de débito",
+  tarjeta_credito: "Tarjeta de crédito",
+  transferencia: "Transferencia",
+  a_meses: "A meses",
+};
+
+export type EstadoPago = "pendiente" | "parcial" | "pagado";
+export const ESTADO_PAGO_LABELS: Record<EstadoPago, string> = {
+  pendiente: "Sin pago",
+  parcial: "Pago parcial",
+  pagado: "Pagado",
+};
 
 export type TipoPrecio = "publico" | "promocion";
 
@@ -465,7 +522,10 @@ export type NotificationType =
   | "exhibicion_poner"
   | "exhibicion_revision"
   | "exhibicion_rechazada"
-  | "etiquetas_por_cambiar";
+  | "etiquetas_por_cambiar"
+  | "entrega_inmediata"
+  | "venta_por_programar"
+  | "solicitud_traslado";
 
 export interface AppNotification {
   id: string;

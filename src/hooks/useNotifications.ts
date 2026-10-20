@@ -1,14 +1,18 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import type { AppNotification } from "../types";
+import { sonarAviso } from "../lib/sonido";
 
 const POLL_INTERVAL_MS = 25_000;
+// Avisos que hacen sonar la campanita (los demás solo se ven).
+const TIPOS_CON_SONIDO = new Set(["entrega_inmediata", "venta_por_programar", "solicitud_traslado"]);
 
 export function useNotifications() {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const conocidas = useRef<Set<string> | null>(null);
 
   const reload = useCallback(async () => {
     const [{ data: notifData, error: notifErr }, { data: readsData, error: readsErr }] = await Promise.all([
@@ -22,8 +26,18 @@ export function useNotifications() {
       setError(readsErr.message);
     } else {
       setError(null);
-      setNotifications((notifData as unknown as AppNotification[]) ?? []);
-      setReadIds(new Set((readsData ?? []).map((r) => r.notification_id as string)));
+      const lista = (notifData as unknown as AppNotification[]) ?? [];
+      const leidas = new Set((readsData ?? []).map((r) => r.notification_id as string));
+      // Suena solo con avisos nuevos (no la primera carga) que aún no se han leído.
+      if (conocidas.current) {
+        const previas = conocidas.current;
+        if (lista.some((n) => !previas.has(n.id) && !leidas.has(n.id) && TIPOS_CON_SONIDO.has(n.type))) {
+          sonarAviso();
+        }
+      }
+      conocidas.current = new Set(lista.map((n) => n.id));
+      setNotifications(lista);
+      setReadIds(leidas);
     }
     setLoading(false);
   }, []);

@@ -12,7 +12,21 @@ const STATUS_BADGE: Record<string, string> = {
 };
 
 export default function Repartos() {
-  const { deliveries, loading, error } = useDeliveries();
+  const { deliveries: todos, loading, error } = useDeliveries();
+
+  // Solo repartos de ventas que Caja ya pasó a almacén; primero los más próximos.
+  const deliveries = useMemo(
+    () =>
+      todos
+        .filter((d) => !!d.sale.liberada_almacen_at)
+        .sort((a, b) => {
+          const fa = a.sale.fecha_programada ?? "9999-12-31";
+          const fb = b.sale.fecha_programada ?? "9999-12-31";
+          if (fa !== fb) return fa.localeCompare(fb);
+          return (a.sale.hora_programada ?? "99").localeCompare(b.sale.hora_programada ?? "99");
+        }),
+    [todos]
+  );
 
   const stats = useMemo(() => {
     const hoy = deliveries.length;
@@ -79,7 +93,9 @@ export default function Repartos() {
               <tr>
                 <th className="text-left font-medium px-4 py-3">Folio</th>
                 <th className="text-left font-medium px-4 py-3">Cliente</th>
+                <th className="text-left font-medium px-4 py-3">Día y hora</th>
                 <th className="text-left font-medium px-4 py-3">Dirección</th>
+                <th className="text-right font-medium px-4 py-3">Por cobrar</th>
                 <th className="text-left font-medium px-4 py-3">Estado</th>
                 <th className="text-right font-medium px-4 py-3">Acción</th>
               </tr>
@@ -89,7 +105,33 @@ export default function Repartos() {
                 <tr key={d.id} className="border-t border-gigante-border">
                   <td className="px-4 py-3 font-medium text-gigante-navy">{d.sale.folio}</td>
                   <td className="px-4 py-3 text-gigante-navy">{d.sale.customer_name}</td>
+                  <td className="px-4 py-3 text-xs text-gigante-navy whitespace-nowrap">
+                    {d.sale.fecha_programada ? (
+                      <>
+                        {new Date(d.sale.fecha_programada + "T12:00:00").toLocaleDateString("es-MX", {
+                          weekday: "short",
+                          day: "numeric",
+                          month: "short",
+                        })}
+                        {d.sale.hora_programada ? ` · ${d.sale.hora_programada.slice(0, 5)}` : ""}
+                      </>
+                    ) : (
+                      <span className="text-gigante-muted">Sin programar</span>
+                    )}
+                    {d.sale.esperando_proveedor && (
+                      <span className="block text-[10px] text-amber-700">Esperando material</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-gigante-muted">{d.sale.customer_address}</td>
+                  <td className="px-4 py-3 text-right whitespace-nowrap">
+                    {Math.max(d.sale.total - d.sale.amount_paid, 0) > 0 ? (
+                      <span className="text-xs font-semibold text-gigante-red">
+                        ${Math.max(d.sale.total - d.sale.amount_paid, 0).toLocaleString("es-MX", { minimumFractionDigits: 2 })}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-emerald-700">Pagado</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3">
                     <span className={`text-xs rounded-full px-2 py-1 ${STATUS_BADGE[d.status]}`}>
                       {DELIVERY_STATUS_LABELS[d.status]}
