@@ -110,6 +110,7 @@ export default function Inventario() {
   const [exhMsg, setExhMsg] = useState<string | null>(null);
   const puedeExhibir = tienePermiso(profile, "pedir_exhibicion");
   const esGerencia = profile?.role === "gerencia";
+  const puedeConfirmarExh = esGerencia || tienePermiso(profile, "confirmar_exhibicion");
   const [conteoModal, setConteoModal] = useState<{ productId?: string } | null>(null);
 
   const [tab, setTab] = useState<TabKey>("productos");
@@ -708,7 +709,7 @@ export default function Inventario() {
           ) : movements.length === 0 ? (
             <p className="p-6 text-sm text-gigante-muted">Todavía no hay movimientos registrados.</p>
           ) : (
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto"><table className="w-full text-sm min-w-[640px]">
               <thead className="bg-gigante-bg text-gigante-muted text-xs">
                 <tr>
                   <th className="text-left font-medium px-4 py-3">Fecha</th>
@@ -745,7 +746,7 @@ export default function Inventario() {
                   );
                 })}
               </tbody>
-            </table>
+            </table></div>
           )}
         </div>
       )}
@@ -761,7 +762,7 @@ export default function Inventario() {
             ) : invoices.length === 0 ? (
               <p className="p-6 text-sm text-gigante-muted">Todavía no hay facturas registradas.</p>
             ) : (
-              <table className="w-full text-sm">
+              <div className="overflow-x-auto"><table className="w-full text-sm min-w-[640px]">
                 <thead className="bg-gigante-bg text-gigante-muted text-xs">
                   <tr>
                     <th className="text-left font-medium px-4 py-3">Fecha</th>
@@ -801,7 +802,7 @@ export default function Inventario() {
                     );
                   })}
                 </tbody>
-              </table>
+              </table></div>
             )}
           </div>
         </div>
@@ -814,7 +815,7 @@ export default function Inventario() {
           ) : writeOffs.length === 0 ? (
             <p className="p-6 text-sm text-gigante-muted">Todavía no hay bajas de material registradas.</p>
           ) : (
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto"><table className="w-full text-sm min-w-[640px]">
               <thead className="bg-gigante-bg text-gigante-muted text-xs">
                 <tr>
                   <th className="text-left font-medium px-4 py-3">Fecha</th>
@@ -854,7 +855,7 @@ export default function Inventario() {
                   );
                 })}
               </tbody>
-            </table>
+            </table></div>
           )}
         </div>
       )}
@@ -1029,7 +1030,7 @@ export default function Inventario() {
                             </p>
                           )}
                           {r.estado === "pendiente" ? (
-                            esGerencia ? (
+                            puedeConfirmarExh && (esGerencia || r.solicitado_por !== profile?.id) ? (
                               revision?.id === r.id ? (
                                 <div className="mt-2 flex gap-2 flex-wrap">
                                   <input
@@ -1065,7 +1066,12 @@ export default function Inventario() {
                                 </div>
                               )
                             ) : (
-                              <p className="text-xs mt-1 text-gigante-navy">⏳ Esperando confirmación de Gerencia</p>
+                              <p className="text-xs mt-1 text-gigante-navy">
+                                ⏳{" "}
+                                {puedeConfirmarExh && r.solicitado_por === profile?.id
+                                  ? "Tu registro lo debe confirmar otra persona (Gerencia)"
+                                  : "Esperando confirmación de Gerencia o del Jefe de almacén"}
+                              </p>
                             )
                           ) : (
                             <p className={`text-xs mt-1 ${r.estado === "confirmada" ? "text-emerald-700" : "text-red-700"}`}>

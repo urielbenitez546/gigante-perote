@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { NAV_MODULES, ROLE_LABELS, calcularSemaforo, SEMAFORO_LABELS, type SemaforoStatus } from "../types";
+import { NAV_MODULES, moduloVisible, ROLE_LABELS, calcularSemaforo, SEMAFORO_LABELS, type SemaforoStatus } from "../types";
 import { MODULE_ICONS } from "../components/layout/navIcons";
 import StatCard from "../components/dashboard/StatCard";
 import InventoryDonut from "../components/dashboard/InventoryDonut";
@@ -39,10 +39,10 @@ export default function Inicio() {
   const { products } = useProducts();
 
   const can = (moduleKey: string) =>
-    !!profile && (NAV_MODULES.find((m) => m.key === moduleKey)?.roles.includes(profile.role) ?? false);
+    !!profile && NAV_MODULES.some((m) => m.key === moduleKey && moduloVisible(profile, m));
 
   const quickAccessModules = profile
-    ? NAV_MODULES.filter((m) => m.key !== "inicio" && m.roles.includes(profile.role))
+    ? NAV_MODULES.filter((m) => m.key !== "inicio" && moduloVisible(profile, m))
     : [];
 
   const showRepartos = can("repartos");

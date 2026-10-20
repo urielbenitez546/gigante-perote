@@ -88,7 +88,7 @@ export default function Repartos() {
             entrega a domicilio.
           </p>
         ) : (
-          <table className="w-full text-sm">
+          <table className="w-full text-sm hidden md:table">
             <thead className="bg-gigante-bg text-gigante-muted text-xs">
               <tr>
                 <th className="text-left font-medium px-4 py-3">Folio</th>
@@ -149,6 +149,56 @@ export default function Repartos() {
               ))}
             </tbody>
           </table>
+        )}
+
+        {!loading && deliveries.length > 0 && (
+          <div className="md:hidden divide-y divide-gigante-border">
+            {deliveries.map((d) => {
+              const porCobrar = Math.max(d.sale.total - d.sale.amount_paid, 0);
+              return (
+                <Link key={d.id} to={`/repartos/${d.id}`} className="block p-4 active:bg-gigante-bg">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gigante-navy">
+                        {d.sale.folio} · {d.sale.customer_name}
+                      </p>
+                      {d.sale.customer_address && (
+                        <p className="text-xs text-gigante-muted mt-0.5 break-words">{d.sale.customer_address}</p>
+                      )}
+                    </div>
+                    <span className={`shrink-0 text-xs rounded-full px-2 py-1 ${STATUS_BADGE[d.status]}`}>
+                      {DELIVERY_STATUS_LABELS[d.status]}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between mt-2 text-xs">
+                    <span className="text-gigante-navy">
+                      {d.sale.fecha_programada ? (
+                        <>
+                          {new Date(d.sale.fecha_programada + "T12:00:00").toLocaleDateString("es-MX", {
+                            weekday: "short",
+                            day: "numeric",
+                            month: "short",
+                          })}
+                          {d.sale.hora_programada ? ` · ${d.sale.hora_programada.slice(0, 5)}` : ""}
+                        </>
+                      ) : (
+                        <span className="text-gigante-muted">Sin programar</span>
+                      )}
+                      {d.sale.esperando_proveedor && <span className="text-amber-700"> · Esperando material</span>}
+                    </span>
+                    {porCobrar > 0 ? (
+                      <span className="font-semibold text-gigante-red">
+                        Cobrar ${porCobrar.toLocaleString("es-MX", { minimumFractionDigits: 2 })}
+                      </span>
+                    ) : (
+                      <span className="text-emerald-700">Pagado</span>
+                    )}
+                  </div>
+                  <p className="mt-2 text-xs font-semibold text-gigante-red">Ver detalle →</p>
+                </Link>
+              );
+            })}
+          </div>
         )}
       </div>
     </div>

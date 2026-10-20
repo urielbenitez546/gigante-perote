@@ -70,7 +70,7 @@ export default function PorProgramar() {
   const { profile } = useAuth();
   const { sales, loading, error, reload } = useOpenSales();
   const puedeProgramar = tienePermiso(profile, "programar_entregas");
-  const puedeConfirmar = tienePermiso(profile, "confirmar_retiros");
+  const puedeConfirmar = profile?.role === "almacen" || tienePermiso(profile, "confirmar_retiros");
 
   const [filtro, setFiltro] = useState<Filtro>(puedeProgramar ? "sin_fecha" : "inmediata");
   const [vista, setVista] = useState<Vista>("lista");

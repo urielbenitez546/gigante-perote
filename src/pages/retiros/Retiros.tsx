@@ -73,7 +73,7 @@ export default function Retiros() {
         ) : withRetiroLines.length === 0 ? (
           <p className="p-6 text-sm text-gigante-muted">No hay ventas de tipo "retiro en sucursal".</p>
         ) : (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto"><table className="w-full text-sm min-w-[640px]">
             <thead className="bg-gigante-bg text-gigante-muted text-xs">
               <tr>
                 <th className="text-left font-medium px-4 py-3">Folio</th>
@@ -134,7 +134,7 @@ export default function Retiros() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         )}
       </div>
 

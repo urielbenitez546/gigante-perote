@@ -22,6 +22,7 @@ import Capacitacion from "./pages/capacitacion/Capacitacion";
 import Kardex from "./pages/kardex/Kardex";
 import Kilometraje from "./pages/kilometraje/Kilometraje";
 import PorProgramar from "./pages/programacion/PorProgramar";
+import EntregasHoy from "./pages/programacion/EntregasHoy";
 import Traslados from "./pages/traslados/Traslados";
 import Combustible from "./pages/combustible/Combustible";
 import Cotizaciones from "./pages/cotizaciones/Cotizaciones";
@@ -67,7 +68,7 @@ export default function App() {
             <Route
               path="/kilometraje"
               element={
-                <ProtectedRoute allowedRoles={["gerencia", "almacen"]}>
+                <ProtectedRoute allowedRoles={["gerencia", "almacen"]} moduleKey="kilometraje">
                   <Kilometraje />
                 </ProtectedRoute>
               }
@@ -75,15 +76,23 @@ export default function App() {
             <Route
               path="/por-programar"
               element={
-                <ProtectedRoute allowedRoles={["gerencia", "almacen"]}>
+                <ProtectedRoute allowedRoles={["gerencia", "almacen"]} moduleKey="por-programar" redirectTo="/entregas-hoy">
                   <PorProgramar />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/entregas-hoy"
+              element={
+                <ProtectedRoute allowedRoles={["gerencia", "almacen"]}>
+                  <EntregasHoy />
                 </ProtectedRoute>
               }
             />
             <Route
               path="/traslados"
               element={
-                <ProtectedRoute allowedRoles={["gerencia", "ventas", "almacen"]}>
+                <ProtectedRoute allowedRoles={["gerencia", "ventas", "almacen"]} moduleKey="traslados">
                   <Traslados />
                 </ProtectedRoute>
               }

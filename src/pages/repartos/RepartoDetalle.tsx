@@ -12,6 +12,7 @@ import {
 } from "../../types";
 import { pendingLinesFor } from "../../lib/pendingLines";
 import { uploadPhoto, uploadPhotos, publicPhotoUrl } from "../../lib/storage";
+import MiniaturaFoto from "../../components/common/MiniaturaFoto";
 import ConfirmarEntregaParcialModal from "../../components/ventas/ConfirmarEntregaParcialModal";
 import SignatureCanvas from "../../components/repartos/SignatureCanvas";
 
@@ -468,8 +469,8 @@ export default function RepartoDetalle() {
                     <div className="flex flex-wrap gap-2 mt-2">
                       {photoFiles.map((file, i) => (
                         <div key={i} className="relative">
-                          <img
-                            src={URL.createObjectURL(file)}
+                          <MiniaturaFoto
+                            file={file}
                             alt={`Foto ${i + 1}`}
                             className="w-16 h-16 object-cover rounded-lg border border-gigante-border"
                           />

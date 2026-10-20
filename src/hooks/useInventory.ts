@@ -91,15 +91,18 @@ export async function registerInventorySalida(
 
 /** Id del último renglón (entrada o salida) que esta persona registró de un producto:
  * sirve para colgarle la foto de apoyo justo después de guardarlo. */
-export async function ultimoMovimientoPropio(productId: string, tipo: "entrada" | "salida", userId: string) {
-  const { data, error } = await supabase
+export async function ultimoMovimientoPropio(productId: string, tipo: "entrada" | "salida", userId: string, desde?: string) {
+  let q = supabase
     .from("inventory_movements")
     .select("id")
     .eq("product_id", productId)
     .eq("type", tipo)
-    .eq("created_by", userId)
+    .or(`created_by.eq.${userId},created_by.is.null`)
     .order("created_at", { ascending: false })
     .limit(1);
+  // Solo renglones creados desde que se tocó "Guardar" (con un margen por diferencia de relojes).
+  if (desde) q = q.gte("created_at", new Date(new Date(desde).getTime() - 60_000).toISOString());
+  const { data, error } = await q;
   if (error || !data || data.length === 0) return null;
   return data[0].id as string;
 }

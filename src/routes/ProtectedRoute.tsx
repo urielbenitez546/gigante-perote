@@ -1,14 +1,18 @@
 import type { ReactNode } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import type { AppRole } from "../types";
+import { NAV_MODULES, moduloVisible, type AppRole } from "../types";
 
 interface Props {
   children: ReactNode;
   allowedRoles?: AppRole[];
+  /** Módulo del menú: además del rol, se exige el permiso que ese módulo pida (ej. Kilometraje). */
+  moduleKey?: string;
+  /** Si no le corresponde, en vez del aviso se le manda a esta ruta. */
+  redirectTo?: string;
 }
 
-export default function ProtectedRoute({ children, allowedRoles }: Props) {
+export default function ProtectedRoute({ children, allowedRoles, moduleKey, redirectTo }: Props) {
   const { session, profile, loading, error, signOut } = useAuth();
 
   if (loading) {
@@ -47,6 +51,16 @@ export default function ProtectedRoute({ children, allowedRoles }: Props) {
             Cerrar sesión
           </button>
         </div>
+      </div>
+    );
+  }
+
+  const modulo = moduleKey ? NAV_MODULES.find((m) => m.key === moduleKey) : undefined;
+  if (profile && modulo && !moduloVisible(profile, modulo)) {
+    if (redirectTo) return <Navigate to={redirectTo} replace />;
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <p className="text-sm text-gigante-muted">No tienes permiso para ver este módulo.</p>
       </div>
     );
   }

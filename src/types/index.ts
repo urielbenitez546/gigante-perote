@@ -41,6 +41,7 @@ export type PermisoKey =
   | "corregir_cobros"
   | "confirmar_retiros"
   | "pedir_exhibicion"
+  | "confirmar_exhibicion"
   | "anular_kardex"
   | "ver_km"
   | "programar_entregas";
@@ -54,7 +55,8 @@ export const PERMISOS: { key: PermisoKey; label: string; ayuda: string }[] = [
   { key: "dar_de_baja", label: "Dar de baja material dañado", ayuda: "Sin este permiso, la persona solo puede reportar el incidente al Jefe de almacén y a Gerencia." },
   { key: "corregir_cobros", label: "Corregir el monto cobrado de una venta", ayuda: "Caja y Gerencia pueden corregir el cobro, siempre con motivo. Gerencia ve el historial de cambios." },
   { key: "confirmar_retiros", label: "Confirmar retiros en sucursal", ayuda: "Marcar que el cliente ya recogió su mercancía." },
-  { key: "pedir_exhibicion", label: "Pedir exhibir o retirar producto de piso", ayuda: "Solicitudes de exhibición en Inventario." },
+  { key: "pedir_exhibicion", label: "Registrar que exhibió o quitó un producto", ayuda: "Botones “Ya exhibí” / “Ya lo quité” con foto de evidencia en Inventario → Exhibición." },
+  { key: "confirmar_exhibicion", label: "Confirmar exhibiciones", ayuda: "Revisar la foto y confirmar o rechazar lo que registran los demás. Nadie confirma su propio registro." },
   { key: "anular_kardex", label: "Anular renglones del Kardex", ayuda: "Corregir un error del Kardex: queda tachado con el motivo, no se borra." },
   { key: "ver_km", label: "Ver kilometraje y repartos del día", ayuda: "Módulo Kilometraje: destinos y km de cada chofer." },
   { key: "programar_entregas", label: "Programar día y hora de entregas", ayuda: "Pantalla Entregas por programar: asignar y cambiar fecha, hora y marcar “esperando proveedor”." },
@@ -83,8 +85,11 @@ export function permisoPorDefecto(
     case "corregir_cobros":
       return role === "caja";
     case "confirmar_retiros":
-    case "pedir_exhibicion":
       return role === "ventas" || operativo;
+    case "pedir_exhibicion":
+      return role === "ventas" || role === "almacen";
+    case "confirmar_exhibicion":
+      return n === "jefe";
     case "anular_kardex":
       return n === "jefe";
     case "ver_km":
@@ -135,6 +140,19 @@ export interface NavModule {
   roles: AppRole[]; // roles que pueden ver este módulo
   /** Si se indica, además del rol hace falta este permiso (por ejemplo, jefe y auxiliar pero no almacenistas). */
   permiso?: PermisoKey;
+  /** Si se indica, el permiso de arriba solo se exige a estos roles (los demás lo ven por su rol). */
+  permisoRoles?: AppRole[];
+}
+
+/** ¿Este módulo le corresponde a esta persona? (rol + permiso si el módulo lo pide) */
+export function moduloVisible(
+  profile: Pick<Profile, "role" | "nivel_almacen" | "permisos"> | null | undefined,
+  m: NavModule
+): boolean {
+  if (!profile || !m.roles.includes(profile.role)) return false;
+  if (!m.permiso) return true;
+  if (m.permisoRoles && !m.permisoRoles.includes(profile.role)) return true;
+  return tienePermiso(profile, m.permiso);
 }
 
 export const NAV_MODULES: NavModule[] = [
@@ -144,8 +162,9 @@ export const NAV_MODULES: NavModule[] = [
   { key: "kilometraje", label: "Kilometraje", path: "/kilometraje", roles: ["gerencia", "almacen"], permiso: "ver_km" },
   { key: "ventas", label: "Ventas y Entregas", path: "/ventas", roles: ["gerencia", "ventas", "caja"] },
   { key: "pedidos", label: "Pedidos Pendientes", path: "/pedidos", roles: ["gerencia", "ventas", "almacen", "caja"] },
-  { key: "por-programar", label: "Entregas por programar", path: "/por-programar", roles: ["gerencia", "almacen"] },
-  { key: "traslados", label: "Traslados a sucursales", path: "/traslados", roles: ["gerencia", "ventas", "almacen"] },
+  { key: "por-programar", label: "Entregas por programar", path: "/por-programar", roles: ["gerencia", "almacen"], permiso: "programar_entregas" },
+  { key: "entregas-hoy", label: "Entregas de hoy", path: "/entregas-hoy", roles: ["gerencia", "almacen"] },
+  { key: "traslados", label: "Traslados a sucursales", path: "/traslados", roles: ["gerencia", "ventas", "almacen"], permiso: "operar_almacen", permisoRoles: ["almacen"] },
   { key: "combustible", label: "Combustible y montacargas", path: "/combustible", roles: ["gerencia", "reparto", "almacen"] },
   { key: "cotizaciones", label: "Cotizaciones", path: "/cotizaciones", roles: ["gerencia", "ventas", "caja"] },
   { key: "retiros", label: "Retiros en Sucursal", path: "/retiros", roles: ["gerencia", "ventas", "almacen"] },

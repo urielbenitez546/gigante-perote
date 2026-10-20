@@ -3,6 +3,7 @@ import { X, Camera, Store, Undo2 } from "lucide-react";
 import { PRODUCT_UNIT_LABELS, productoId, type Product } from "../../types";
 import { solicitarExhibicion } from "../../hooks/useInventory";
 import { uploadPhoto } from "../../lib/storage";
+import MiniaturaFoto from "../common/MiniaturaFoto";
 import ProductSearchSelect from "../common/ProductSearchSelect";
 
 interface Props {
@@ -18,7 +19,7 @@ interface Props {
 /**
  * Aviso de exhibición. Ventas o Almacén registran que ya exhibieron (o
  * quitaron) un producto, con foto como evidencia; queda pendiente hasta
- * que Gerencia lo confirma. Lo que registra Gerencia se confirma solo.
+ * que Gerencia o el Jefe de almacén lo confirma. Lo que registra Gerencia se confirma solo.
  */
 export default function ExhibicionModal({ products, tipo, initialProductId = "", esGerencia, onClose, onSuccess }: Props) {
   const [productId, setProductId] = useState(initialProductId);
@@ -27,7 +28,6 @@ export default function ExhibicionModal({ products, tipo, initialProductId = "",
   const [ubicacion, setUbicacion] = useState("");
   const [notas, setNotas] = useState("");
   const [foto, setFoto] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,7 +39,6 @@ export default function ExhibicionModal({ products, tipo, initialProductId = "",
 
   function elegirFoto(f: File | null) {
     setFoto(f);
-    setPreview(f ? URL.createObjectURL(f) : null);
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -92,7 +91,7 @@ export default function ExhibicionModal({ products, tipo, initialProductId = "",
         <p className="text-xs text-gigante-muted mb-4">
           {esGerencia
             ? "Como Gerencia, tu registro queda confirmado de inmediato."
-            : "Queda pendiente hasta que Gerencia revise la foto y lo confirme."}
+            : "Queda pendiente hasta que Gerencia o el Jefe de almacén revise la foto y lo confirme."}
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -133,7 +132,7 @@ export default function ExhibicionModal({ products, tipo, initialProductId = "",
                 onChange={(e) => elegirFoto(e.target.files?.[0] ?? null)}
               />
             </label>
-            {preview && <img src={preview} alt="Vista previa" className="mt-2 max-h-40 rounded-lg border border-gigante-border" />}
+            {foto && <MiniaturaFoto file={foto} alt="Vista previa" className="mt-2 max-h-40 rounded-lg border border-gigante-border" />}
           </div>
 
           {exhibir && (
@@ -205,7 +204,7 @@ export default function ExhibicionModal({ products, tipo, initialProductId = "",
               disabled={submitting || pool.length === 0}
               className="flex-1 bg-gigante-red hover:bg-gigante-redDark disabled:opacity-60 text-white rounded-lg py-2.5 text-sm font-semibold"
             >
-              {submitting ? "Guardando..." : esGerencia ? "Registrar" : "Enviar a Gerencia"}
+              {submitting ? "Guardando..." : esGerencia ? "Registrar" : "Enviar a revisión"}
             </button>
           </div>
         </form>

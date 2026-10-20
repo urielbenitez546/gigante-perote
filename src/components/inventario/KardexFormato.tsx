@@ -126,7 +126,12 @@ export default function KardexFormato({ product, onChanged }: Props) {
       return setMsg({ tipo: "error", texto: "Anota solo entrada o solo salida en cada renglón." });
     }
     if (nEntrada <= 0 && nSalida <= 0) {
-      return setMsg({ tipo: "error", texto: "Escribe cuánto entra o cuánto sale." });
+      return setMsg({
+        tipo: "error",
+        texto: foto
+          ? "Escribe cuánto entra o cuánto sale: la foto se guarda junto con el renglón."
+          : "Escribe cuánto entra o cuánto sale.",
+      });
     }
     if (nSalida > 0) {
       if (!puedeSalida) return setMsg({ tipo: "error", texto: "No tienes permiso para registrar salidas." });
@@ -153,6 +158,7 @@ export default function KardexFormato({ product, onChanged }: Props) {
       fotoPath = sub.path;
     }
     const tipoMov = nSalida > 0 ? "salida" : "entrada";
+    const inicioGuardado = new Date().toISOString();
     const { error: err } =
       nSalida > 0
         ? await registerInventorySalida(product.id, nSalida, referencia.trim())
@@ -164,7 +170,7 @@ export default function KardexFormato({ product, onChanged }: Props) {
 
     let avisoFoto: string | null = null;
     if (fotoPath && profile) {
-      const movId = await ultimoMovimientoPropio(product.id, tipoMov, profile.id);
+      const movId = await ultimoMovimientoPropio(product.id, tipoMov, profile.id, inicioGuardado);
       const adj = movId ? await adjuntarFotoKardex(movId, fotoPath) : { error: "no se encontró el renglón" };
       if (adj.error) avisoFoto = adj.error;
     }

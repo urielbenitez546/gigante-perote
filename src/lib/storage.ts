@@ -16,7 +16,13 @@ async function comprimirFoto(file: File): Promise<File> {
   try {
     if (!file.type.startsWith("image/") || file.type === "image/gif" || file.type === "image/svg+xml") return file;
     if (file.size < 150 * 1024) return file;
-    const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+    // Se decodifica ya reducida (mucho más rápido en el celular que abrir la foto completa).
+    let bitmap: ImageBitmap;
+    try {
+      bitmap = await createImageBitmap(file, { imageOrientation: "from-image", resizeWidth: 1280, resizeQuality: "medium" });
+    } catch {
+      bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+    }
     const MAX = 1280;
     const escala = Math.min(1, MAX / Math.max(bitmap.width, bitmap.height));
     const w = Math.round(bitmap.width * escala);
@@ -39,12 +45,43 @@ async function comprimirFoto(file: File): Promise<File> {
   }
 }
 
+// La compresión se hace una sola vez por foto y se guarda: así, si ya se preparó
+// al elegirla, al guardar solo queda subirla.
+const comprimidas = new WeakMap<File, Promise<File>>();
+
+export function fotoComprimida(file: File): Promise<File> {
+  let p = comprimidas.get(file);
+  if (!p) {
+    p = comprimirFoto(file);
+    comprimidas.set(file, p);
+  }
+  return p;
+}
+
+/**
+ * Empieza a preparar (reducir) cada foto en cuanto se elige, sin esperar a
+ * "Guardar". Se activa una sola vez al abrir la app.
+ */
+export function iniciarPrecompresion() {
+  document.addEventListener(
+    "change",
+    (e) => {
+      const t = e.target;
+      if (!(t instanceof HTMLInputElement) || t.type !== "file" || !t.files) return;
+      for (const f of Array.from(t.files)) {
+        if (f.type.startsWith("image/")) fotoComprimida(f).catch(() => undefined);
+      }
+    },
+    true
+  );
+}
+
 export async function uploadPhoto(
   bucket: PhotoBucket,
   original: File
 ): Promise<{ path: string | null; error: string | null }> {
   // La firma es un dibujo chico: no se toca.
-  const file = bucket === "repartos-firmas" ? original : await comprimirFoto(original);
+  const file = bucket === "repartos-firmas" ? original : await fotoComprimida(original);
   const ext = file.name.split(".").pop() || "jpg";
   const path = `${crypto.randomUUID()}.${ext}`;
 
@@ -68,14 +105,11 @@ export async function uploadPhotos(
   bucket: PhotoBucket,
   files: File[]
 ): Promise<{ paths: string[]; error: string | null }> {
-  const paths: string[] = [];
-  for (const file of files) {
-    const { path, error } = await uploadPhoto(bucket, file);
-    if (error || !path) {
-      return { paths, error: error ?? "No se pudo subir una de las fotos" };
-    }
-    paths.push(path);
-  }
+  // Las fotos se suben al mismo tiempo (más rápido que una por una).
+  const resultados = await Promise.all(files.map((f) => uploadPhoto(bucket, f)));
+  const paths = resultados.filter((r) => r.path && !r.error).map((r) => r.path as string);
+  const fallo = resultados.find((r) => r.error || !r.path);
+  if (fallo) return { paths, error: fallo.error ?? "No se pudo subir una de las fotos" };
   return { paths, error: null };
 }
 
