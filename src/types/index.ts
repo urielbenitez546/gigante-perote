@@ -52,7 +52,7 @@ export const PERMISOS: { key: PermisoKey; label: string; ayuda: string }[] = [
   { key: "kardex_entradas", label: "Kardex: registrar entradas y conteos", ayuda: "Anotar entradas de mercancía y conteos físicos en el Kardex." },
   { key: "registrar_facturas", label: "Registrar facturas de compra", ayuda: "Botón Registrar factura en Inventario." },
   { key: "dar_de_baja", label: "Dar de baja material dañado", ayuda: "Sin este permiso, la persona solo puede reportar el incidente al Jefe de almacén y a Gerencia." },
-  { key: "corregir_cobros", label: "Corregir el monto cobrado de una venta", ayuda: "Caja solo registra el cobro la primera vez; corregirlo es de Gerencia." },
+  { key: "corregir_cobros", label: "Corregir el monto cobrado de una venta", ayuda: "Caja y Gerencia pueden corregir el cobro, siempre con motivo. Gerencia ve el historial de cambios." },
   { key: "confirmar_retiros", label: "Confirmar retiros en sucursal", ayuda: "Marcar que el cliente ya recogió su mercancía." },
   { key: "pedir_exhibicion", label: "Pedir exhibir o retirar producto de piso", ayuda: "Solicitudes de exhibición en Inventario." },
   { key: "anular_kardex", label: "Anular renglones del Kardex", ayuda: "Corregir un error del Kardex: queda tachado con el motivo, no se borra." },
@@ -81,7 +81,7 @@ export function permisoPorDefecto(
     case "dar_de_baja":
       return n === "jefe";
     case "corregir_cobros":
-      return false;
+      return role === "caja";
     case "confirmar_retiros":
     case "pedir_exhibicion":
       return role === "ventas" || operativo;
@@ -525,7 +525,8 @@ export type NotificationType =
   | "etiquetas_por_cambiar"
   | "entrega_inmediata"
   | "venta_por_programar"
-  | "solicitud_traslado";
+  | "solicitud_traslado"
+  | "cobro_corregido";
 
 export interface AppNotification {
   id: string;

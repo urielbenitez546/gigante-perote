@@ -15,7 +15,7 @@ import {
 import { useAuth } from "../../context/AuthContext";
 import { useOpenSales, confirmarEntregaInmediata } from "../../hooks/useSales";
 import { pendingLinesFor } from "../../lib/pendingLines";
-import { tienePermiso, TIPO_DOCUMENTO_LABELS, type SaleWithItems } from "../../types";
+import { tienePermiso, type SaleWithItems } from "../../types";
 import DetalleVentaModal from "../../components/ventas/DetalleVentaModal";
 import ConfirmarEntregaParcialModal from "../../components/ventas/ConfirmarEntregaParcialModal";
 import ProgramarEntregaModal from "../../components/ventas/ProgramarEntregaModal";
@@ -172,8 +172,7 @@ export default function PorProgramar() {
             </button>
             <span className="text-sm text-gigante-navy"> · {sale.customer_name}</span>
             <p className="text-[11px] text-gigante-muted mt-0.5">
-              {tipos.join(" + ")} · {TIPO_DOCUMENTO_LABELS[sale.tipo_documento]}
-              {sale.numero_orden ? ` · Orden ${sale.numero_orden}` : ""}
+              {tipos.join(" + ")}
             </p>
             {sale.customer_address && f.domicilio.length > 0 && (
               <p className="text-[11px] text-gigante-muted">{sale.customer_address}</p>

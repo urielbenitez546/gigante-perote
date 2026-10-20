@@ -129,7 +129,6 @@ export const LESSONS: Lesson[] = [
     pasos: [
       "En “Ventas y Entregas” toca “Nueva venta”.",
       "Escribe el nombre del cliente y elige el tipo de entrega: se lo lleva ya, recoge en sucursal o a domicilio.",
-      "Elige si es Nota sencilla o Factura, y escribe el número de orden si lo tienes.",
       "Elige el método de pago: efectivo, tarjeta de débito o crédito, transferencia o “A meses” (ahí solo anotas los meses; Caja ve los intereses).",
       "Busca cada producto por código o nombre; a un lado ves el semáforo y cuánto hay disponible. Las cantidades pueden llevar decimales.",
       "Si una parte se la lleva hoy y otra se le entrega después, cambia el tipo de entrega de ESE producto.",
@@ -199,14 +198,15 @@ export const LESSONS: Lesson[] = [
     paraQue:
       "Registrar cuánto pagó el cliente. Al hacerlo, la venta llega a Almacén (y, si es entrega inmediata, les suena el aviso para cargar).",
     pasos: [
-      "En “Ventas y Entregas” entra al filtro “Esperando Caja” y abre el folio del cliente.",
+      "En “Ventas y Entregas” entra al filtro “Esperando Caja” y busca la venta del cliente.",
+      "Toca “Confirmar cobro” en esa fila.",
       "Escribe cuánto pagó (el total o un anticipo) y confirma el método de pago. Si es “A meses”, anota los meses.",
-      "Si la venta es con factura, escribe el folio de la factura.",
-      "Toca “Registrar pago y pasar a almacén”.",
+      "Toca “Confirmar cobro y pasar a almacén”.",
       "Excepción: si el cliente pagará todo al recibir en su domicilio, usa “Pasar a almacén sin cobro”. El chofer cobrará el total.",
       "Lo que falte por pagar queda como saldo: el chofer lo ve en su reparto para cobrarlo.",
+      "Si te equivocaste en el monto: toca “Corregir cobro”, escribe el monto correcto y el motivo. Gerencia ve el cambio.",
     ],
-    tip: "El cobro solo se registra una vez; si hay que corregirlo, lo hace Gerencia.",
+    tip: "Corregir un cobro siempre pide el motivo; queda guardado el monto de antes y de después.",
     pregunta: {
       texto: "El total es $1,000, el cliente deja $700 y el resto lo paga al recibir. ¿Qué pasa al registrar $700?",
       opciones: [

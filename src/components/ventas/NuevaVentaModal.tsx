@@ -1,10 +1,10 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { X, Plus, Trash2 } from "lucide-react";
-import type { Product, DeliveryType, TipoPrecio, TipoDocumento, MetodoPagoVenta } from "../../types";
+import type { Product, DeliveryType, TipoPrecio, MetodoPagoVenta } from "../../types";
 import { calcularSemaforo, PRODUCT_UNIT_LABELS, precioPublico } from "../../types";
 import { precioSegunTipo } from "../../lib/precioVenta";
 import ProductSearchSelect from "../common/ProductSearchSelect";
-import { DELIVERY_TYPE_LABELS, TIPO_DOCUMENTO_LABELS, METODO_PAGO_VENTA_LABELS } from "../../types";
+import { DELIVERY_TYPE_LABELS, METODO_PAGO_VENTA_LABELS } from "../../types";
 import { registerSale, type SaleItemInput } from "../../hooks/useSales";
 import { marcarCotizacionConvertida } from "../../hooks/useCotizaciones";
 
@@ -41,8 +41,6 @@ export default function NuevaVentaModal({ products, onClose, onSuccess, desdeCot
   const [customerAddress, setCustomerAddress] = useState(desdeCotizacion?.customer_address ?? "");
   const [deliveryType, setDeliveryType] = useState<DeliveryType>("inmediata");
   const [pickupDate, setPickupDate] = useState("");
-  const [tipoDocumento, setTipoDocumento] = useState<TipoDocumento>("nota");
-  const [numeroOrden, setNumeroOrden] = useState("");
   const [metodoPago, setMetodoPago] = useState<MetodoPagoVenta | "">("");
   const [mesesNota, setMesesNota] = useState("");
   const [items, setItems] = useState<DraftItem[]>(
@@ -128,7 +126,7 @@ export default function NuevaVentaModal({ products, onClose, onSuccess, desdeCot
       deliveryType,
       payloadItems,
       deliveryType === "retiro_sucursal" ? pickupDate : undefined,
-      { tipoDocumento, numeroOrden, metodoPago, mesesNota }
+      { tipoDocumento: "nota", numeroOrden: "", metodoPago, mesesNota }
     );
     setSubmitting(false);
 
@@ -195,40 +193,7 @@ export default function NuevaVentaModal({ products, onClose, onSuccess, desdeCot
 
 
           <div className="rounded-xl border border-gigante-border p-3 space-y-3 bg-gigante-bg/50">
-            <div>
-              <p className="block text-sm font-medium text-gigante-navy mb-1">Documento</p>
-              <div className="grid grid-cols-2 gap-2">
-                {(Object.keys(TIPO_DOCUMENTO_LABELS) as TipoDocumento[]).map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => setTipoDocumento(t)}
-                    className={`rounded-lg border px-3 py-2 text-sm font-medium ${
-                      tipoDocumento === t
-                        ? "border-gigante-navy bg-gigante-navy text-white"
-                        : "border-gigante-border bg-white text-gigante-navy"
-                    }`}
-                  >
-                    {TIPO_DOCUMENTO_LABELS[t]}
-                  </button>
-                ))}
-              </div>
-              {tipoDocumento === "factura" && (
-                <p className="text-[11px] text-gigante-muted mt-1">
-                  El folio de la factura lo captura Caja al cobrar.
-                </p>
-              )}
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-gigante-navy mb-1">Número de orden</label>
-                <input
-                  value={numeroOrden}
-                  onChange={(e) => setNumeroOrden(e.target.value)}
-                  placeholder="Opcional"
-                  className="w-full rounded-lg border border-gigante-border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gigante-navy/30"
-                />
-              </div>
+            <div className="grid grid-cols-1 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gigante-navy mb-1">Método de pago</label>
                 <select

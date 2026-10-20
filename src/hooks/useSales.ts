@@ -110,7 +110,7 @@ export interface CobroCajaInput {
 }
 
 /** Caja registra lo que pagó el cliente (total o parcial) y PASA la venta
- * a almacén. La primera vez es de Caja; corregirlo después es de Gerencia. */
+ * a almacén. Solo sirve la primera vez; cambiarlo después es "corregirCobroVenta" (con motivo). */
 export async function cajaCobrarVenta(saleId: string, c: CobroCajaInput) {
   const { error } = await supabase.rpc("caja_cobrar_venta", {
     p_sale_id: saleId,
@@ -121,6 +121,48 @@ export async function cajaCobrarVenta(saleId: string, c: CobroCajaInput) {
     p_pasar_sin_cobro: c.pasarSinCobro ?? false,
   });
   return { error: error?.message ?? null };
+}
+
+export interface CorreccionCobroInput {
+  monto: number;
+  metodoPago?: MetodoPagoVenta | "";
+  mesesNota?: string;
+  motivo: string;
+}
+
+/** Caja o Gerencia corrigen el cobro de una venta que ya pasó a almacén.
+ * El motivo es obligatorio y queda en el historial que ve Gerencia. */
+export async function corregirCobroVenta(saleId: string, c: CorreccionCobroInput) {
+  const { error } = await supabase.rpc("corregir_cobro_venta", {
+    p_sale_id: saleId,
+    p_monto: c.monto,
+    p_metodo_pago: c.metodoPago || null,
+    p_meses_nota: c.mesesNota?.trim() || null,
+    p_motivo: c.motivo.trim(),
+  });
+  return { error: error?.message ?? null };
+}
+
+export interface CobroHistorialEntry {
+  id: string;
+  sale_id: string;
+  monto_anterior: number;
+  monto_nuevo: number;
+  metodo_anterior: MetodoPagoVenta | null;
+  metodo_nuevo: MetodoPagoVenta | null;
+  motivo: string;
+  created_by: string | null;
+  created_at: string;
+}
+
+/** Solo Gerencia puede leerlo (lo controla la base de datos). */
+export async function cargarHistorialCobros(saleId: string) {
+  const { data, error } = await supabase
+    .from("sale_cobro_historial")
+    .select("*")
+    .eq("sale_id", saleId)
+    .order("created_at", { ascending: false });
+  return { historial: (data as CobroHistorialEntry[] | null) ?? [], error: error?.message ?? null };
 }
 
 export async function guardarFolioFactura(saleId: string, folio: string) {
