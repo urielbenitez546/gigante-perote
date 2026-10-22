@@ -29,7 +29,7 @@ export const KB_PAGINA: EntradaKB[] = [
     variantes: ["el cliente quiere otro color", "cambiar producto de la venta", "modificar venta"],
     claves: ["cambiar", "cambio", "producto", "modificar", "venta", "color", "otro"],
     respuesta:
-      "Abre la venta (en Ventas o en Pedidos Pendientes) → en el producto toca “Cambiar por otro producto” → elige el nuevo, la cantidad y el motivo. Solo se cambia lo que falta por entregar; se recalcula el total y, si ya había pagado, Caja recibe aviso de cuánto regresar o cobrar.",
+      "Abre la venta (en Ventas o en Entregas por programar) → en el producto toca “Cambiar por otro producto” → elige el nuevo, la cantidad y el motivo. Solo se cambia lo que falta por entregar; se recalcula el total y, si ya había pagado, Caja recibe aviso de cuánto regresar o cobrar.",
     roles: ["gerencia", "ventas"],
     link: { to: "/ventas", label: "Ir a Ventas" },
     fuente: FP,
@@ -118,6 +118,7 @@ export const KB_PAGINA: EntradaKB[] = [
     id: "pag-abono",
     categoria: "pagina",
     pregunta: "¿Cómo registro el abono de un cliente?",
+    variantes: ["cliente dejo anticipo y luego liquido", "el cliente liquida despues", "cliente paga otro dia", "pago parcial de un cliente"],
     claves: ["abono", "abonar", "pago", "saldo", "recibo", "cobranza", "registrar"],
     respuesta:
       "En “Cobranza y Corte” entra a “Por cobrar”, busca la cuenta y toca “Registrar abono”. Anota el monto, el método, el número de recibo y la fecha del pago. Cuando el saldo llega a cero, la cuenta sale sola de la lista.",
@@ -289,7 +290,7 @@ export const KB_PAGINA: EntradaKB[] = [
     id: "pag-precios-etiquetas",
     categoria: "pagina",
     pregunta: "¿Cómo actualizo precios, rotación y etiquetas cuando llega el Excel?",
-    variantes: ["llego el excel de rotacion", "etiquetas por cambiar", "como hago las etiquetas rojas", "actualizar descuentos"],
+    variantes: ["llego el excel de rotacion", "etiquetas por cambiar", "actualizar descuentos"],
     claves: ["excel", "rotacion", "etiquetas", "roja", "descuento", "actualizar", "repartir", "vendedores", "imprimir", "tamano"],
     respuesta:
       "• Gerencia: “Precios y Etiquetas” → “Subir Excel de rotación”. Revisa qué columna es el ID y la rotación, toca “Ver qué va a cambiar” y luego “Aplicar”. El sistema calcula el descuento (del Excel o de la tabla por rotación) y el precio final.\n" +

@@ -446,6 +446,37 @@ async function ventasDeHoy(): Promise<RespuestaDato> {
   };
 }
 
+async function cobranzaDeHoy(): Promise<RespuestaDato> {
+  const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" });
+  const { data, error } = await supabase
+    .from("sale_pagos")
+    .select("monto, metodo, tipo, origen, sale:sales(folio, customer_name)")
+    .eq("fecha_caja", hoy)
+    .eq("anulado", false)
+    .order("created_at", { ascending: false });
+  if (error) return sinPermiso();
+  const rows =
+    (data as unknown as { monto: number; metodo: string | null; tipo: "venta" | "cobranza"; origen: string; sale: { folio: string; customer_name: string } | null }[]) ?? [];
+  const suma = (tipo: "venta" | "cobranza") => rows.filter((r) => r.tipo === tipo).reduce((s, r) => s + Number(r.monto), 0);
+  const ventas = suma("venta");
+  const cobranza = suma("cobranza");
+  return {
+    titulo: "Corte de hoy",
+    texto:
+      `• VENTA (pagó el mismo día): ${money(ventas)}\n• COBRANZA (pagó otro día): ${money(cobranza)}\n• TOTAL en caja hoy: ${money(ventas + cobranza)}` +
+      (rows.length === 0 ? "\nTodavía no hay pagos registrados hoy." : ""),
+    tabla:
+      rows.length > 0
+        ? {
+            columnas: ["Folio", "Cliente", "Tipo", "Monto"],
+            filas: rows.slice(0, 15).map((r) => [r.sale?.folio ?? "—", r.sale?.customer_name ?? "—", r.tipo === "venta" ? "Venta" : "Cobranza", money(r.monto)]),
+          }
+        : undefined,
+    link: { to: "/cobranza", label: "Ir a Cobranza y Corte" },
+    fuente: FUENTE,
+  };
+}
+
 async function cobrosPendientes(): Promise<RespuestaDato> {
   const [{ data: rep, error: e1 }, ventas] = await Promise.all([
     supabase
@@ -600,6 +631,11 @@ export async function responderConDatos(pregunta: string, role: AppRole): Promis
 
   if (esDefinicion) return null;
 
+  // Preguntas de "cómo se hace / qué diferencia hay / dónde veo": se contestan con la guía, no con datos.
+  const esComoSeHace =
+    /^\s*¿?\s*(como (hago|registro|reporto|cambio|se |puedo|funciona|manejo|le hago|veo|busco|guardo|corrijo|anulo|pongo|agrego|imprimo|descargo)|que hago|que diferencia|cual es la diferencia|donde (veo|esta|encuentro|puedo)|a quien|para que|para cuando esta|quien)/.test(t);
+  if (esComoSeHace) return null;
+
   // 4) Incidencias de reparto / reportes (no las del personal)
   const incidenciaPersonal = /(baja|vigen|motivo|levant|acta|me dan|me pueden|corren|despid|puedo tener|formato)/.test(t);
   if (/incidencia|problemas? reportad|reportes/.test(t) && !incidenciaPersonal && /(reparto|entrega|abierta|activa|hay|pendiente|hoy|ultima|reportad|reportes|cuales)/.test(t)) {
@@ -623,13 +659,21 @@ export async function responderConDatos(pregunta: string, role: AppRole): Promis
     return PUEDE_VER_VENTAS.includes(role) ? resumenPedidos() : sinPermiso();
   }
 
+  // 8a) Cobranza / corte de hoy (venta vs cobranza)
+  if (
+    /(cuanto (entro|se cobro|cobramos|llevamos cobrado|hemos cobrado|se ha cobrado|cobre)|cobranza (de )?hoy|corte (de )?hoy|dinero (de )?hoy|ingresos? (de )?hoy)/.test(t) &&
+    !/(como|que es|que hago|diferencia)/.test(t)
+  ) {
+    return role === "gerencia" || role === "caja" ? cobranzaDeHoy() : sinPermiso();
+  }
+
   // 8) Ventas de hoy
   if (/(ventas? (de )?hoy|cuanto (se )?(ha )?vend|vendimos|llevamos vendido)/.test(t)) {
     return role === "gerencia" || role === "ventas" || role === "caja" ? ventasDeHoy() : sinPermiso();
   }
 
   // 9) Cobros pendientes
-  if (/(cobros? pendientes?|por cobrar|falta(n)? (de )?cobrar|saldos? pendientes?)/.test(t)) {
+  if (/(cobros? (estan |hay |faltan |quedan )?pendientes?|por cobrar|falta(n)? (de )?cobrar|saldos? pendientes?|quien (me )?debe|cuanto (me )?deben)/.test(t)) {
     return role === "gerencia" || role === "caja" ? cobrosPendientes() : sinPermiso();
   }
 

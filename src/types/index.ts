@@ -235,6 +235,8 @@ export interface Product {
   medida_caja: string | null;
   /** Tamaño de etiqueta fijado a mano; null = automático por tipo de producto. */
   tamano_etiqueta?: "carta" | "media" | "cuarto" | "octavo" | null;
+  /** Foto del producto (bucket "productos-fotos"), para comprobar que el material coincide. */
+  foto_path?: string | null;
   external_id: string | null;
   active: boolean;
   created_at: string;

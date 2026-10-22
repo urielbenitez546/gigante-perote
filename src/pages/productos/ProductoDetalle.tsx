@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { Package, ArrowLeft } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
 import { useAuth } from "../../context/AuthContext";
+import FotoProducto from "../../components/inventario/FotoProducto";
 import KardexFormato from "../../components/inventario/KardexFormato";
 import { ROTACION_LABELS, PRODUCT_UNIT_LABELS, productoId, precioPublico, tienePermiso, type Product } from "../../types";
 
@@ -83,13 +84,18 @@ export default function ProductoDetalle({ productId }: { productId?: string } = 
       )}
 
       <div className="bg-white border border-gigante-border rounded-2xl p-5">
-        <div className="flex items-center gap-2 text-gigante-muted text-xs mb-1">
-          <Package size={14} /> {productoId(product) && <strong className="text-gigante-navy">ID {productoId(product)} ·</strong>} {product.code}
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 text-gigante-muted text-xs mb-1">
+              <Package size={14} /> {productoId(product) && <strong className="text-gigante-navy">ID {productoId(product)} ·</strong>} {product.code}
+            </div>
+            <h1 className="text-xl font-bold text-gigante-navy">{product.name}</h1>
+            <p className="text-sm text-gigante-muted mt-0.5">
+              {product.brand} · {product.category}
+            </p>
+          </div>
+          <FotoProducto product={product} onChanged={() => cargarProducto()} />
         </div>
-        <h1 className="text-xl font-bold text-gigante-navy">{product.name}</h1>
-        <p className="text-sm text-gigante-muted mt-0.5">
-          {product.brand} · {product.category}
-        </p>
 
         <div className="mt-4">
           {product.precio_lista != null ? (

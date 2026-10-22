@@ -2,6 +2,7 @@ import type { AppRole, FaqEntry } from "../../types";
 import type { EntradaKB } from "../../data/asistente/tipos";
 import { KB_MANUALES } from "../../data/asistente/manuales";
 import { KB_PAGINA } from "../../data/asistente/pagina";
+import { KB_NUEVAS } from "../../data/asistente/nuevas";
 
 // ============================================================
 // Motor del Asistente de Consulta
@@ -13,7 +14,7 @@ import { KB_PAGINA } from "../../data/asistente/pagina";
 // Todo corre en el navegador, sin costo por pregunta.
 // ============================================================
 
-export const BASE_CONOCIMIENTO: EntradaKB[] = [...KB_MANUALES, ...KB_PAGINA];
+export const BASE_CONOCIMIENTO: EntradaKB[] = [...KB_MANUALES, ...KB_PAGINA, ...KB_NUEVAS];
 
 const STOPWORDS = new Set([
   "a", "al", "algo", "algun", "alguna", "alguno", "ante", "antes", "aqui", "asi", "como", "con", "cual", "cuales",
@@ -179,42 +180,42 @@ export function esRespuestaClara(r: Coincidencia[]): boolean {
 export const SUGERENCIAS_POR_ROL: Record<AppRole, string[]> = {
   gerencia: [
     "¿Qué productos se están acabando?",
+    "¿Cuánto se cobró hoy?",
     "¿Hay incidencias de reparto abiertas?",
     "¿Qué apartados están vencidos?",
-    "¿Cuánto se vendió hoy?",
-    "¿Cómo vamos con los conteos de inventario?",
-    "¿Cuánto puedo prestar a un colaborador?",
+    "¿Cómo busco un cobro de días anteriores?",
+    "¿Cómo doy de alta a un usuario y qué permisos le doy?",
   ],
   ventas: [
     "¿Cuánto hay de piso beige?",
     "¿Qué productos se están acabando?",
-    "¿Qué camisa me toca hoy?",
+    "¿Para cuándo está programada la entrega de mi cliente?",
     "¿Cómo cambio un producto de una venta?",
-    "¿Qué apartados están por vencer?",
-    "¿Qué es lote, tono y calibre?",
+    "¿Cómo vendo un producto a precio promoción?",
+    "¿Cómo hago una cotización y la convierto en venta?",
   ],
   caja: [
     "¿Qué cobros están pendientes?",
-    "¿Cuánto se vendió hoy?",
-    "¿Qué camisa me toca hoy?",
-    "¿Cómo registro el cobro en Caja?",
+    "¿Cuánto se cobró hoy?",
+    "¿Dónde veo el corte de caja de hoy?",
+    "¿Cómo registro el abono de un cliente?",
+    "¿Cómo corrijo o anulo un pago mal registrado?",
     "¿Qué hago si hay una diferencia en el corte?",
-    "¿Con cuántas incidencias me dan de baja?",
   ],
   almacen: [
     "¿Qué productos se están acabando?",
-    "¿Cuánto hay de tinaco?",
-    "¿Qué hago si encuentro mercancía dañada?",
+    "¿Cómo anoto una entrada o una salida en el Kardex?",
+    "¿Cómo pongo la foto del producto junto al nombre?",
+    "¿Cómo confirmo que ya cargué una entrega?",
     "¿Cómo hago un conteo físico?",
-    "¿Qué hay por entregar?",
-    "¿Cuál es el uniforme de Almacén?",
+    "¿Qué hago si encuentro mercancía dañada?",
   ],
   reparto: [
     "¿Qué repartos hay pendientes?",
-    "¿Hay incidencias de reparto abiertas?",
-    "¿Cómo entrego un reparto en la página?",
-    "¿A quién le entrego el dinero que cobré?",
-    "¿Qué hago si la camioneta tiene una falla?",
-    "¿Con cuántas incidencias me dan de baja?",
+    "¿Cómo entrego un reparto en la página (foto, firma y cobro)?",
+    "¿A quién le entrega el chofer el dinero que cobró?",
+    "¿Cómo registro una carga de combustible o del montacargas?",
+    "¿Qué puedo hacer en el Kardex como chofer?",
+    "¿Qué hago si la camioneta de reparto tiene una falla?",
   ],
 };

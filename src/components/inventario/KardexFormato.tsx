@@ -6,6 +6,8 @@ import {
   registerInventorySalida,
   anularMovimientoKardex,
   adjuntarFotoKardex,
+  guardarFotoProducto,
+  errorFotoAmigable,
   ultimoMovimientoPropio,
   useProductKardex,
 } from "../../hooks/useInventory";
@@ -56,6 +58,8 @@ export default function KardexFormato({ product, onChanged }: Props) {
   const [conteoAbierto, setConteoAbierto] = useState(false);
   const [etiquetaAbierta, setEtiquetaAbierta] = useState(false);
   const [foto, setFoto] = useState<File | null>(null);
+  const [fotoEsDelProducto, setFotoEsDelProducto] = useState(true);
+  const vistaFoto = useMemo(() => (foto ? URL.createObjectURL(foto) : null), [foto]);
   const fotoNuevaRef = useRef<HTMLInputElement>(null);
   const fotoFilaRef = useRef<HTMLInputElement>(null);
   const [movParaFoto, setMovParaFoto] = useState<string | null>(null);
@@ -113,9 +117,9 @@ export default function KardexFormato({ product, onChanged }: Props) {
     if (!file || !movId) return;
     setMsg(null);
     const { path, error: errSubida } = await uploadPhoto("kardex-soporte", file);
-    if (errSubida || !path) return setMsg({ tipo: "error", texto: errSubida ?? "No se pudo subir la foto." });
+    if (errSubida || !path) return setMsg({ tipo: "error", texto: errorFotoAmigable(errSubida ?? "No se pudo subir la foto.") });
     const { error: errAdjuntar } = await adjuntarFotoKardex(movId, path);
-    if (errAdjuntar) return setMsg({ tipo: "error", texto: errAdjuntar });
+    if (errAdjuntar) return setMsg({ tipo: "error", texto: errorFotoAmigable(errAdjuntar) });
     setMsg({ tipo: "ok", texto: "Foto agregada al renglón." });
     reload();
   }
@@ -153,7 +157,7 @@ export default function KardexFormato({ product, onChanged }: Props) {
       const sub = await uploadPhoto("kardex-soporte", foto);
       if (sub.error || !sub.path) {
         setGuardando(false);
-        return setMsg({ tipo: "error", texto: `No se pudo subir la foto: ${sub.error ?? "error desconocido"}` });
+        return setMsg({ tipo: "error", texto: `No se pudo subir la foto: ${errorFotoAmigable(sub.error ?? "error desconocido")}` });
       }
       fotoPath = sub.path;
     }
@@ -172,7 +176,12 @@ export default function KardexFormato({ product, onChanged }: Props) {
     if (fotoPath && profile) {
       const movId = await ultimoMovimientoPropio(product.id, tipoMov, profile.id, inicioGuardado);
       const adj = movId ? await adjuntarFotoKardex(movId, fotoPath) : { error: "no se encontró el renglón" };
-      if (adj.error) avisoFoto = adj.error;
+      if (adj.error) avisoFoto = errorFotoAmigable(adj.error);
+    }
+    // Si el producto aún no tiene foto, la misma foto queda como foto del producto.
+    if (foto && puedeFoto && !product.foto_path && fotoEsDelProducto) {
+      const subP = await uploadPhoto("productos-fotos", foto);
+      if (subP.path) await guardarFotoProducto(product.id, subP.path, true);
     }
     setGuardando(false);
 
@@ -386,6 +395,7 @@ export default function KardexFormato({ product, onChanged }: Props) {
                         </button>
                         {foto && (
                           <>
+                            {vistaFoto && <img src={vistaFoto} alt="Vista previa" className="h-10 w-10 rounded object-cover border border-gigante-border" />}
                             <span className="text-[11px] text-gigante-muted truncate max-w-[200px]">{foto.name}</span>
                             <button
                               type="button"
@@ -398,6 +408,16 @@ export default function KardexFormato({ product, onChanged }: Props) {
                               Quitar
                             </button>
                           </>
+                        )}
+                        {foto && !product.foto_path && (
+                          <label className="basis-full flex items-center gap-1.5 text-[11px] text-gigante-navy">
+                            <input
+                              type="checkbox"
+                              checked={fotoEsDelProducto}
+                              onChange={(e) => setFotoEsDelProducto(e.target.checked)}
+                            />
+                            Usar también como foto del producto (aparece junto al nombre)
+                          </label>
                         )}
                         <input
                           ref={fotoNuevaRef}

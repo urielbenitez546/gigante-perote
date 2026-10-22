@@ -113,6 +113,27 @@ export async function adjuntarFotoKardex(movementId: string, path: string) {
   return { error: error?.message ?? null };
 }
 
+/** Guarda la foto del producto (ya subida a "productos-fotos"). soloSiNoTiene: no pisa una foto existente. */
+export async function guardarFotoProducto(productId: string, path: string, soloSiNoTiene = false) {
+  const { error } = await supabase.rpc("producto_guardar_foto", {
+    p_product_id: productId,
+    p_path: path,
+    p_solo_si_no_tiene: soloSiNoTiene,
+  });
+  return { error: error?.message ?? null };
+}
+
+/** Mensaje claro cuando falla una foto por permisos. */
+export function errorFotoAmigable(msg: string): string {
+  if (/row-level security|policy|permission|not allowed|violates/i.test(msg)) {
+    return "Tu usuario aún no tiene activado el permiso para subir fotos. Avisa a Gerencia (falta correr el SQL de fotos en Supabase).";
+  }
+  if (/bucket.*not found|Bucket not found/i.test(msg)) {
+    return "Falta crear el espacio de fotos en Supabase. Avisa a Gerencia (SQL 0034).";
+  }
+  return msg;
+}
+
 /** Anula un renglón del Kardex (queda tachado con el motivo). Jefe de almacén y Gerencia. */
 export async function anularMovimientoKardex(movementId: string, motivo: string) {
   const { error } = await supabase.rpc("anular_movimiento_kardex", {

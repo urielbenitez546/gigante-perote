@@ -154,7 +154,7 @@ export const LESSONS: Lesson[] = [
     path: "/ventas",
     paraQue: "Cuando el cliente cambia de opinión (otro color, otro modelo) sin tener que cancelar toda la venta.",
     pasos: [
-      "Abre la venta en “Ventas y Entregas” o en “Pedidos Pendientes”.",
+      "Abre la venta en “Ventas y Entregas” o en “Entregas por programar”.",
       "En el producto a cambiar toca “Cambiar por otro producto”.",
       "Elige el producto nuevo, la cantidad y escribe el motivo.",
       "Revisa el total nuevo: si ya había pagado, la página te dice si Caja debe regresar dinero o cobrar la diferencia.",
@@ -542,6 +542,7 @@ export const LESSONS: Lesson[] = [
       "Guarda el renglón: la foto queda pegada a él (se comprime sola para no gastar espacio).",
       "Si olvidaste la foto, en el renglón toca “+ Agregar foto”. Solo se puede agregar si no tenía una.",
       "Para verla toca “Ver foto de apoyo”. La pueden subir y ver Gerencia, todo almacén y los choferes.",
+      "Foto del producto: junto al nombre aparece una foto de referencia para comprobar que el material coincide. Si no tiene, toca “Agregar foto del producto” (o marca “Usar también como foto del producto” al guardar el renglón).",
     ],
     pregunta: {
       texto: "Guardaste una entrada sin foto. ¿Qué haces?",
