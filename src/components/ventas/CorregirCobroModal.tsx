@@ -146,7 +146,7 @@ export default function CorregirCobroModal({ sale, onClose, onDone }: Props) {
           </button>
         </div>
         <p className="text-[11px] text-gigante-muted mt-2">
-          El cambio queda guardado con tu nombre, el monto de antes y de después, y el motivo. Gerencia puede verlo.
+          El cambio queda guardado con tu nombre, el monto de antes y de después, y el motivo. Gerencia puede verlo. Para corregir un abono o el cobro de un chofer, hazlo en “Cobranza y Corte” → “Historial de cobros”.
         </p>
       </div>
     </div>

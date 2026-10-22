@@ -356,7 +356,7 @@ async function apartados(tipo: "vencidos" | "por_vencer" | "ambos"): Promise<Res
             ]),
           }
         : undefined,
-    link: { to: "/pedidos", label: "Ir a Pedidos Pendientes" },
+    link: { to: "/por-programar", label: "Ir a Entregas por programar" },
     fuente: FUENTE,
   };
 }
@@ -384,7 +384,7 @@ async function resumenPedidos(): Promise<RespuestaDato> {
             ]),
           }
         : undefined,
-    link: { to: "/pedidos", label: "Ir a Pedidos Pendientes" },
+    link: { to: "/por-programar", label: "Ir a Entregas por programar" },
     fuente: FUENTE,
   };
 }

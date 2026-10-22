@@ -15,7 +15,7 @@ import {
 import { useAuth } from "../../context/AuthContext";
 import { useOpenSales, confirmarEntregaInmediata } from "../../hooks/useSales";
 import { pendingLinesFor } from "../../lib/pendingLines";
-import { tienePermiso, type SaleWithItems } from "../../types";
+import { DIAS_AVISO_APARTADO, diasRestantesApartado, tienePermiso, type SaleWithItems } from "../../types";
 import DetalleVentaModal from "../../components/ventas/DetalleVentaModal";
 import ConfirmarEntregaParcialModal from "../../components/ventas/ConfirmarEntregaParcialModal";
 import ProgramarEntregaModal from "../../components/ventas/ProgramarEntregaModal";
@@ -23,7 +23,7 @@ import EsperandoProveedorModal from "../../components/ventas/EsperandoProveedorM
 
 const money = (n: number) => `$${n.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-type Filtro = "sin_fecha" | "inmediata" | "domicilio" | "retiro" | "proveedor" | "programadas";
+type Filtro = "sin_fecha" | "inmediata" | "domicilio" | "retiro" | "proveedor" | "programadas" | "vencer";
 type Vista = "lista" | "semana";
 
 /** Fecha local yyyy-mm-dd (sin cambios por zona horaria). */
@@ -70,9 +70,12 @@ export default function PorProgramar() {
   const { profile } = useAuth();
   const { sales, loading, error, reload } = useOpenSales();
   const puedeProgramar = tienePermiso(profile, "programar_entregas");
-  const puedeConfirmar = profile?.role === "almacen" || tienePermiso(profile, "confirmar_retiros");
+  // Solo Almacén (con permiso) y Gerencia confirman la carga; Ventas y Caja solo consultan.
+  const puedeConfirmar = profile?.role === "almacen" || profile?.role === "gerencia";
+  // Ventas, Caja y quien programa ven todos los filtros. Los demás de Almacén solo lo inmediato.
+  const vistaCompleta = puedeProgramar || profile?.role === "ventas" || profile?.role === "caja";
 
-  const [filtro, setFiltro] = useState<Filtro>(puedeProgramar ? "sin_fecha" : "inmediata");
+  const [filtro, setFiltro] = useState<Filtro>(vistaCompleta ? "sin_fecha" : "inmediata");
   const [vista, setVista] = useState<Vista>("lista");
   const [semanaBase, setSemanaBase] = useState<Date>(() => lunesDe(new Date()));
   const [detalleId, setDetalleId] = useState<string | null>(null);
@@ -113,6 +116,7 @@ export default function PorProgramar() {
       retiro: filas.filter((f) => f.retiro.length > 0),
       proveedor: filas.filter((f) => f.sale.esperando_proveedor),
       programadas: filas.filter((f) => programable(f) && !!f.sale.fecha_programada),
+      vencer: filas.filter((f) => diasRestantesApartado(f.sale.created_at) <= DIAS_AVISO_APARTADO),
     }),
     [filas]
   );
@@ -124,8 +128,9 @@ export default function PorProgramar() {
     { key: "retiro", label: "Recoge en sucursal", icon: Warehouse, solo: "programar" },
     { key: "proveedor", label: "Esperando proveedor", icon: Hourglass, solo: "programar" },
     { key: "programadas", label: "Ya programadas", icon: CalendarDays, solo: "programar" },
+    { key: "vencer", label: "Apartado por vencer", icon: Hourglass, solo: "programar" },
   ];
-  const filtrosVisibles = FILTROS.filter((f) => !f.solo || puedeProgramar);
+  const filtrosVisibles = FILTROS.filter((f) => !f.solo || vistaCompleta);
   const filtroActivo: Filtro = filtrosVisibles.some((f) => f.key === filtro) ? filtro : "inmediata";
   const lista = porFiltro[filtroActivo];
 
@@ -178,6 +183,19 @@ export default function PorProgramar() {
               <p className="text-[11px] text-gigante-muted">{sale.customer_address}</p>
             )}
             <p className="text-[11px] text-gigante-muted mt-0.5 break-words">{material}</p>
+            {(() => {
+              const dias = diasRestantesApartado(sale.created_at);
+              if (dias > DIAS_AVISO_APARTADO) return null;
+              return (
+                <p className={`text-[11px] mt-0.5 font-semibold ${dias < 0 ? "text-red-700" : "text-amber-700"}`}>
+                  {dias < 0
+                    ? `Apartado vencido hace ${Math.abs(dias)} d`
+                    : dias === 0
+                    ? "El apartado vence HOY"
+                    : `El apartado vence en ${dias} d`}
+                </p>
+              );
+            })()}
           </div>
           <div className="text-right shrink-0 space-y-1">
             {sale.fecha_programada && (
@@ -248,6 +266,8 @@ export default function PorProgramar() {
           <p className="text-sm text-gigante-muted mt-1">
             {puedeProgramar
               ? "Aquí llegan las ventas que Caja ya pasó a almacén. Asigna día y hora aproximada de entrega."
+              : vistaCompleta
+              ? "Consulta cuándo se entregará cada venta. El día y la hora los asigna el Jefe de almacén."
               : "Aquí llegan las entregas inmediatas que Caja ya pasó a almacén: carga el material y confírmalo."}
           </p>
         </div>
@@ -290,7 +310,7 @@ export default function PorProgramar() {
         })}
       </div>
 
-      {puedeProgramar && (filtroActivo === "programadas" || filtroActivo === "domicilio" || filtroActivo === "retiro") && (
+      {vistaCompleta && (filtroActivo === "programadas" || filtroActivo === "domicilio" || filtroActivo === "retiro") && (
         <div className="mt-3 inline-flex rounded-lg border border-gigante-border overflow-hidden bg-white text-xs">
           {(["lista", "semana"] as Vista[]).map((v) => (
             <button
@@ -304,7 +324,7 @@ export default function PorProgramar() {
         </div>
       )}
 
-      {vista === "semana" && puedeProgramar && filtroActivo !== "inmediata" ? (
+      {vista === "semana" && vistaCompleta && filtroActivo !== "inmediata" ? (
         <div className="mt-3">
           <div className="flex items-center justify-between mb-2">
             <button
@@ -345,7 +365,7 @@ export default function PorProgramar() {
                       {items.map((f) => (
                         <button
                           key={f.sale.id}
-                          onClick={() => setProgramando(f.sale)}
+                          onClick={() => (puedeProgramar ? setProgramando(f.sale) : setDetalleId(f.sale.id))}
                           className="w-full text-left rounded-lg bg-gigante-bg px-2 py-1.5 hover:bg-gigante-border/50"
                         >
                           <p className="text-[11px] font-semibold text-gigante-navy">
@@ -364,8 +384,10 @@ export default function PorProgramar() {
             })}
           </div>
           <p className="text-[11px] text-gigante-muted mt-2">
-            Toca una entrega para cambiar su día u hora (se pide un motivo). Las que aún no tienen fecha están en
-            “Sin fecha asignada”.
+            {puedeProgramar
+              ? "Toca una entrega para cambiar su día u hora (se pide un motivo). "
+              : "Toca una entrega para ver su detalle. "}
+            Las que aún no tienen fecha están en “Sin fecha asignada”.
           </p>
         </div>
       ) : (

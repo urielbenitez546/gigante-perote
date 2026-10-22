@@ -11,6 +11,7 @@ import {
 } from "../../types";
 import CobrarVentaModal from "./CobrarVentaModal";
 import CorregirCobroModal from "./CorregirCobroModal";
+import AbonoModal from "../cobranza/AbonoModal";
 
 const money = (n: number) => `$${n.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -42,6 +43,7 @@ export default function CobroCajaPanel({ sale, onUpdated }: Props) {
 
   const [cobrando, setCobrando] = useState(false);
   const [corrigiendo, setCorrigiendo] = useState(false);
+  const [abonando, setAbonando] = useState(false);
   const [historial, setHistorial] = useState<CobroHistorialEntry[]>([]);
 
   const cargarHistorial = useCallback(async () => {
@@ -57,6 +59,7 @@ export default function CobroCajaPanel({ sale, onUpdated }: Props) {
   function terminado() {
     setCobrando(false);
     setCorrigiendo(false);
+    setAbonando(false);
     onUpdated?.();
   }
 
@@ -106,7 +109,7 @@ export default function CobroCajaPanel({ sale, onUpdated }: Props) {
       )}
 
       {esCaja && sale.status !== "cancelada" && (
-        <div className="mt-3">
+        <div className="mt-3 flex flex-wrap items-center gap-4">
           {enCaja ? (
             <button
               onClick={() => setCobrando(true)}
@@ -120,6 +123,14 @@ export default function CobroCajaPanel({ sale, onUpdated }: Props) {
             </button>
           ) : (
             <p className="text-[11px] text-gigante-muted">Pídele a Gerencia que corrija el monto cobrado.</p>
+          )}
+          {!enCaja && pendiente > 0 && (
+            <button
+              onClick={() => setAbonando(true)}
+              className="text-xs font-semibold text-gigante-navy border border-gigante-navy rounded-lg px-3 py-1 hover:bg-gigante-navy hover:text-white"
+            >
+              Registrar abono
+            </button>
           )}
         </div>
       )}
@@ -151,6 +162,7 @@ export default function CobroCajaPanel({ sale, onUpdated }: Props) {
 
       {cobrando && <CobrarVentaModal sale={sale} onClose={() => setCobrando(false)} onDone={terminado} />}
       {corrigiendo && <CorregirCobroModal sale={sale} onClose={() => setCorrigiendo(false)} onDone={terminado} />}
+      {abonando && <AbonoModal venta={sale} onClose={() => setAbonando(false)} onDone={terminado} />}
     </div>
   );
 }

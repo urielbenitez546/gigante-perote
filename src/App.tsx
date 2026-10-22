@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import AppLayout from "./components/layout/AppLayout";
@@ -10,13 +10,13 @@ import Retiros from "./pages/retiros/Retiros";
 import Repartos from "./pages/repartos/Repartos";
 import RepartoDetalle from "./pages/repartos/RepartoDetalle";
 import EvidenciasCobros from "./pages/evidencias/EvidenciasCobros";
+import Cobranza from "./pages/cobranza/Cobranza";
 import Manuales from "./pages/manuales/Manuales";
 import Asistente from "./pages/asistente/Asistente";
 import Administracion from "./pages/administracion/Administracion";
 import Calculadora from "./pages/calculadora/Calculadora";
 import Etiquetas from "./pages/etiquetas/Etiquetas";
 import ProductoDetalle from "./pages/productos/ProductoDetalle";
-import PedidosPendientes from "./pages/pedidos/PedidosPendientes";
 import Gastos from "./pages/gastos/Gastos";
 import Capacitacion from "./pages/capacitacion/Capacitacion";
 import Kardex from "./pages/kardex/Kardex";
@@ -76,7 +76,7 @@ export default function App() {
             <Route
               path="/por-programar"
               element={
-                <ProtectedRoute allowedRoles={["gerencia", "almacen"]} moduleKey="por-programar" redirectTo="/entregas-hoy">
+                <ProtectedRoute allowedRoles={["gerencia", "ventas", "caja", "almacen"]} moduleKey="por-programar" redirectTo="/entregas-hoy">
                   <PorProgramar />
                 </ProtectedRoute>
               }
@@ -129,14 +129,7 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/pedidos"
-              element={
-                <ProtectedRoute allowedRoles={["gerencia", "ventas", "almacen", "caja"]}>
-                  <PedidosPendientes />
-                </ProtectedRoute>
-              }
-            />
+            <Route path="/pedidos" element={<Navigate to="/por-programar" replace />} />
             <Route
               path="/gastos"
               element={
@@ -175,6 +168,14 @@ export default function App() {
               element={
                 <ProtectedRoute allowedRoles={["gerencia", "reparto", "caja", "ventas", "almacen"]}>
                   <RepartoDetalle />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/cobranza"
+              element={
+                <ProtectedRoute allowedRoles={["gerencia", "caja"]}>
+                  <Cobranza />
                 </ProtectedRoute>
               }
             />

@@ -104,6 +104,50 @@ export const KB_PAGINA: EntradaKB[] = [
     fuente: FP,
   },
   {
+    id: "pag-venta-cobranza",
+    categoria: "pagina",
+    pregunta: "¿Qué es venta y qué es cobranza en el corte de caja?",
+    claves: ["venta", "cobranza", "corte", "caja", "diferencia", "abono"],
+    respuesta:
+      "Venta es lo que el cliente paga el mismo día de su compra, ya sea en caja o al chofer. Cobranza es lo que paga en un día posterior. El sistema lo separa solo por las fechas: no tienes que moverlo a mano. Si un cliente deja una parte y se le entrega ese mismo día, queda como venta.",
+    roles: ["gerencia", "caja"],
+    link: { to: "/cobranza", label: "Ir a Cobranza y Corte" },
+    fuente: FP,
+  },
+  {
+    id: "pag-abono",
+    categoria: "pagina",
+    pregunta: "¿Cómo registro el abono de un cliente?",
+    claves: ["abono", "abonar", "pago", "saldo", "recibo", "cobranza", "registrar"],
+    respuesta:
+      "En “Cobranza y Corte” entra a “Por cobrar”, busca la cuenta y toca “Registrar abono”. Anota el monto, el método, el número de recibo y la fecha del pago. Cuando el saldo llega a cero, la cuenta sale sola de la lista.",
+    roles: ["gerencia", "caja"],
+    link: { to: "/cobranza", label: "Ir a Cobranza y Corte" },
+    fuente: FP,
+  },
+  {
+    id: "pag-corte-excel",
+    categoria: "pagina",
+    pregunta: "¿Cómo descargo el corte o la cobranza en Excel?",
+    claves: ["excel", "descargar", "corte", "cobranza", "historial", "formato", "semana"],
+    respuesta:
+      "En “Cobranza y Corte”: en “Corte de caja” elige las fechas y toca “Descargar Excel” (RESUMEN, VENTAS y COBRANZA). En “Historial de cobros” descargas lo que filtraste. En “Por cobrar” puedes bajar el Excel del mes con el mismo formato de siempre (TOTAL, mes, APARTADOS y ENTREGADOS).",
+    roles: ["gerencia", "caja"],
+    link: { to: "/cobranza", label: "Ir a Cobranza y Corte" },
+    fuente: FP,
+  },
+  {
+    id: "pag-corregir-pago",
+    categoria: "pagina",
+    pregunta: "¿Cómo corrijo o anulo un pago mal registrado?",
+    claves: ["corregir", "anular", "pago", "cobro", "error", "monto", "equivoqué"],
+    respuesta:
+      "En “Cobranza y Corte”, entra a “Historial de cobros”, busca el pago y toca “Corregir”. Cambia el monto, la fecha, el recibo o si cuenta como venta o cobranza, y escribe el motivo. Si el pago no existe o se duplicó, anúlalo. Todo queda en la bitácora y Gerencia lo ve.",
+    roles: ["gerencia", "caja"],
+    link: { to: "/cobranza", label: "Ir a Cobranza y Corte" },
+    fuente: FP,
+  },
+  {
     id: "pag-entradas",
     categoria: "pagina",
     pregunta: "¿Cómo registro mercancía que llegó (factura o entrada)?",
@@ -165,7 +209,7 @@ export const KB_PAGINA: EntradaKB[] = [
     claves: ["apartado", "apartados", "vence", "vencido", "plazo", "recoger", "mes"],
     respuesta:
       "El cliente tiene 1 mes desde que compra para recoger o recibir su material. 5 días antes llega aviso a la campanita y otro cuando ya venció. No se cancela solo: Gerencia decide si se le llama, se le da más tiempo o se elimina la venta. Pregúntame “¿qué apartados están vencidos?” para ver la lista.",
-    link: { to: "/pedidos", label: "Ir a Pedidos Pendientes" },
+    link: { to: "/por-programar", label: "Ir a Entregas por programar" },
     fuente: FP,
   },
   {

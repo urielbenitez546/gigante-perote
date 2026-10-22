@@ -45,6 +45,11 @@ function calcularRendimientos(registros: RegistroCombustible[]): Map<string, num
   return res;
 }
 
+/** Un dato fuera de lo normal casi siempre es un error al anotar el tablero (ej. km en vez de horas). */
+function datoRaro(tipo: TipoUnidad, valor: number): boolean {
+  return tipo === "vehiculo" ? valor < 2 || valor > 40 : valor < 0.5 || valor > 15;
+}
+
 export default function Combustible() {
   const { profile } = useAuth();
   const { nameFor } = useProfileNames();
@@ -283,16 +288,34 @@ export default function Combustible() {
                     {prom == null
                       ? "Rendimiento: faltan cargas con kilometraje/horas"
                       : r.tipo === "vehiculo"
-                      ? `Rendimiento aprox.: ${num(prom)} km/L`
-                      : `Consumo aprox.: ${num(prom)} L/hora`}
+                      ? `Rendimiento aprox.: ${num(prom)} km por litro`
+                      : `Consumo aprox.: ${num(prom)} litros por hora`}
                   </p>
+                  {prom != null && datoRaro(r.tipo, prom) && (
+                    <p className="text-[11px] text-amber-700 mt-0.5">
+                      ⚠️ Dato raro: revisa que el tablero se haya anotado en {r.tipo === "vehiculo" ? "kilómetros" : "horas (no km)"}.
+                    </p>
+                  )}
                 </div>
               );
             })}
           </div>
-          <p className="text-[11px] text-gigante-muted mt-1">
-            El rendimiento es aproximado: compara cada carga con la anterior y supone que se llena el tanque.
-          </p>
+          <div className="mt-2 text-[11px] text-gigante-muted bg-white border border-gigante-border rounded-lg px-3 py-2 space-y-1">
+            <p className="font-semibold text-gigante-navy">¿Cómo se calcula?</p>
+            <p>
+              Se compara cada carga con la anterior de la misma unidad y se supone que el tanque se llena cada vez
+              (los litros de la carga = lo que se gastó desde la carga anterior).
+            </p>
+            <p>
+              <strong>Vehículos — rendimiento:</strong> km recorridos ÷ litros. Entre más km por litro, mejor.
+              Ej.: 450 km con 30 L → 15 km/L.
+            </p>
+            <p>
+              <strong>Montacargas — consumo:</strong> litros ÷ horas trabajadas. Entre menos litros por hora, mejor.
+              Ej.: 24 L en 8 horas → 3 L/hora (1 litro dura casi 20 minutos).
+            </p>
+            <p>Es aproximado: si algún día no se llenó el tanque, ese dato sale distorsionado.</p>
+          </div>
         </div>
       )}
 
@@ -328,7 +351,7 @@ export default function Combustible() {
                 <th className="text-right font-medium px-3 py-2.5">Litros</th>
                 <th className="text-right font-medium px-3 py-2.5">Importe</th>
                 <th className="text-right font-medium px-3 py-2.5">Km / horas</th>
-                {veTodo && <th className="text-right font-medium px-3 py-2.5">Rend.</th>}
+                {veTodo && <th className="text-right font-medium px-3 py-2.5">Rendimiento / consumo</th>}
                 <th className="text-left font-medium px-3 py-2.5">Fotos</th>
                 {esGerencia && <th className="px-3 py-2.5"></th>}
               </tr>
@@ -356,7 +379,10 @@ export default function Combustible() {
                     <td className="px-3 py-2.5 text-right">{r.odometro != null ? num(Number(r.odometro), 1) : "—"}</td>
                     {veTodo && (
                       <td className="px-3 py-2.5 text-right">
-                        {rd ? `${num(rd)} ${r.tipo_unidad === "vehiculo" ? "km/L" : "L/h"}` : "—"}
+                        {rd ? `${num(rd)} ${r.tipo_unidad === "vehiculo" ? "km/L" : "L/hora"}` : "—"}
+                        {rd && datoRaro(r.tipo_unidad, rd) && (
+                          <span className="block text-[10px] text-amber-700">⚠️ revisa el tablero</span>
+                        )}
                       </td>
                     )}
                     <td className="px-3 py-2.5 whitespace-nowrap">

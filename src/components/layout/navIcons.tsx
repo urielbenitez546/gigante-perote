@@ -22,6 +22,7 @@ import {
   ArrowRightLeft,
   Fuel,
   FileText,
+  Wallet,
   type LucideIcon,
 } from "lucide-react";
 
@@ -39,6 +40,7 @@ export const MODULE_ICONS: Record<string, LucideIcon> = {
   pedidos: ClipboardList,
   retiros: Warehouse,
   repartos: Truck,
+  cobranza: Wallet,
   evidencias: Camera,
   gastos: Receipt,
   capacitacion: GraduationCap,

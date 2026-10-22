@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
-import { X, Printer } from "lucide-react";
-import { ROTACION_LABELS, productoId, type Product } from "../../types";
+import { X, Printer, Plus } from "lucide-react";
+import { PRODUCT_UNIT_LABELS, ROTACION_LABELS, productoId, type Product } from "../../types";
 
 interface Props {
   product: Product;
@@ -11,17 +11,80 @@ interface Props {
 const esc = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
+type TipoEtiqueta = "piso" | "bulto" | "pieza" | "rollo" | "otro";
+
+const TIPOS: Record<TipoEtiqueta, string> = {
+  piso: "Piso o recubrimiento (por caja / m²)",
+  bulto: "Bulto o bolsa (cemento, adhesivo, boquilla…)",
+  pieza: "Pieza o equipo (tinaco, mueble, llave…)",
+  rollo: "Rollo (manguera, cable, malla…)",
+  otro: "Otro (renglones libres)",
+};
+
+interface Fila {
+  label: string;
+  valor: string;
+}
+
+/** Tipo de etiqueta sugerido por la unidad y el nombre del producto. */
+function tipoSugerido(p: Product): TipoEtiqueta {
+  const n = p.name.toLowerCase();
+  if (/(cemento|mortero|adhesivo|pegazulejo|pegapiso|boquilla|yeso|\bcal\b|cementante|impermeabilizante)/.test(n)) return "bulto";
+  if (p.unit === "caja" || p.unit === "m2") return "piso";
+  if (p.unit === "bolsa") return "bulto";
+  if (p.unit === "rollo") return "rollo";
+  return "pieza";
+}
+
+/** Renglones que se llenan a mano según el tipo; lo que el sistema ya sabe viene precargado. */
+function filasPara(tipo: TipoEtiqueta, p: Product): Fila[] {
+  switch (tipo) {
+    case "piso":
+      return [
+        { label: "M² por caja", valor: p.medida_caja ?? "" },
+        { label: "Cajas por tarima", valor: "" },
+        { label: "M² por pza", valor: "" },
+      ];
+    case "bulto":
+      return [
+        { label: "Peso por bulto", valor: p.medida ?? "" },
+        { label: "Bultos por tarima", valor: "" },
+        { label: "Rendimiento / uso", valor: "" },
+      ];
+    case "pieza":
+      return [
+        { label: "Medida / capacidad", valor: p.medida ?? "" },
+        { label: "Color", valor: p.color ?? "" },
+        { label: "Piezas por tarima", valor: "" },
+      ];
+    case "rollo":
+      return [
+        { label: "Largo por rollo", valor: p.medida ?? "" },
+        { label: "Rollos por tarima", valor: "" },
+        { label: "Calibre / ancho", valor: "" },
+      ];
+    default:
+      return [
+        { label: "Medida", valor: p.medida ?? "" },
+        { label: "Color", valor: p.color ?? "" },
+        { label: "", valor: "" },
+      ];
+  }
+}
+
 /**
  * Etiqueta amarilla del Kardex (la que va en el protector de plástico del
  * anaquel). Se llena sola con los datos del producto; solo "cajas por
  * tarima" y "m² por pieza" se escriben a mano porque el sistema no los
  * guarda. El QR abre el Kardex de este producto al escanearlo.
+ *
+ * Los renglones de abajo cambian según el tipo de producto (piso, bulto,
+ * pieza, rollo u otro) y se pueden renombrar, quitar o agregar.
  */
 export default function EtiquetaKardexModal({ product, onClose }: Props) {
   const [qr, setQr] = useState<string | null>(null);
-  const [m2Caja, setM2Caja] = useState(product.medida_caja ?? "");
-  const [cajasTarima, setCajasTarima] = useState("");
-  const [m2Pza, setM2Pza] = useState("");
+  const [tipoEt, setTipoEt] = useState<TipoEtiqueta>(() => tipoSugerido(product));
+  const [filas, setFilas] = useState<Fila[]>(() => filasPara(tipoSugerido(product), product));
   const [copias, setCopias] = useState(1);
   const [porHoja, setPorHoja] = useState<1 | 2>(1);
   const [fondo, setFondo] = useState(false);
@@ -33,6 +96,15 @@ export default function EtiquetaKardexModal({ product, onClose }: Props) {
   }, [url]);
 
   const id = productoId(product) || product.code;
+  const seVendePor = PRODUCT_UNIT_LABELS[product.unit].toUpperCase();
+
+  function cambiarTipo(t: TipoEtiqueta) {
+    setTipoEt(t);
+    setFilas(filasPara(t, product));
+  }
+  function editarFila(i: number, campo: keyof Fila, valor: string) {
+    setFilas((fs) => fs.map((f, j) => (j === i ? { ...f, [campo]: valor } : f)));
+  }
   const tipo = ROTACION_LABELS[product.rotacion].toUpperCase();
 
   function imprimir() {
@@ -49,9 +121,11 @@ export default function EtiquetaKardexModal({ product, onClose }: Props) {
           <table>
             <tr><th>CÓDIGO</th><td>${esc(product.code)}</td></tr>
             <tr><th>MARCA</th><td>${esc(product.brand || "")}</td></tr>
-            <tr><th>M² POR CAJA</th><td>${esc(m2Caja)}</td></tr>
-            <tr><th>CAJAS POR TARIMA</th><td>${esc(cajasTarima)}</td></tr>
-            <tr><th>M² POR PZA</th><td>${esc(m2Pza)}</td></tr>
+            <tr><th>SE VENDE POR</th><td>${esc(seVendePor)}</td></tr>
+            ${filas
+              .filter((f) => f.label.trim() !== "")
+              .map((f) => `<tr><th>${esc(f.label.trim().toUpperCase())}</th><td>${esc(f.valor)}</td></tr>`)
+              .join("")}
           </table>
           <img src="${qr}" class="qr" />
         </div>
@@ -111,23 +185,57 @@ export default function EtiquetaKardexModal({ product, onClose }: Props) {
           </p>
         </div>
         <p className="text-xs text-gigante-muted mb-3">
-          ID, tipo, descripción, código y marca se llenan solos. Completa lo demás si lo necesitas:
+          ID, tipo, descripción, código, marca y unidad se llenan solos. Los renglones cambian según el tipo de producto:
         </p>
 
         <div className="space-y-3">
           <label className="block text-xs font-medium text-gigante-navy">
-            M² por caja
-            <input value={m2Caja} onChange={(e) => setM2Caja(e.target.value)} className={campo} />
+            Tipo de producto
+            <select value={tipoEt} onChange={(e) => cambiarTipo(e.target.value as TipoEtiqueta)} className={campo}>
+              {(Object.keys(TIPOS) as TipoEtiqueta[]).map((t) => (
+                <option key={t} value={t}>
+                  {TIPOS[t]}
+                </option>
+              ))}
+            </select>
           </label>
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block text-xs font-medium text-gigante-navy">
-              Cajas por tarima
-              <input value={cajasTarima} onChange={(e) => setCajasTarima(e.target.value)} className={campo} />
-            </label>
-            <label className="block text-xs font-medium text-gigante-navy">
-              M² por pieza
-              <input value={m2Pza} onChange={(e) => setM2Pza(e.target.value)} className={campo} />
-            </label>
+          <div className="space-y-2">
+            <p className="text-[11px] text-gigante-muted">
+              Renglones de la etiqueta (puedes cambiar el nombre, llenarlos o quitarlos). “Se vende por: {seVendePor.toLowerCase()}” sale solo.
+            </p>
+            {filas.map((f, i) => (
+              <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center">
+                <input
+                  value={f.label}
+                  onChange={(e) => editarFila(i, "label", e.target.value)}
+                  placeholder="Nombre del renglón"
+                  className={`${campo} !py-1.5 font-medium`}
+                />
+                <input
+                  value={f.valor}
+                  onChange={(e) => editarFila(i, "valor", e.target.value)}
+                  placeholder="Valor"
+                  className={`${campo} !py-1.5`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setFilas((fs) => fs.filter((_, j) => j !== i))}
+                  aria-label="Quitar renglón"
+                  className="text-gigante-muted hover:text-gigante-red"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            ))}
+            {filas.length < 6 && (
+              <button
+                type="button"
+                onClick={() => setFilas((fs) => [...fs, { label: "", valor: "" }])}
+                className="inline-flex items-center gap-1 text-xs font-medium text-gigante-navy underline"
+              >
+                <Plus size={13} /> Agregar renglón
+              </button>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <label className="block text-xs font-medium text-gigante-navy">

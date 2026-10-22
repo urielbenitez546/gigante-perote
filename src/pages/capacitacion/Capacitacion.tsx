@@ -383,7 +383,7 @@ function AvanceEquipo({ videos, progress }: { videos: TrainingVideo[]; progress:
       .map((p) => {
         const hecho = (key: string) => progress.some((x) => x.user_id === p.id && x.lesson_key === key);
         const vids = videosForRole(videos, p.role);
-        const lecs = lessonsForRole(p.role);
+        const lecs = lessonsForRole(p.role, p.nivel_almacen);
         const videosVistos = vids.filter((v) => hecho(videoLessonKey(v.id))).length;
         const leccionesHechas = lecs.filter((l) => hecho(l.key)).length;
         const pendientes = [
@@ -449,7 +449,7 @@ export default function Capacitacion() {
   // Gerencia administra todos los videos (incluidos ocultos); el resto ve los de su puesto.
   const videosLista = isGerencia ? allVideos : videosForRole(allVideos, profile.role);
   const misVideos = videosForRole(allVideos, profile.role);
-  const misLecciones = lessonsForRole(profile.role);
+  const misLecciones = lessonsForRole(profile.role, profile.nivel_almacen);
   const doneKeys = new Set(progress.filter((p) => p.user_id === profile.id).map((p) => p.lesson_key));
   const videosVistos = misVideos.filter((v) => doneKeys.has(videoLessonKey(v.id))).length;
   const leccionesHechas = misLecciones.filter((l) => doneKeys.has(l.key)).length;

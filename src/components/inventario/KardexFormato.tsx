@@ -45,8 +45,8 @@ export default function KardexFormato({ product, onChanged }: Props) {
   const puedeEntrada = tienePermiso(profile, "kardex_entradas");
   const puedeAnotar = puedeSalida || puedeEntrada;
   const puedeAnular = tienePermiso(profile, "anular_kardex");
-  // Foto de apoyo: solo jefe, auxiliar y Gerencia la suben y la ven.
-  const puedeFoto = tienePermiso(profile, "operar_almacen");
+  // Foto de apoyo: Gerencia, todo almacén y choferes la suben y la ven.
+  const puedeFoto = profile?.role === "gerencia" || profile?.role === "almacen" || profile?.role === "reparto";
 
   const [entrada, setEntrada] = useState("");
   const [salida, setSalida] = useState("");

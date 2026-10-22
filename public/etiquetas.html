@@ -413,6 +413,7 @@ Minimum version required to store current data is: `+i+`.
           <button type="button" id="btnEscanearProducto" style="flex-shrink:0; white-space:nowrap; padding:0 14px; border-radius:8px; border:1px solid #0E1E42; background:#fff; color:#0E1E42; font-weight:600; font-size:13px; cursor:pointer;">📷 Escanear</button>
         </div>
         <div id="resultadosBusqueda" style="display:none; position:absolute; z-index:20; background:#fff; border:1px solid #ddd; border-radius:8px; margin-top:4px; max-height:220px; overflow-y:auto; width:100%; box-shadow:0 4px 12px rgba(0,0,0,.10);"></div>
+        <div id="promoInfo" style="display:none; margin-top:8px; border-radius:8px; padding:8px 10px; font-size:12.5px; line-height:1.4;"></div>
         <p class="hint" id="buscarHint" style="margin-top:4px;">Si lo encuentras aquí (o lo escaneas), se llenan solos el nombre, ID, marca y precio — los demás campos (color, medida, etc.) los sigues llenando a mano.</p>
       </div>
 
@@ -496,6 +497,7 @@ Minimum version required to store current data is: `+i+`.
       </div>
 
       <button class="btn btn-add" id="btnAdd">➕ Agregar a la lista</button>
+      <button class="btn btn-add" id="btnAddAmbas" style="display:none; background:#C41230; margin-top:8px;">➕ Agregar las 2 etiquetas (precio original + promoción)</button>
       <button class="btn btn-cancel" id="btnCancelEdit" style="display:none;">Cancelar edición</button>
     </div>
 
@@ -699,7 +701,7 @@ Minimum version required to store current data is: `+i+`.
     const q = encodeURIComponent(`*${query.trim()}*`);
     // Si escriben solo números, también se busca por el ID del sistema (ej. 30243).
     const idFiltro = /^\d+$/.test(query.trim()) ? `,external_id.eq.${query.trim()}` : "";
-    const url = `${SUPABASE_URL}/rest/v1/products?select=id,code,name,brand,unit,unit_price,descuento_porcentaje,external_id&or=(code.ilike.${q},name.ilike.${q}${idFiltro})&limit=8`;
+    const url = `${SUPABASE_URL}/rest/v1/products?select=id,code,name,brand,unit,unit_price,descuento_porcentaje,precio_lista,external_id&or=(code.ilike.${q},name.ilike.${q}${idFiltro})&limit=8`;
     try {
       const res = await fetch(url, {
         headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${token}` }
@@ -738,8 +740,24 @@ Minimum version required to store current data is: `+i+`.
     document.getElementById("nombre").value = producto.name;
     document.getElementById("idProd").value = producto.external_id || producto.code;
     document.getElementById("marca").value = producto.brand || "PORCELANITE";
-    const precioFinal = producto.unit_price * (1 - (producto.descuento_porcentaje || 0) / 100);
-    document.getElementById("precio").value = precioFinal.toFixed(2);
+    // Promoción: con lista de precios, lo tachado es el precio público y el final es el precio vigente;
+    // sin lista, el final es el precio con el % de descuento del producto.
+    const conLista = producto.precio_lista != null && Number(producto.precio_lista) > Number(producto.unit_price);
+    let pct = Number(producto.descuento_porcentaje || 0);
+    let normal = Number(producto.unit_price);
+    let promoPrecio = normal * (1 - pct / 100);
+    if (conLista){
+      normal = Number(producto.precio_lista);
+      promoPrecio = Number(producto.unit_price);
+      pct = Math.max(0, Math.round((1 - promoPrecio / normal) * 100));
+    }
+    promoDe = pct > 0 ? { normal: normal.toFixed(2), promo: promoPrecio.toFixed(2), pct } : null;
+    precioSinPromo = normal.toFixed(2);
+    // Si tiene promoción, la etiqueta nace roja con el precio de promoción; si no, azul con el precio normal.
+    setHeaderColorForm(promoDe ? "red" : "navy");
+    document.getElementById("esPromo").checked = !!promoDe;
+    document.getElementById("precio").value = promoDe ? promoDe.promo : precioSinPromo;
+    actualizarPromoInfo();
     document.getElementById("unidadPrecio").value = UNIDAD_POR_UNIT[producto.unit] || "";
     document.getElementById("buscarProducto").value = `${producto.external_id ? "ID " + producto.external_id + " · " : ""}${producto.code} — ${producto.name}`;
     await ensureQrForProduct(producto.id);
@@ -755,7 +773,7 @@ Minimum version required to store current data is: `+i+`.
   async function buscarProductoPorId(id){
     const token = getSupabaseAccessToken();
     if (!token) return null;
-    const url = `${SUPABASE_URL}/rest/v1/products?select=id,code,name,brand,unit,unit_price,descuento_porcentaje,external_id&id=eq.${encodeURIComponent(id)}&limit=1`;
+    const url = `${SUPABASE_URL}/rest/v1/products?select=id,code,name,brand,unit,unit_price,descuento_porcentaje,precio_lista,external_id&id=eq.${encodeURIComponent(id)}&limit=1`;
     try {
       const res = await fetch(url, { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${token}` } });
       if (!res.ok) return null;
@@ -866,6 +884,8 @@ Minimum version required to store current data is: `+i+`.
 
   document.getElementById("buscarProducto").addEventListener("input", (e) => {
     selectedProductId = null; // si vuelve a escribir, ya no corresponde a lo que había seleccionado
+    promoDe = null;
+    actualizarPromoInfo();
     clearTimeout(searchDebounce);
     const value = e.target.value;
     searchDebounce = setTimeout(() => buscarEnInventario(value), 300);
@@ -908,6 +928,44 @@ Minimum version required to store current data is: `+i+`.
   let orientation = "horizontal";
   let startPos = 1; // en qué espacio de la primera hoja empezar a imprimir
 
+  // Promoción del producto elegido del Inventario (null = no tiene). Azul = precio original, rojo = promoción.
+  let promoDe = null;
+  let precioSinPromo = "";
+
+  function actualizarPromoInfo(){
+    const box = document.getElementById("promoInfo");
+    const btnAmbas = document.getElementById("btnAddAmbas");
+    if(!selectedProductId){
+      box.style.display = "none";
+      btnAmbas.style.display = "none";
+      return;
+    }
+    const m = (v) => "$" + Number(v).toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    box.style.display = "block";
+    if(promoDe){
+      box.style.background = "#fdecee";
+      box.style.border = "1px solid #f3c9d1";
+      box.style.color = "#7a1010";
+      box.innerHTML = `🔥 <strong>Este producto SÍ tiene promoción (-${promoDe.pct}%)</strong><br>Precio original: ${m(promoDe.normal)} · Precio promoción: ${m(promoDe.promo)}<br><span style="color:#555;">Elige <strong>Azul</strong> para la etiqueta de precio original o <strong>Rojo</strong> para la de promoción — el precio se cambia solo. O usa el botón rojo de abajo para generar las dos de una vez.</span>`;
+      btnAmbas.style.display = "block";
+    } else {
+      box.style.background = "#eef2fa";
+      box.style.border = "1px solid #cfd8ec";
+      box.style.color = "#0E1E42";
+      box.innerHTML = `Este producto <strong>no tiene promoción</strong> — se usa su precio normal.`;
+      btnAmbas.style.display = "none";
+    }
+  }
+
+  // Cambio de color hecho por la persona: si el producto tiene promoción, también cambia el precio.
+  function aplicarColorUsuario(c){
+    setHeaderColorForm(c);
+    if(promoDe && selectedProductId){
+      document.getElementById("precio").value = c === "red" ? promoDe.promo : promoDe.normal;
+      document.getElementById("esPromo").checked = c === "red";
+    }
+  }
+
   const fieldIds = ["nombre","color","medida","tipo","usoRecomendado","calidad","medidaCaja","idProd","precio","unidadPrecio","marca","cantidad"];
   const fieldMap = { idProd: "id" };
 
@@ -915,7 +973,8 @@ Minimum version required to store current data is: `+i+`.
     return {
       nombre:"", color:"", medida:"", tipo:"", usoRecomendado:"",
       calidad:"", medidaCaja:"", id:"", precio:"", unidadPrecio:"",
-      marca:"PORCELANITE", headerColor:"navy", cantidad:1, promo:false, productId:null
+      marca:"PORCELANITE", headerColor:"navy", cantidad:1, promo:false, productId:null,
+      precioAntes:"", descuento:0, promoDe:null, precioSinPromo:""
     };
   }
 
@@ -930,6 +989,12 @@ Minimum version required to store current data is: `+i+`.
     f.headerColor = headerColorForm;
     f.promo = document.getElementById("esPromo").checked;
     f.productId = selectedProductId;
+    f.promoDe = promoDe;
+    f.precioSinPromo = precioSinPromo;
+    // La tienda imprime las dos etiquetas (azul y roja) para que se vea el descuento,
+    // así que la roja NO lleva el precio original tachado.
+    f.precioAntes = "";
+    f.descuento = 0;
     return f;
   }
 
@@ -941,6 +1006,9 @@ Minimum version required to store current data is: `+i+`.
     setHeaderColorForm(data.headerColor || "navy");
     document.getElementById("esPromo").checked = !!data.promo;
     selectedProductId = data.productId || null;
+    promoDe = data.promoDe || null;
+    precioSinPromo = data.precioSinPromo || "";
+    actualizarPromoInfo();
     document.getElementById("buscarProducto").value = "";
     document.getElementById("buscarHint").textContent = "Si lo encuentras aquí, se llenan solos el nombre, ID, marca y precio — los demás campos (color, medida, etc.) los sigues llenando a mano.";
   }
@@ -951,13 +1019,14 @@ Minimum version required to store current data is: `+i+`.
     document.getElementById("btnRed").className = c === "red" ? "active-red" : "";
   }
 
-  document.getElementById("btnNavy").addEventListener("click", () => setHeaderColorForm("navy"));
-  document.getElementById("btnRed").addEventListener("click", () => setHeaderColorForm("red"));
+  document.getElementById("btnNavy").addEventListener("click", () => aplicarColorUsuario("navy"));
+  document.getElementById("btnRed").addEventListener("click", () => aplicarColorUsuario("red"));
 
   // Marcar "es promoción" acomoda automáticamente el rojo, que es como
   // ya lo usan para ofertas — se puede volver a cambiar a azul si quieren.
   document.getElementById("esPromo").addEventListener("change", (e) => {
-    if(e.target.checked) setHeaderColorForm("red");
+    if(e.target.checked) aplicarColorUsuario("red");
+    else if(promoDe) aplicarColorUsuario("navy");
   });
 
   // Evita que el precio se vaya a notación científica (ej. "22e34") o
@@ -989,6 +1058,28 @@ Minimum version required to store current data is: `+i+`.
     } else {
       productos.push(data);
     }
+    fillForm(emptyForm());
+    document.getElementById("nombre").focus();
+    renderList();
+    renderPreview();
+  });
+
+  // Genera de un jalón las dos etiquetas del producto: precio original (azul) y promoción (roja).
+  document.getElementById("btnAddAmbas").addEventListener("click", async () => {
+    if(!promoDe || !selectedProductId){ return; }
+    const base = readForm();
+    if(!base.nombre.trim()){
+      alert("Ponle al menos el nombre del producto antes de agregarlo a la lista.");
+      return;
+    }
+    await ensureQrForProduct(base.productId);
+    const original = Object.assign({}, base, { headerColor:"navy", promo:false, precio:promoDe.normal, precioAntes:"", descuento:0 });
+    const promocion = Object.assign({}, base, { headerColor:"red", promo:true, precio:promoDe.promo, precioAntes:"", descuento:0 });
+    productos.push(original, promocion);
+    editIndex = null;
+    document.getElementById("formTitle").textContent = "Agregar producto";
+    document.getElementById("btnAdd").textContent = "➕ Agregar a la lista";
+    document.getElementById("btnCancelEdit").style.display = "none";
     fillForm(emptyForm());
     document.getElementById("nombre").focus();
     renderList();
