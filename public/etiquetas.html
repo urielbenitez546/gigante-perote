@@ -344,8 +344,42 @@
   .etiqueta .footer .web{white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .etiqueta .footer .fb{white-space:nowrap;}
 
+  /* ---------- Diseños nuevos de la etiqueta azul + sticker ---------- */
+  .etiqueta.nuevo{display:block;}
+  .etiqueta.nuevo .dis{
+    position:absolute; left:50%; top:50%;
+    transform-origin:center center;
+    background:#fff; overflow:hidden;
+    font-family:"Open Sans","Segoe UI",Arial,Helvetica,sans-serif;
+    color:#0E1E42;
+  }
+  .etiqueta.nuevo .dis > img.fondo{position:absolute; left:0; top:0; width:100%; height:100%; display:block;}
+  .etiqueta.nuevo .t{position:absolute; display:flex; align-items:flex-end; overflow:hidden; line-height:1.05; font-weight:700; text-align:left;}
+  .etiqueta.nuevo .t.c{justify-content:center; text-align:center;}
+  .etiqueta.nuevo .t.mid{align-items:center;}
+  .etiqueta.nuevo .t.top{align-items:flex-start;}
+  .etiqueta.nuevo .t .v{display:block; max-width:100%; box-sizing:border-box; padding-right:3px; overflow-wrap:anywhere;}
+  .etiqueta.nuevo .t.una .v{white-space:nowrap; max-width:none; overflow-wrap:normal; padding-right:0;}
+  .etiqueta.nuevo .t.pi, .etiqueta.nuevo .t.ps{overflow:visible;}
+  .etiqueta.nuevo .t.pi .v{display:inline-block; white-space:nowrap; max-width:none; font-weight:800; line-height:1; transform-origin:center center;}
+  .etiqueta.nuevo .t.ps .v{display:inline-flex; align-items:flex-start; white-space:nowrap; max-width:none; line-height:1;}
+  .etiqueta.nuevo .t.ps .d{font-size:.30em; font-weight:700; margin-top:.16em; margin-right:.06em;}
+  .etiqueta.nuevo .t.ps .a{font-size:1em; font-weight:800; line-height:.9;}
+  .etiqueta.nuevo .t.ps .ct{font-size:.42em; font-weight:800; margin-top:.06em;}
+  .etiqueta.nuevo .qrn{position:absolute; background:#fff; box-sizing:border-box; padding:2px; display:flex;}
+  .etiqueta.nuevo .qrn img{width:100%; height:100%; display:block; image-rendering:pixelated;}
+  .etiqueta.nuevo .ov{
+    position:absolute; background:#0E1E42; border-radius:999px; color:#fff;
+    display:flex; align-items:center; justify-content:center;
+    font-size:9px; font-weight:800; line-height:1;
+  }
+  .sticker-wrap{ display:flex; align-items:center; justify-content:center; }
+  .uso-checks{display:flex; flex-wrap:wrap; gap:6px 14px; margin:-2px 0 12px; font-size:12px; color:#374151;}
+  .uso-checks label{display:inline-flex; align-items:center; gap:5px; cursor:pointer;}
+
   #hoja-imprimible{display:none;}
   #estrella-imprimible{display:none;}
+  #sticker-imprimible{display:none;}
   .print-page{ page-break-after: always; }
   .print-page:last-child{ page-break-after: auto; }
 
@@ -363,7 +397,13 @@
       top:0;
       left:0;
     }
-    #hoja-imprimible, #hoja-imprimible *, #estrella-imprimible, #estrella-imprimible *{
+    body.print-sticker #sticker-imprimible{
+      display:block !important;
+      position:absolute;
+      top:0;
+      left:0;
+    }
+    #hoja-imprimible, #hoja-imprimible *, #estrella-imprimible, #estrella-imprimible *, #sticker-imprimible, #sticker-imprimible *{
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
       color-adjust: exact !important;
@@ -449,7 +489,14 @@ Minimum version required to store current data is: `+i+`.
 
       <div class="field">
         <label>Uso recomendado</label>
-        <input id="usoRecomendado">
+        <input id="usoRecomendado" placeholder="Ej. Interior, Baño">
+      </div>
+      <div class="uso-checks" id="usoChecks">
+        <label><input type="checkbox" data-uso="Interior"> Interior</label>
+        <label><input type="checkbox" data-uso="Exterior"> Exterior</label>
+        <label><input type="checkbox" data-uso="Baño"> Baño</label>
+        <label><input type="checkbox" data-uso="Cocina"> Cocina</label>
+        <label><input type="checkbox" data-uso="Comercial"> Comercial</label>
       </div>
 
       <div class="row2">
@@ -519,6 +566,17 @@ Minimum version required to store current data is: `+i+`.
           <option value="cuarto" selected>1/4 de carta</option>
           <option value="octavo">1/8 de carta</option>
         </select>
+      </div>
+
+      <div class="field">
+        <label>Diseño de las etiquetas azules (aplica a toda la lista)</label>
+        <select id="disenoAzul">
+          <option value="auto" selected>Automático: información si el producto tiene medida o calidad; si no, sencilla</option>
+          <option value="info">Información: formato, calidad, m² por caja, uso recomendado y precio</option>
+          <option value="sencilla">Sencilla: nombre, precio e ID</option>
+          <option value="clasica">Clásica (el diseño anterior)</option>
+        </select>
+        <p class="hint" id="disenoHint">Las etiquetas rojas (promoción) no cambian. Al elegir un diseño se pone solo el tamaño que mejor le queda (información: 1/4 de carta vertical; sencilla: 1/8 de carta horizontal); lo puedes cambiar abajo.</p>
       </div>
 
       <div class="field">
@@ -598,10 +656,39 @@ Minimum version required to store current data is: `+i+`.
       </div>
     </div>
   </div>
+
+  <div class="card" style="margin-top:20px;">
+    <p class="title">🆕 Sticker “Nuevo producto”</p>
+    <p class="subtitle" style="margin:-6px 0 14px;">Sticker redondo para marcar los productos nuevos en exhibición. Elige el tamaño y cuántos quieres; se imprimen varios por hoja.</p>
+
+    <div class="grid">
+      <div>
+        <div class="field">
+          <label>Tamaño</label>
+          <select id="stkTamano">
+            <option value="chico">Chico (5 cm)</option>
+            <option value="mediano" selected>Mediano (9 cm, el tamaño original)</option>
+            <option value="grande">Grande (13 cm)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Cantidad de stickers</label>
+          <input id="stkCantidad" type="number" min="1" step="1" value="1">
+        </div>
+        <button type="button" class="btn btn-add" id="stkBtnLlenar" style="background:#fff; color:#0E1E42; border:1px solid #0E1E42;">Llenar toda la hoja</button>
+        <p class="hint" id="stkHint"></p>
+        <button class="btn btn-print" id="stkBtnPrint">🖨️ Imprimir sticker(s)</button>
+      </div>
+      <div>
+        <div id="stkPreviewContainer"></div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div id="hoja-imprimible"></div>
 <div id="estrella-imprimible"></div>
+<div id="sticker-imprimible"></div>
 
 <script>
   // Cada tamaño define su "medida base" (dos dimensiones, la mayor y la
@@ -660,7 +747,7 @@ Minimum version required to store current data is: `+i+`.
   console.log("[QR] ¿Cargó la librería jsQR (escáner) al inicio?", typeof jsQR !== "undefined" ? "SÍ" : "NO");
   const SUPABASE_ANON_KEY = "sb_publishable_IfE4OkCLK0KOubb1hXo1ig_-SWuzdJW";
 
-  const UNIDAD_POR_UNIT = { caja: "Por caja", pieza: "Por pieza", bolsa: "Por bolsa", rollo: "Por rollo" };
+  const UNIDAD_POR_UNIT = { caja: "Por caja", pieza: "Por pieza", bolsa: "Por bolsa", rollo: "Por rollo", m2: "Por m²" };
   const qrCache = {};
   let selectedProductId = null; // uuid del producto real, si se eligió del Inventario
   let searchDebounce = null;
@@ -1004,6 +1091,7 @@ Minimum version required to store current data is: `+i+`.
       document.getElementById(id).value = data[key] ?? "";
     });
     setHeaderColorForm(data.headerColor || "navy");
+    syncUsoChecks();
     document.getElementById("esPromo").checked = !!data.promo;
     selectedProductId = data.productId || null;
     promoDe = data.promoDe || null;
@@ -1199,7 +1287,7 @@ Minimum version required to store current data is: `+i+`.
       alert("Agrega al menos un producto a la lista antes de imprimir.");
       return;
     }
-    document.body.classList.remove("print-estrella");
+    document.body.classList.remove("print-estrella", "print-sticker");
     document.body.classList.add("print-etiquetas");
     window.print();
   });
@@ -1233,6 +1321,8 @@ Minimum version required to store current data is: `+i+`.
     if(!data){
       return `<div class="etiqueta vacia" style="width:${widthIn}in; height:${heightIn}in;"></div>`;
     }
+    const diseno = disenoPara(data);
+    if(diseno !== "clasica") return buildEtiquetaNueva(data, diseno, widthIn, heightIn);
     const bg = data.headerColor === "red" ? "#C41230" : "#0E1E42";
     const p = (key) => propIn(heightIn, key);
     const promoHtml = data.promo
@@ -1320,6 +1410,171 @@ Minimum version required to store current data is: `+i+`.
     `;
   }
 
+  // ============================================================
+  // Diseños nuevos de la etiqueta AZUL (sin descuento):
+  //   · "info": formato, calidad, m² por caja, uso recomendado y precio.
+  //   · "sencilla": nombre, precio e ID.
+  // El arte (logo, esquinas, líneas) es el SVG de Illustrator tal cual; aquí
+  // solo se escriben encima los datos del producto. Las medidas de abajo
+  // están en puntos del diseño original.
+  // La etiqueta ROJA (promoción) sigue con el diseño de siempre.
+  // ============================================================
+  const DISENOS = {
+    info:     { w: 297.638, h: 348.661, img: "/etiquetas-diseno/info.svg" },
+    sencilla: { w: 283.465, h: 170.079, img: "/etiquetas-diseno/sencilla.svg" },
+  };
+  let disenoAzul = "auto";
+
+  const normTxt = (t) => (t || "").toString().normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
+  function tieneDatosInfo(d){
+    return [d.medida, d.calidad, d.medidaCaja, d.usoRecomendado].some(v => (v || "").toString().trim() !== "");
+  }
+
+  // Qué diseño le toca a una etiqueta: la roja y las de promoción siguen con el clásico.
+  function disenoPara(d){
+    if(!d || d.headerColor === "red" || d.promo) return "clasica";
+    if(disenoAzul === "auto") return tieneDatosInfo(d) ? "info" : "sencilla";
+    return disenoAzul;
+  }
+
+  function usosMarcados(txt){
+    const n = normTxt(txt);
+    return { interior: n.includes("interior"), exterior: n.includes("exterior"), bano: n.includes("bano"),
+             cocina: n.includes("cocina"), comercial: n.includes("comercial") };
+  }
+
+  function tBox(cls, x, y, w, h, texto, fs, extra){
+    const t = (texto || "").toString().trim();
+    if(!t) return "";
+    return `<div class="t ${cls}" style="left:${x}px; top:${y}px; width:${w}px; height:${h}px;${extra || ""}"><span class="v" data-fs="${fs}" style="font-size:${fs}px;">${escapeHtml(t)}</span></div>`;
+  }
+
+  function buildEtiquetaNueva(data, diseno, widthIn, heightIn){
+    const D = DISENOS[diseno];
+    const k = Math.min((widthIn * 96) / D.w, (heightIn * 96) / D.h);
+    const pf = formatPrecio(data.precio);
+    const unidad = (data.unidadPrecio || "").trim();
+    const nombre = (data.nombre || "").toString().trim().toUpperCase();
+    let capas = "";
+    // El QR del producto (si se buscó en el inventario) igual que en la etiqueta clásica.
+    const qrSrc = data.productId && qrCache[data.productId] ? qrCache[data.productId] : "";
+    const qrImg = (x, y, t) => `<div class="qrn" style="left:${x}px; top:${y}px; width:${t}px; height:${t}px;"><img src="${qrSrc}" alt="Código QR"></div>`;
+
+    if(diseno === "info"){
+      if(qrSrc) capas += qrImg(246, 46, 40);
+      capas += tBox("una", 178, 51.5, 62, 14, data.id, 11);
+      capas += tBox("", 116, 67, 124.5, 19, nombre, 11, " line-height:1.02;");
+      capas += tBox("una", 116, 95, 124.5, 14.5, (data.marca || "").toString().toUpperCase(), 11);
+      capas += tBox("una", 86, 129, 54, 13.5, data.medida, 10);
+      capas += tBox("una", 86, 149.5, 54, 13.5, data.calidad, 10);
+      capas += tBox("una", 86, 170, 54, 13.5, data.medidaCaja, 10);
+      const u = usosMarcados(data.usoRecomendado);
+      [["interior",164.1,151],["exterior",209.9,151],["bano",250.8,151],["cocina",164.1,176.2],["comercial",209.9,176.2]]
+        .forEach(([key, x, y]) => { if(u[key]) capas += `<div class="ov" style="left:${x}px; top:${y}px; width:13.8px; height:11.3px;">✓</div>`; });
+      if(pf){
+        capas += `<div class="t pi c mid" style="left:72px; top:213px; width:149px; height:106px;"><span class="v">${pf.entero}</span></div>`;
+        if(pf.centavos !== null) capas += tBox("c una mid", 225, 213, 36, 27, pf.centavos, 26, " font-weight:800;");
+        capas += tBox("c top", 223, 246, 40, 70, unidad, 10);
+      }
+    } else {
+      capas += tBox("", 50, 33, 218, 18.7, nombre, 13, " line-height:1.02;");
+      if(qrSrc) capas += qrImg(228, 58, 42);
+      if(pf){
+        const inner = pf.centavos !== null
+          ? `<span class="d">$</span><span class="a">${pf.entero}</span><span class="ct">.${pf.centavos}</span>`
+          : `<span class="d">$</span><span class="a">${pf.entero}</span>`;
+        capas += `<div class="t ps c mid" style="left:18px; top:56px; width:${qrSrc ? 206 : 248}px; height:60px;"><span class="v" data-fs="68" style="font-size:68px;">${inner}</span></div>`;
+      }
+      capas += tBox("c una mid", 18, 116, 248, 14, unidad, 10);
+      capas += tBox("una mid", 205, 133.5, 59, 13, data.id, 11);
+    }
+
+    return `
+      <div class="etiqueta nuevo" style="width:${widthIn}in; height:${heightIn}in;">
+        <div class="dis" style="width:${D.w}px; height:${D.h}px; margin-left:${-D.w/2}px; margin-top:${-D.h/2}px; transform:scale(${k.toFixed(5)});">
+          <img class="fondo" src="${D.img}" alt="">
+          ${capas}
+        </div>
+      </div>`;
+  }
+
+  // Ajusta los textos de los diseños nuevos para que siempre quepan:
+  // baja la letra hasta que entre; el precio grande de la etiqueta de información
+  // se "angosta" (como el número alargado del diseño original) antes de achicarse.
+  function fitNuevas(root){
+    root.querySelectorAll(".etiqueta.nuevo .t .v").forEach((v) => {
+      const box = v.parentElement;
+      if(box.classList.contains("pi") || box.classList.contains("ps")) return;
+      let fs = parseFloat(v.dataset.fs) || parseFloat(getComputedStyle(v).fontSize);
+      const unaLinea = box.classList.contains("una");
+      const cabe = () => unaLinea ? v.offsetWidth <= box.clientWidth + 0.5 : v.offsetHeight <= box.clientHeight + 0.5;
+      let guard = 0;
+      while(!cabe() && fs > 5 && guard < 80){ fs = Math.max(5, fs * 0.95); v.style.fontSize = fs + "px"; guard++; }
+    });
+    root.querySelectorAll(".etiqueta.nuevo .t.pi .v").forEach((v) => {
+      const box = v.parentElement;
+      const W = box.clientWidth, H = box.clientHeight;
+      if(!W || !H) return;
+      let fs = H / 0.72;
+      v.style.fontSize = fs + "px"; v.style.transform = "";
+      let k = Math.min(1, W / v.offsetWidth);
+      if(k < 0.6){
+        fs = fs * (k / 0.6);
+        v.style.fontSize = fs + "px";
+        k = Math.min(1, W / v.offsetWidth);
+      }
+      v.style.transform = `scaleX(${k.toFixed(4)})`;
+    });
+    root.querySelectorAll(".etiqueta.nuevo .t.ps .v").forEach((v) => {
+      const box = v.parentElement;
+      const W = box.clientWidth, H = box.clientHeight;
+      if(!W || !H) return;
+      let fs = parseFloat(v.dataset.fs) || 68;
+      let guard = 0;
+      while((v.offsetWidth > W || v.offsetHeight > H) && fs > 10 && guard < 80){ fs *= 0.95; v.style.fontSize = fs + "px"; guard++; }
+    });
+  }
+
+  // Casillas de "Uso recomendado": escriben (y leen) las palabras en el campo de texto.
+  const USOS = ["Interior","Exterior","Baño","Cocina","Comercial"];
+  function usosDelTexto(txt){
+    const n = normTxt(txt);
+    return USOS.filter(u => n.includes(normTxt(u)));
+  }
+  function syncUsoChecks(){
+    const marcados = usosDelTexto(document.getElementById("usoRecomendado").value);
+    document.querySelectorAll("#usoChecks input[type=checkbox]").forEach(cb => { cb.checked = marcados.includes(cb.dataset.uso); });
+  }
+  document.querySelectorAll("#usoChecks input[type=checkbox]").forEach(cb => {
+    cb.addEventListener("change", () => {
+      const inp = document.getElementById("usoRecomendado");
+      const actuales = inp.value.split(",").map(t => t.trim()).filter(Boolean);
+      const sin = actuales.filter(t => normTxt(t) !== normTxt(cb.dataset.uso));
+      if(cb.checked) sin.push(cb.dataset.uso);
+      // Se mantiene el orden Interior, Exterior, Baño, Cocina, Comercial.
+      const ordenadas = USOS.filter(u => sin.some(t => normTxt(t) === normTxt(u)))
+        .concat(sin.filter(t => !USOS.some(u => normTxt(u) === normTxt(t))));
+      inp.value = ordenadas.join(", ");
+    });
+  });
+  document.getElementById("usoRecomendado").addEventListener("input", syncUsoChecks);
+
+  // Selector de diseño de la lista.
+  function aplicarTamanoRecomendado(){
+    const rec = { info: ["cuarto","vertical"], auto: ["cuarto","vertical"], sencilla: ["octavo","horizontal"] }[disenoAzul];
+    if(!rec) return;
+    const sel = document.getElementById("sizeKey");
+    sel.value = rec[0];
+    sel.dispatchEvent(new Event("change"));
+    setOrientation(rec[1]);
+  }
+  document.getElementById("disenoAzul").addEventListener("change", (e) => {
+    disenoAzul = e.target.value;
+    aplicarTamanoRecomendado();
+    renderPreview();
+  });
+
   function expandirEtiquetas(){
     const flat = [];
     productos.forEach(p => {
@@ -1395,6 +1650,7 @@ Minimum version required to store current data is: `+i+`.
     // no caber a lo ancho. Aquí lo reducimos hasta que quepa completo,
     // midiendo sobre la vista previa (que sí está visible en pantalla).
     fitPriceText(previewContainer);
+    fitNuevas(previewContainer);
 
     // La copia que se manda a imprimir se clona YA AJUSTADA desde la
     // vista previa (en vez de generarse aparte oculta, donde no se
@@ -1428,6 +1684,8 @@ Minimum version required to store current data is: `+i+`.
   }
 
   fillForm(emptyForm());
+  // Si no viene un lote ya armado, se arranca con el tamaño que mejor le queda al diseño nuevo.
+  if(!/lote=/.test((window.location.hash || "") + (window.location.search || ""))) aplicarTamanoRecomendado();
   renderList();
   renderPosGrid();
   renderPreview();
@@ -1600,12 +1858,84 @@ Minimum version required to store current data is: `+i+`.
     const cfg = estGetConfig();
     document.getElementById("pageStyle").textContent =
       `@page{ size: letter${cfg.landscape ? " landscape" : ""}; margin: 0; }`;
-    document.body.classList.remove("print-etiquetas");
+    document.body.classList.remove("print-etiquetas", "print-sticker");
     document.body.classList.add("print-estrella");
     window.print();
   });
 
   estRenderPreview();
+  // ---------- Sticker "Nuevo producto" ----------
+  const STK_SIZES = { chico: 5 / 2.54, mediano: 9 / 2.54, grande: 13 / 2.54 };
+  const STK_IMG = "/etiquetas-diseno/nuevo-producto.svg";
+
+  function stkGetConfig(){
+    const d = STK_SIZES[document.getElementById("stkTamano").value] || STK_SIZES.mediano;
+    const grid = computeGrid(d, d);
+    return { widthIn: d, heightIn: d, cols: grid.cols, rows: grid.rows, pageW: grid.pageW, pageH: grid.pageH, landscape: grid.landscape };
+  }
+
+  function buildSticker(conImagen, d){
+    return `<div class="sticker-wrap" style="width:${d}in; height:${d}in;">${conImagen ? `<img src="${STK_IMG}" alt="Nuevo producto" style="width:100%; height:100%; display:block;">` : ""}</div>`;
+  }
+
+  function buildStickerHoja(items, cfg){
+    const total = cfg.cols * cfg.rows;
+    let cells = "";
+    for(let i = 0; i < total; i++) cells += buildSticker(!!items[i], cfg.widthIn);
+    return `<div class="hoja" style="width:${cfg.cols*cfg.widthIn}in; height:${cfg.rows*cfg.heightIn}in; grid-template-columns:repeat(${cfg.cols}, ${cfg.widthIn}in); grid-template-rows:repeat(${cfg.rows}, ${cfg.heightIn}in); place-items:center;">${cells}</div>`;
+  }
+
+  function stkRenderPreview(){
+    const cfg = stkGetConfig();
+    const porHoja = cfg.cols * cfg.rows;
+    const cantidad = Math.max(1, parseInt(document.getElementById("stkCantidad").value || "1", 10) || 1);
+    const flat = new Array(cantidad).fill(true);
+    const paginas = paginar(flat, porHoja, 1);
+    document.getElementById("stkHint").textContent =
+      `Caben ${porHoja} por hoja Carta a este tamaño → ${paginas.length} hoja${paginas.length>1?"s":""} para ${cantidad} sticker${cantidad>1?"s":""}${cfg.landscape ? ". Esta combinación necesita la hoja apaisada/horizontal al imprimir." : ""}`;
+
+    const previewContainer = document.getElementById("stkPreviewContainer");
+    const imprimibleContainer = document.getElementById("sticker-imprimible");
+    const previewScale = PREVIEW_MAX_WIDTH_PX / (cfg.pageW * 96);
+    previewContainer.innerHTML = paginas.map((pagina, idx) => `
+      <div class="sheet-block">
+        <div class="sheet-label">Hoja ${idx+1} de ${paginas.length}</div>
+        <div class="preview-frame" style="width:${cfg.pageW*96*previewScale}px; height:${cfg.pageH*96*previewScale}px;">
+          <div class="preview-inner" style="transform:scale(${previewScale});">
+            ${buildStickerHoja(pagina, cfg)}
+          </div>
+        </div>
+      </div>
+    `).join("");
+
+    imprimibleContainer.innerHTML = "";
+    previewContainer.querySelectorAll(".preview-inner > .hoja").forEach((hoja) => {
+      const pageDiv = document.createElement("div");
+      pageDiv.className = "print-page";
+      pageDiv.appendChild(hoja.cloneNode(true));
+      imprimibleContainer.appendChild(pageDiv);
+    });
+  }
+
+  ["stkTamano","stkCantidad"].forEach((id) => {
+    document.getElementById(id).addEventListener("input", stkRenderPreview);
+    document.getElementById(id).addEventListener("change", stkRenderPreview);
+  });
+  document.getElementById("stkBtnLlenar").addEventListener("click", () => {
+    const cfg = stkGetConfig();
+    document.getElementById("stkCantidad").value = cfg.cols * cfg.rows;
+    stkRenderPreview();
+  });
+  document.getElementById("stkBtnPrint").addEventListener("click", () => {
+    const cfg = stkGetConfig();
+    document.getElementById("pageStyle").textContent =
+      `@page{ size: letter${cfg.landscape ? " landscape" : ""}; margin: 0; }`;
+    document.body.classList.remove("print-etiquetas", "print-estrella");
+    document.body.classList.add("print-sticker");
+    window.print();
+  });
+
+  stkRenderPreview();
 </script>
 </body>
 </html>
