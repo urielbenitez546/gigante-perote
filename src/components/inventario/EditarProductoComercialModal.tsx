@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { X } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { updateProductComercial, updateProductDescuento } from "../../hooks/useInventory";
-import { ROTACION_LABELS, PRODUCT_UNIT_LABELS, tienePermiso, type Product, type ProductRotacion } from "../../types";
+import { ROTACION_LABELS, PRODUCT_UNIT_LABELS, PRODUCT_UNIT_AYUDA, tienePermiso, type Product, type ProductRotacion, type ProductUnit } from "../../types";
 
 interface Props {
   product: Product;
@@ -11,6 +11,7 @@ interface Props {
 }
 
 const ROTACIONES: ProductRotacion[] = ["rapido", "medio", "lento", "muy_lento", "obsoleto", "incorporacion"];
+const UNIDADES: ProductUnit[] = ["m2", "pieza", "bolsa", "caja", "rollo"];
 
 export default function EditarProductoComercialModal({ product, onClose, onSuccess }: Props) {
   const { profile } = useAuth();
@@ -21,6 +22,7 @@ export default function EditarProductoComercialModal({ product, onClose, onSucce
 
   const [precio, setPrecio] = useState(String(product.unit_price));
   const [rotacion, setRotacion] = useState<ProductRotacion>(product.rotacion);
+  const [unidad, setUnidad] = useState<ProductUnit>(product.unit);
   const [stockMinimo, setStockMinimo] = useState(String(product.stock_minimo));
   const [descuento, setDescuento] = useState(String(product.descuento_porcentaje));
   const [color, setColor] = useState(product.color ?? "");
@@ -59,6 +61,7 @@ export default function EditarProductoComercialModal({ product, onClose, onSucce
     if (canEditPrecioRotacion) {
       const { error: err } = await updateProductComercial(product.id, {
         unit_price: precioNum,
+        unit: unidad,
         rotacion,
         stock_minimo: stockMinimoNum,
         color: color.trim() || null,
@@ -110,7 +113,7 @@ export default function EditarProductoComercialModal({ product, onClose, onSucce
           {canEditPrecioRotacion ? (
             <div>
               <label className="block text-sm font-medium text-gigante-navy mb-1">
-                Precio por {PRODUCT_UNIT_LABELS[product.unit]}
+                Precio por {PRODUCT_UNIT_LABELS[unidad]}
               </label>
               <input
                 type="number"
@@ -150,6 +153,33 @@ export default function EditarProductoComercialModal({ product, onClose, onSucce
             <p className="text-sm text-gigante-navy">
               Mínimo actual: <strong>{product.stock_minimo}</strong>{" "}
               <span className="text-xs text-gigante-muted">(solo Gerencia y Almacén pueden cambiarlo)</span>
+            </p>
+          )}
+
+          {canEditPrecioRotacion ? (
+            <div>
+              <label className="block text-sm font-medium text-gigante-navy mb-1">Se vende por</label>
+              <div className="grid grid-cols-3 gap-2">
+                {UNIDADES.map((u) => (
+                  <button
+                    key={u}
+                    type="button"
+                    onClick={() => setUnidad(u)}
+                    className={`text-sm font-medium rounded-lg py-2 border ${
+                      unidad === u
+                        ? "bg-gigante-navy text-white border-gigante-navy"
+                        : "border-gigante-border text-gigante-navy"
+                    }`}
+                  >
+                    {u === "m2" ? "Metraje (m²)" : PRODUCT_UNIT_LABELS[u].charAt(0).toUpperCase() + PRODUCT_UNIT_LABELS[u].slice(1)}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-gigante-muted mt-1">{PRODUCT_UNIT_AYUDA[unidad]}. La existencia y las ventas de este producto se cuentan en esta unidad.</p>
+            </div>
+          ) : (
+            <p className="text-sm text-gigante-navy">
+              Se vende por: <strong>{PRODUCT_UNIT_LABELS[product.unit]}</strong>
             </p>
           )}
 

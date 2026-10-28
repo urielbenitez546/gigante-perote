@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import ProductSearchSelect from "../common/ProductSearchSelect";
-import { X, Plus, Trash2, Upload } from "lucide-react";
+import ElegirFoto from "../common/ElegirFoto";
+import { X, Plus, Trash2 } from "lucide-react";
 import type { Product } from "../../types";
 import { registerPurchaseInvoice, type InvoiceItemInput } from "../../hooks/usePurchases";
 import { uploadPhoto } from "../../lib/storage";
@@ -116,17 +117,8 @@ export default function RegistrarFacturaModal({ products, onClose, onSuccess }: 
             <label className="block text-sm font-medium text-gigante-navy mb-1">
               Foto de la factura (opcional)
             </label>
-            <label className="flex items-center gap-2 border border-dashed border-gigante-border rounded-lg px-3 py-3 text-sm text-gigante-muted cursor-pointer hover:bg-gigante-bg">
-              <Upload size={16} />
-              {photoFile ? photoFile.name : "Toca para tomar/seleccionar una foto"}
-              <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                className="hidden"
-                onChange={(e) => setPhotoFile(e.target.files?.[0] ?? null)}
-              />
-            </label>
+            <ElegirFoto onFiles={(f) => setPhotoFile(f[0] ?? null)} />
+            {photoFile && <p className="text-xs text-gigante-muted mt-1.5 truncate">✓ {photoFile.name}</p>}
           </div>
 
           <div>

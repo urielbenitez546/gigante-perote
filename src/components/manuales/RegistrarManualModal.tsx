@@ -1,8 +1,9 @@
 import { useState, type FormEvent } from "react";
-import { X, Upload } from "lucide-react";
+import { X } from "lucide-react";
 import { ROLE_LABELS, MANUAL_CATEGORY_LABELS, type AppRole, type ManualCategory } from "../../types";
 import { registerManual } from "../../hooks/useManuals";
 import { uploadPhoto } from "../../lib/storage";
+import ElegirFoto from "../common/ElegirFoto";
 
 interface Props {
   onClose: () => void;
@@ -145,16 +146,12 @@ export default function RegistrarManualModal({ onClose, onSuccess }: Props) {
             <label className="block text-sm font-medium text-gigante-navy mb-1">
               Archivo (PDF o imagen, opcional)
             </label>
-            <label className="flex items-center gap-2 border border-dashed border-gigante-border rounded-lg px-3 py-3 text-sm text-gigante-muted cursor-pointer hover:bg-gigante-bg">
-              <Upload size={16} />
-              {file ? file.name : "Toca para seleccionar un archivo"}
-              <input
-                type="file"
-                accept="application/pdf,image/*"
-                className="hidden"
-                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              />
-            </label>
+            <ElegirFoto
+              accept="application/pdf,image/*"
+              etiquetaGaleria="Elegir archivo"
+              onFiles={(f) => setFile(f[0] ?? null)}
+            />
+            {file && <p className="text-xs text-gigante-muted mt-1.5 truncate">✓ {file.name}</p>}
           </div>
 
           {error && (

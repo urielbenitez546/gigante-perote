@@ -85,15 +85,31 @@ export async function uploadPhoto(
   const ext = file.name.split(".").pop() || "jpg";
   const path = `${crypto.randomUUID()}.${ext}`;
 
-  const { error } = await supabase.storage.from(bucket).upload(path, file, {
-    cacheControl: "3600",
-    upsert: false,
-  });
-
-  if (error) {
-    return { path: null, error: error.message };
+  // Si la señal del celular falla a media subida, se reintenta solo (hasta 3 veces).
+  // Los errores de permisos o de tamaño no se reintentan: no se arreglan solos.
+  let ultimoError = "";
+  for (let intento = 1; intento <= 3; intento++) {
+    try {
+      const { error } = await supabase.storage.from(bucket).upload(path, file, {
+        cacheControl: "3600",
+        upsert: false,
+      });
+      if (!error) return { path, error: null };
+      ultimoError = error.message;
+      if (/security|policy|permission|not found|bucket|exceed|too large|mime/i.test(error.message)) break;
+    } catch (e) {
+      ultimoError = e instanceof Error ? e.message : "No se pudo subir la foto";
+    }
+    if (intento < 3) await new Promise((r) => setTimeout(r, 800 * intento));
   }
-  return { path, error: null };
+  if (/row-level security|policy|permission|not allowed|violates/i.test(ultimoError)) {
+    ultimoError = "Tu usuario no tiene permiso para subir fotos aquí. Avisa a Gerencia (falta correr el SQL de actualización en Supabase).";
+  } else if (/bucket.*not found/i.test(ultimoError)) {
+    ultimoError = "Falta crear el espacio de fotos en Supabase. Avisa a Gerencia (falta correr el SQL de actualización).";
+  } else if (/failed to fetch|network|load failed|timeout/i.test(ultimoError)) {
+    ultimoError = "No se pudo subir la foto por la señal. Revisa tu internet y vuelve a intentarlo.";
+  }
+  return { path: null, error: ultimoError || "No se pudo subir la foto" };
 }
 
 /**

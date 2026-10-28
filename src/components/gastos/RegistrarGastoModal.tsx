@@ -1,8 +1,9 @@
 import { useState, type FormEvent } from "react";
-import { X, Upload } from "lucide-react";
+import { X } from "lucide-react";
 import { EXPENSE_CATEGORIES, EXPENSE_PAYMENT_METHODS } from "../../types";
 import { createExpense } from "../../hooks/useExpenses";
 import { uploadPhotos } from "../../lib/storage";
+import ElegirFoto from "../common/ElegirFoto";
 
 interface Props {
   onClose: () => void;
@@ -149,19 +150,20 @@ export default function RegistrarGastoModal({ onClose, onSuccess }: Props) {
 
           <div>
             <label className="block text-sm font-medium text-gigante-navy mb-1">Foto del ticket / factura</label>
-            <label className="flex items-center gap-2 border border-dashed border-gigante-border rounded-lg px-3 py-3 text-sm text-gigante-muted cursor-pointer">
-              <Upload size={16} />
-              <span className="truncate">
-                {files.length === 0 ? "Elegir foto(s)" : `${files.length} archivo(s): ${files.map((f) => f.name).join(", ")}`}
-              </span>
-              <input
-                type="file"
-                accept="image/*,application/pdf"
-                multiple
-                className="hidden"
-                onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
-              />
-            </label>
+            <ElegirFoto
+              multiple
+              accept="image/*,application/pdf"
+              etiquetaGaleria="Galería o archivo"
+              onFiles={(nuevos) => setFiles((prev) => [...prev, ...nuevos])}
+            />
+            {files.length > 0 && (
+              <p className="text-xs text-gigante-muted mt-1.5">
+                ✓ {files.length} archivo(s): {files.map((f) => f.name).join(", ")}{" "}
+                <button type="button" onClick={() => setFiles([])} className="text-gigante-red underline">
+                  Quitar
+                </button>
+              </p>
+            )}
             <p className="text-[11px] text-gigante-muted mt-1">
               Los comprobantes son privados: solo Gerencia los puede ver.
             </p>

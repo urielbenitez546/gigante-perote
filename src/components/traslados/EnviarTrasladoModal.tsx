@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Camera, X } from "lucide-react";
+import { X } from "lucide-react";
 import ProductSearchSelect from "../common/ProductSearchSelect";
+import ElegirFoto from "../common/ElegirFoto";
 import { registrarTraslado, type SolicitudTraslado } from "../../hooks/useTraslados";
 import { adjuntarFotoKardex } from "../../hooks/useInventory";
 import { uploadPhoto } from "../../lib/storage";
@@ -115,11 +116,9 @@ export default function EnviarTrasladoModal({ products, solicitud, sucursalesCon
             <input value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Ej. camioneta 2, chofer Luis" className={campo} />
           </label>
           <div>
-            <label className="inline-flex items-center gap-1.5 text-xs font-medium border border-gigante-border rounded-lg px-2.5 py-1.5 text-gigante-navy bg-white cursor-pointer">
-              <Camera size={13} /> {foto ? "Cambiar foto" : "Foto de apoyo (opcional)"}
-              <input type="file" accept="image/*" className="hidden" onChange={(e) => setFoto(e.target.files?.[0] ?? null)} />
-            </label>
-            {foto && <span className="ml-2 text-[11px] text-gigante-muted">{foto.name}</span>}
+            <p className="text-xs font-medium text-gigante-navy mb-1">Foto de apoyo (opcional){foto ? " ✓" : ""}</p>
+            <ElegirFoto compacto onFiles={(f) => setFoto(f[0] ?? null)} />
+            {foto && <span className="text-[11px] text-gigante-muted">{foto.name}</span>}
           </div>
         </div>
 

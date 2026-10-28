@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { X } from "lucide-react";
+import { unidadLabel } from "../../types";
 import {
   TIPO_RESPUESTA_LABELS,
   responderSolicitudTraslado,
@@ -22,7 +23,7 @@ export default function ResponderSolicitudModal({ solicitud, previa, onClose, on
   const [nota, setNota] = useState(previa?.nota ?? "");
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const unidad = solicitud.product?.unit ?? "";
+  const unidad = unidadLabel(solicitud.product?.unit);
 
   async function guardar() {
     setError(null);

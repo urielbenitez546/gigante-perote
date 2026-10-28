@@ -1,5 +1,5 @@
-import { useMemo, useRef, useState } from "react";
-import { Camera, ClipboardCheck, Paperclip, Tag } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ClipboardCheck, Paperclip, Tag } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import {
   registerInventoryEntry,
@@ -13,6 +13,7 @@ import {
 } from "../../hooks/useInventory";
 import { signedPhotoUrl, uploadPhoto } from "../../lib/storage";
 import { useProfileNames } from "../../hooks/useProfileNames";
+import ElegirFoto from "../common/ElegirFoto";
 import ConteoFisicoModal from "./ConteoFisicoModal";
 import EtiquetaKardexModal from "./EtiquetaKardexModal";
 import { PRODUCT_UNIT_LABELS, productoId, tienePermiso, type Product } from "../../types";
@@ -60,9 +61,6 @@ export default function KardexFormato({ product, onChanged }: Props) {
   const [foto, setFoto] = useState<File | null>(null);
   const [fotoEsDelProducto, setFotoEsDelProducto] = useState(true);
   const vistaFoto = useMemo(() => (foto ? URL.createObjectURL(foto) : null), [foto]);
-  const fotoNuevaRef = useRef<HTMLInputElement>(null);
-  const fotoFilaRef = useRef<HTMLInputElement>(null);
-  const [movParaFoto, setMovParaFoto] = useState<string | null>(null);
 
   const unidad = PRODUCT_UNIT_LABELS[product.unit];
   const stock = Number(product.physical_stock);
@@ -110,10 +108,7 @@ export default function KardexFormato({ product, onChanged }: Props) {
     else window.location.href = url;
   }
 
-  async function adjuntarAFila(file: File | undefined) {
-    const movId = movParaFoto;
-    setMovParaFoto(null);
-    if (fotoFilaRef.current) fotoFilaRef.current.value = "";
+  async function adjuntarAFila(file: File | undefined, movId: string | null | undefined) {
     if (!file || !movId) return;
     setMsg(null);
     const { path, error: errSubida } = await uploadPhoto("kardex-soporte", file);
@@ -189,7 +184,6 @@ export default function KardexFormato({ product, onChanged }: Props) {
     setSalida("");
     setReferencia("");
     setFoto(null);
-    if (fotoNuevaRef.current) fotoNuevaRef.current.value = "";
     setMsg(
       avisoFoto
         ? { tipo: "error", texto: `Renglón guardado, pero la foto no se pudo adjuntar (${avisoFoto}). Agrégala desde el renglón.` }
@@ -288,15 +282,14 @@ export default function KardexFormato({ product, onChanged }: Props) {
                         </button>
                       )}
                       {puedeFoto && !e.fotoPath && e.movId && !e.anulado && (e.tipoMov === "entrada" || e.tipoMov === "salida") && (
-                        <button
-                          onClick={() => {
-                            setMovParaFoto(e.movId);
-                            fotoFilaRef.current?.click();
-                          }}
-                          className="mt-0.5 ml-0 block text-[11px] text-gigante-muted underline"
-                        >
-                          + Agregar foto
-                        </button>
+                        <div className="mt-1">
+                          <ElegirFoto
+                            compacto
+                            etiquetaCamara="Tomar foto"
+                            etiquetaGaleria="Galería"
+                            onFiles={(f) => adjuntarAFila(f[0], e.movId)}
+                          />
+                        </div>
                       )}
                       {e.anulado && (
                         <span className="block text-[11px] text-gigante-red">
@@ -386,13 +379,11 @@ export default function KardexFormato({ product, onChanged }: Props) {
                     />
                     {puedeFoto && (
                       <div className="mt-2 flex items-center gap-2 flex-wrap">
-                        <button
-                          type="button"
-                          onClick={() => fotoNuevaRef.current?.click()}
-                          className="inline-flex items-center gap-1.5 text-xs font-medium border border-gigante-border rounded-lg px-2.5 py-1.5 text-gigante-navy bg-white"
-                        >
-                          <Camera size={13} /> {foto ? "Cambiar foto" : "Foto de apoyo (opcional)"}
-                        </button>
+                        <ElegirFoto
+                          compacto
+                          etiquetaCamara={foto ? "Otra foto" : "Foto de apoyo (opcional)"}
+                          onFiles={(f) => setFoto(f[0] ?? null)}
+                        />
                         {foto && (
                           <>
                             {vistaFoto && <img src={vistaFoto} alt="Vista previa" className="h-10 w-10 rounded object-cover border border-gigante-border" />}
@@ -401,7 +392,6 @@ export default function KardexFormato({ product, onChanged }: Props) {
                               type="button"
                               onClick={() => {
                                 setFoto(null);
-                                if (fotoNuevaRef.current) fotoNuevaRef.current.value = "";
                               }}
                               className="text-[11px] text-gigante-red underline"
                             >
@@ -419,13 +409,6 @@ export default function KardexFormato({ product, onChanged }: Props) {
                             Usar también como foto del producto (aparece junto al nombre)
                           </label>
                         )}
-                        <input
-                          ref={fotoNuevaRef}
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => setFoto(e.target.files?.[0] ?? null)}
-                        />
                       </div>
                     )}
                   </td>
@@ -453,14 +436,6 @@ export default function KardexFormato({ product, onChanged }: Props) {
       {!puedeAnotar && (
         <p className="text-xs text-gigante-muted mt-3">Solo consulta: tu usuario no puede anotar renglones en el Kardex.</p>
       )}
-
-      <input
-        ref={fotoFilaRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={(e) => adjuntarAFila(e.target.files?.[0])}
-      />
 
       {etiquetaAbierta && <EtiquetaKardexModal product={product} onClose={() => setEtiquetaAbierta(false)} />}
 

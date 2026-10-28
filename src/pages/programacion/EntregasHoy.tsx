@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CalendarCheck, Clock, PackageCheck, RefreshCw, Truck, Warehouse, Zap } from "lucide-react";
 import { useOpenSales, confirmarEntregaInmediata } from "../../hooks/useSales";
 import { pendingLinesFor } from "../../lib/pendingLines";
-import type { PendingLine, SaleWithItems } from "../../types";
+import { unidadLabel, type PendingLine, type SaleWithItems } from "../../types";
 import ConfirmarEntregaParcialModal from "../../components/ventas/ConfirmarEntregaParcialModal";
 
 /** Fecha local yyyy-mm-dd (sin cambios por zona horaria). */
@@ -26,7 +26,7 @@ function Material({ lines }: { lines: PendingLine[] }) {
       {lines.map((l) => (
         <li key={l.sale_item_id} className="text-sm text-gigante-navy">
           <span className="font-semibold">
-            {l.pending} {l.unit}
+            {l.pending} {unidadLabel(l.unit)}
           </span>{" "}
           · {l.product_code} — {l.product_name}
         </li>

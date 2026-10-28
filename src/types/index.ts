@@ -194,6 +194,21 @@ export const PRODUCT_UNIT_LABELS: Record<ProductUnit, string> = {
   m2: "m²",
 };
 
+/** Nombre de la unidad para mostrar ("m²", "pieza"...). Acepta el valor tal como viene de la base. */
+export function unidadLabel(u: string | null | undefined): string {
+  if (!u) return "";
+  return PRODUCT_UNIT_LABELS[u as ProductUnit] ?? u;
+}
+
+/** Cómo se explica cada unidad en la pantalla de editar producto. */
+export const PRODUCT_UNIT_AYUDA: Record<ProductUnit, string> = {
+  m2: "Metraje: pisos y azulejos, se venden por metro cuadrado",
+  pieza: "Pieza: tinacos, llaves, lavabos, muebles...",
+  bolsa: "Bolsa: pegazulejo, junteador, adhesivos",
+  rollo: "Rollo",
+  caja: "Caja: solo si el producto se vende cerrado por caja",
+};
+
 export type ProductRotacion = "incorporacion" | "muy_lento" | "lento" | "medio" | "rapido" | "obsoleto";
 
 export const ROTACION_LABELS: Record<ProductRotacion, string> = {

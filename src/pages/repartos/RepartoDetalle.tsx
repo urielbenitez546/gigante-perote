@@ -1,18 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Phone, Plus, Upload, X, CheckCircle2, Clock } from "lucide-react";
+import { ArrowLeft, Phone, Plus, X, CheckCircle2, Clock } from "lucide-react";
 import { useDeliveries, updateDelivery, createAdditionalDelivery } from "../../hooks/useDeliveries";
 import { useAuth } from "../../context/AuthContext";
 import { useProfileNames } from "../../hooks/useProfileNames";
 import {
   DELIVERY_STATUS_LABELS,
   PAYMENT_METHOD_LABELS,
+  unidadLabel,
   type DeliveryStatus,
   type PaymentMethod,
 } from "../../types";
 import { pendingLinesFor } from "../../lib/pendingLines";
 import { uploadPhoto, uploadPhotos, publicPhotoUrl } from "../../lib/storage";
 import MiniaturaFoto from "../../components/common/MiniaturaFoto";
+import ElegirFoto from "../../components/common/ElegirFoto";
 import ConfirmarEntregaParcialModal from "../../components/ventas/ConfirmarEntregaParcialModal";
 import SignatureCanvas from "../../components/repartos/SignatureCanvas";
 
@@ -68,7 +70,7 @@ export default function RepartoDetalle() {
           id: ref.sale_item_id,
           code: saleItem?.product?.code ?? "",
           name: saleItem?.product?.name ?? "",
-          unit: saleItem?.product?.unit ?? "",
+          unit: unidadLabel(saleItem?.product?.unit),
           quantity: ref.quantity,
           unitPrice: saleItem?.unit_price ?? 0,
         };
@@ -81,7 +83,7 @@ export default function RepartoDetalle() {
         id: si.id,
         code: si.product?.code ?? "",
         name: si.product?.name ?? "",
-        unit: si.product?.unit ?? "",
+        unit: unidadLabel(si.product?.unit),
         quantity: si.quantity - si.delivered_quantity,
         unitPrice: si.unit_price,
       }));
@@ -111,10 +113,6 @@ export default function RepartoDetalle() {
   const canEdit = profile?.role === "gerencia" || profile?.role === "reparto";
   const willMarkAsEntregado = !!delivery && delivery.status !== "entregado" && status === "entregado";
 
-  function handlePhotoFiles(files: FileList | null) {
-    if (!files) return;
-    setPhotoFiles((prev) => [...prev, ...Array.from(files)]);
-  }
   function removePhotoFile(index: number) {
     setPhotoFiles((prev) => prev.filter((_, i) => i !== index));
   }
@@ -451,20 +449,7 @@ export default function RepartoDetalle() {
                   <label className="block text-sm font-medium text-gigante-navy mb-1">
                     Fotos de evidencia
                   </label>
-                  <label className="flex items-center gap-2 border border-dashed border-gigante-border rounded-lg px-3 py-3 text-sm text-gigante-muted cursor-pointer hover:bg-white bg-white">
-                    <Upload size={16} />
-                    Toca para tomar/seleccionar fotos
-                    <input
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      className="hidden"
-                      onChange={(e) => {
-                        handlePhotoFiles(e.target.files);
-                        e.target.value = "";
-                      }}
-                    />
-                  </label>
+                  <ElegirFoto multiple onFiles={(f) => setPhotoFiles((prev) => [...prev, ...f])} />
                   {photoFiles.length > 0 && (
                     <div className="flex flex-wrap gap-2 mt-2">
                       {photoFiles.map((file, i) => (

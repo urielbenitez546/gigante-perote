@@ -139,15 +139,15 @@ export default function ProductoDetalle({ productId }: { productId?: string } = 
         <div className="grid grid-cols-3 gap-3 mt-5 pt-4 border-t border-gigante-border text-center">
           <div>
             <p className="text-xs text-gigante-muted">Física</p>
-            <p className="text-base font-semibold text-gigante-navy">{product.physical_stock}</p>
+            <p className="text-base font-semibold text-gigante-navy">{product.physical_stock} <span className="text-xs font-normal text-gigante-muted">{PRODUCT_UNIT_LABELS[product.unit]}</span></p>
           </div>
           <div>
             <p className="text-xs text-gigante-muted">Pendiente</p>
-            <p className="text-base font-semibold text-gigante-red">{product.sold_pending}</p>
+            <p className="text-base font-semibold text-gigante-red">{product.sold_pending} <span className="text-xs font-normal text-gigante-muted">{PRODUCT_UNIT_LABELS[product.unit]}</span></p>
           </div>
           <div>
             <p className="text-xs text-gigante-muted">Disponible</p>
-            <p className="text-base font-semibold text-gigante-navy">{disponible}</p>
+            <p className="text-base font-semibold text-gigante-navy">{Number(disponible.toFixed(3))} <span className="text-xs font-normal text-gigante-muted">{PRODUCT_UNIT_LABELS[product.unit]}</span></p>
           </div>
         </div>
 

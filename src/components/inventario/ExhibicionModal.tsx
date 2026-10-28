@@ -1,9 +1,10 @@
 import { useState, type FormEvent } from "react";
-import { X, Camera, Store, Undo2 } from "lucide-react";
+import { X, Store, Undo2 } from "lucide-react";
 import { PRODUCT_UNIT_LABELS, productoId, type Product } from "../../types";
 import { solicitarExhibicion } from "../../hooks/useInventory";
 import { uploadPhoto } from "../../lib/storage";
 import MiniaturaFoto from "../common/MiniaturaFoto";
+import ElegirFoto from "../common/ElegirFoto";
 import ProductSearchSelect from "../common/ProductSearchSelect";
 
 interface Props {
@@ -121,17 +122,8 @@ export default function ExhibicionModal({ products, tipo, initialProductId = "",
             <label className="block text-sm font-medium text-gigante-navy mb-1">
               {exhibir ? "Foto de cómo quedó (obligatoria)" : "Foto del espacio ya sin el producto (opcional)"}
             </label>
-            <label className="flex items-center gap-2 border border-dashed border-gigante-border rounded-lg px-3 py-3 text-sm text-gigante-muted cursor-pointer">
-              <Camera size={16} />
-              <span className="truncate">{foto ? foto.name : "Tomar o elegir foto"}</span>
-              <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                className="hidden"
-                onChange={(e) => elegirFoto(e.target.files?.[0] ?? null)}
-              />
-            </label>
+            <ElegirFoto onFiles={(f) => elegirFoto(f[0] ?? null)} />
+            {foto && <p className="text-xs text-gigante-muted mt-1.5 truncate">✓ {foto.name}</p>}
             {foto && <MiniaturaFoto file={foto} alt="Vista previa" className="mt-2 max-h-40 rounded-lg border border-gigante-border" />}
           </div>
 

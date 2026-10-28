@@ -1,4 +1,5 @@
 import type { Cotizacion } from "../hooks/useCotizaciones";
+import { unidadLabel } from "../types";
 
 const esc = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -13,7 +14,7 @@ export function imprimirCotizacion(c: Cotizacion) {
       (i) => `<tr>
         <td>${esc(i.product?.code ?? "")}</td>
         <td>${esc(i.product?.name ?? "")}${i.tipo_precio === "promocion" ? ' <span class="promo">Promoción</span>' : ""}</td>
-        <td class="r">${i.quantity.toLocaleString("es-MX", { maximumFractionDigits: 3 })} ${esc(i.product?.unit ?? "")}</td>
+        <td class="r">${i.quantity.toLocaleString("es-MX", { maximumFractionDigits: 3 })} ${esc(unidadLabel(i.product?.unit))}</td>
         <td class="r">${money(Number(i.unit_price))}</td>
         <td class="r">${money(Number(i.unit_price) * Number(i.quantity))}</td>
       </tr>`

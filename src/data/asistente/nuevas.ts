@@ -416,4 +416,33 @@ export const KB_NUEVAS: EntradaKB[] = [
     link: { to: "/lista-precios", label: "Ir a Lista de precios" },
     fuente: FP,
   },
+  {
+    id: "uni-unidad-producto",
+    categoria: "pagina",
+    pregunta: "¿Por qué algunos productos dicen m², otros pieza y otros bolsa?",
+    variantes: ["unidad del producto", "metraje o pieza", "se vende por m2", "dice caja", "cambiar la unidad de un producto", "pisos en metros", "tinaco por pieza", "cuanto hay en metros"],
+    claves: ["unidad", "metraje", "m2", "metros", "pieza", "bolsa", "caja", "vende"],
+    respuesta:
+      "• Pisos y azulejos se manejan por metraje: la existencia, las ventas y el precio van por m².\n" +
+      "• Tinacos, llaves, lavabos, muebles y accesorios van por pieza; pegazulejo y junteador, por bolsa.\n" +
+      "• “Caja” solo se usa en productos que se venden cerrados por caja (su nombre dice “caja con…”).\n" +
+      "• Si un producto quedó con la unidad equivocada, el Jefe de almacén o Gerencia lo corrige en Inventario → lápiz del producto → “Se vende por”.",
+    roles: ["gerencia", "ventas", "caja", "almacen", "reparto"],
+    link: { to: "/inventario", label: "Ir a Inventario" },
+    fuente: FP,
+  },
+  {
+    id: "uni-foto-camara-galeria",
+    categoria: "pagina",
+    pregunta: "¿Cómo subo una foto: tomarla en ese momento o elegirla de la galería?",
+    variantes: ["tomar foto o galeria", "subir foto desde el celular", "no me deja subir la foto", "foto tarda en subir", "elegir foto de galeria", "usar la camara"],
+    claves: ["foto", "tomar", "camara", "galeria", "subir", "imagen"],
+    respuesta:
+      "• En todo lugar donde se sube una foto hay dos botones: “Tomar foto” (abre la cámara en ese momento) y “Galería” (eliges una que ya tienes).\n" +
+      "• La foto se reduce sola antes de subirse; si falla la señal, se reintenta hasta 3 veces.\n" +
+      "• Espera a ver la palomita (✓) o el nombre de la foto antes de guardar.\n" +
+      "• Si sale un mensaje de permisos, avisa a Gerencia: falta correr una actualización en Supabase.",
+    roles: ["gerencia", "ventas", "caja", "almacen", "reparto"],
+    fuente: FP,
+  },
 ];

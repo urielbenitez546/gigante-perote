@@ -5,7 +5,7 @@ import { useSales, registerRetiro } from "../../hooks/useSales";
 import { pendingLinesFor } from "../../lib/pendingLines";
 import ConfirmarEntregaParcialModal from "../../components/ventas/ConfirmarEntregaParcialModal";
 import type { SaleWithItems } from "../../types";
-import { SALE_STATUS_LABELS, DIAS_AVISO_APARTADO, diasRestantesApartado, tienePermiso } from "../../types";
+import { SALE_STATUS_LABELS, DIAS_AVISO_APARTADO, diasRestantesApartado, tienePermiso, unidadLabel } from "../../types";
 
 const STATUS_BADGE: Record<string, string> = {
   pendiente: "bg-amber-100 text-amber-700",
@@ -113,7 +113,7 @@ export default function Retiros() {
                   <td className="px-4 py-3 text-gigante-muted">
                     {lines.length === 0
                       ? "—"
-                      : lines.map((l) => `${l.product_code} (${l.pending} ${l.unit})`).join(", ")}
+                      : lines.map((l) => `${l.product_code} (${l.pending} ${unidadLabel(l.unit)})`).join(", ")}
                   </td>
                   <td className="px-4 py-3">
                     <span className={`text-xs rounded-full px-2 py-1 ${STATUS_BADGE[sale.status] ?? ""}`}>

@@ -299,6 +299,7 @@ export async function updateProductComercial(
   productId: string,
   data: {
     unit_price?: number;
+    unit?: string;
     rotacion?: string;
     stock_minimo?: number;
     color?: string | null;

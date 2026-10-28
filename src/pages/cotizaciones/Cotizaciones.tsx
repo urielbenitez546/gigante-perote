@@ -5,6 +5,7 @@ import { useProducts } from "../../hooks/useInventory";
 import { useProfileNames } from "../../hooks/useProfileNames";
 import { cancelarCotizacion, useCotizaciones, type Cotizacion } from "../../hooks/useCotizaciones";
 import { imprimirCotizacion } from "../../lib/cotizacionImprimir";
+import { unidadLabel } from "../../types";
 import NuevaCotizacionModal from "../../components/cotizaciones/NuevaCotizacionModal";
 import NuevaVentaModal, { type DesdeCotizacion } from "../../components/ventas/NuevaVentaModal";
 
@@ -154,7 +155,7 @@ export default function Cotizaciones() {
                   </p>
                   <p className="text-[11px] text-gigante-muted mt-1 break-words">
                     {c.cotizacion_items
-                      .map((i) => `${i.product?.code ?? "?"} (${Number(i.quantity)} ${i.product?.unit ?? ""})`)
+                      .map((i) => `${i.product?.code ?? "?"} (${Number(i.quantity)} ${unidadLabel(i.product?.unit)})`)
                       .join(", ")}
                   </p>
                 </div>

@@ -15,7 +15,7 @@ import {
 import { useAuth } from "../../context/AuthContext";
 import { useOpenSales, confirmarEntregaInmediata } from "../../hooks/useSales";
 import { pendingLinesFor } from "../../lib/pendingLines";
-import { DIAS_AVISO_APARTADO, diasRestantesApartado, tienePermiso, type SaleWithItems } from "../../types";
+import { DIAS_AVISO_APARTADO, diasRestantesApartado, tienePermiso, unidadLabel, type SaleWithItems } from "../../types";
 import DetalleVentaModal from "../../components/ventas/DetalleVentaModal";
 import ConfirmarEntregaParcialModal from "../../components/ventas/ConfirmarEntregaParcialModal";
 import ProgramarEntregaModal from "../../components/ventas/ProgramarEntregaModal";
@@ -165,7 +165,7 @@ export default function PorProgramar() {
     if (f.retiro.length) tipos.push("Recoge en sucursal");
     const atrasada = !!sale.fecha_programada && sale.fecha_programada < hoy && programable(f);
     const material = [...f.inmediata, ...f.domicilio, ...f.retiro]
-      .map((l) => `${l.product_code} (${l.pending} ${l.unit})`)
+      .map((l) => `${l.product_code} (${l.pending} ${unidadLabel(l.unit)})`)
       .join(", ");
 
     return (

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { X } from "lucide-react";
-import type { PendingLine } from "../../types";
+import { unidadLabel, type PendingLine } from "../../types";
 
 interface Props {
   title: string;
@@ -80,7 +80,7 @@ export default function ConfirmarEntregaParcialModal({
               <div className="min-w-0">
                 <p className="text-sm text-gigante-navy truncate">{line.product_name}</p>
                 <p className="text-xs text-gigante-muted">
-                  {line.product_code} · pendiente: {line.pending} {line.unit}
+                  {line.product_code} · pendiente: {line.pending} {unidadLabel(line.unit)}
                 </p>
               </div>
               <input

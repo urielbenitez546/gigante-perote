@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from "react";
-import { Camera, Fuel, Paperclip } from "lucide-react";
+import { Fuel, Paperclip } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useProfileNames } from "../../hooks/useProfileNames";
 import {
@@ -12,6 +12,7 @@ import {
 } from "../../hooks/useCombustible";
 import { signedPhotoUrl, uploadPhoto } from "../../lib/storage";
 import { tienePermiso } from "../../types";
+import ElegirFoto from "../../components/common/ElegirFoto";
 
 const money = (n: number) => `$${n.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const num = (n: number, d = 1) => n.toLocaleString("es-MX", { maximumFractionDigits: d });
@@ -180,10 +181,10 @@ export default function Combustible() {
     "w-full rounded-lg border border-gigante-border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gigante-navy/30";
 
   const botonFoto = (etiqueta: string, file: File | null, set: (f: File | null) => void) => (
-    <label className="inline-flex items-center gap-1.5 text-xs font-medium border border-gigante-border rounded-lg px-2.5 py-2 text-gigante-navy bg-white cursor-pointer">
-      <Camera size={14} /> {file ? `${etiqueta} ✓` : etiqueta}
-      <input type="file" accept="image/*" className="hidden" onChange={(e) => set(e.target.files?.[0] ?? null)} />
-    </label>
+    <div>
+      <p className="text-[11px] font-medium text-gigante-navy mb-1">{file ? `${etiqueta} ✓` : etiqueta}</p>
+      <ElegirFoto compacto onFiles={(f) => set(f[0] ?? null)} />
+    </div>
   );
 
   return (

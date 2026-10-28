@@ -19,7 +19,7 @@ export function pendingLinesFor(sale: SaleWithItems, type: DeliveryType): Pendin
       product_id: item.product_id,
       product_name: item.product?.name ?? "",
       product_code: item.product?.code ?? "",
-      unit: item.product?.unit ?? "caja",
+      unit: item.product?.unit ?? "pieza",
       pending: item.quantity - item.delivered_quantity,
     }))
     .filter((line) => line.pending > 0);

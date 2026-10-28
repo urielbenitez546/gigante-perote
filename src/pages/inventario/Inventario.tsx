@@ -32,6 +32,7 @@ import {
   estadoExhibicion,
   precioPublico,
   precioPromocion,
+  unidadLabel,
   type DisplayRequest,
   type EstadoExhibicion,
   type Product,
@@ -785,7 +786,7 @@ export default function Inventario() {
                         <td className="px-4 py-3 text-gigante-navy">{inv.supplier}</td>
                         <td className="px-4 py-3 text-gigante-muted">
                           {inv.purchase_invoice_items
-                            .map((it) => `${it.product?.code} (${it.quantity} ${it.product?.unit})`)
+                            .map((it) => `${it.product?.code} (${it.quantity} ${unidadLabel(it.product?.unit)})`)
                             .join(", ")}
                         </td>
                         <td className="px-4 py-3 text-gigante-muted">{nameFor(inv.created_by)}</td>
@@ -838,7 +839,7 @@ export default function Inventario() {
                         {w.product?.code} — {w.product?.name}
                       </td>
                       <td className="px-4 py-3 text-right text-gigante-red font-medium">
-                        -{w.quantity} {w.product?.unit}
+                        -{w.quantity} {unidadLabel(w.product?.unit)}
                       </td>
                       <td className="px-4 py-3 text-gigante-muted">{w.reason}</td>
                       <td className="px-4 py-3 text-gigante-muted">{nameFor(w.created_by)}</td>

@@ -11,7 +11,7 @@ import {
   type SolicitudTraslado,
 } from "../../hooks/useTraslados";
 import { signedPhotoUrl } from "../../lib/storage";
-import { tienePermiso } from "../../types";
+import { tienePermiso, unidadLabel } from "../../types";
 import NuevaSolicitudModal from "../../components/traslados/NuevaSolicitudModal";
 import ResponderSolicitudModal from "../../components/traslados/ResponderSolicitudModal";
 import EnviarTrasladoModal from "../../components/traslados/EnviarTrasladoModal";
@@ -75,7 +75,7 @@ export default function Traslados() {
 
   function tarjeta(s: SolicitudTraslado) {
     const p = products.find((x) => x.id === s.product_id);
-    const unidad = s.product?.unit ?? "";
+    const unidad = unidadLabel(s.product?.unit);
     const fisico = p ? Number(p.physical_stock) : null;
     const apartado = p ? Number(p.sold_pending) : null;
     const disponible = fisico !== null && apartado !== null ? fisico - apartado : null;
@@ -249,7 +249,7 @@ export default function Traslados() {
             <div key={t.id} className="px-4 py-3 flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className={`text-sm text-gigante-navy ${t.anulado_at ? "line-through text-gigante-muted" : ""}`}>
-                  <strong>{fmt(Number(t.quantity))}</strong> {t.product?.unit} de {t.product?.code} → {t.destino}
+                  <strong>{fmt(Number(t.quantity))}</strong> {unidadLabel(t.product?.unit)} de {t.product?.code} → {t.destino}
                 </p>
                 <p className="text-[11px] text-gigante-muted">
                   {nameFor(t.created_by)} · {fecha(t.created_at)}

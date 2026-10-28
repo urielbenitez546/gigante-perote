@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { X, Trash2, ArrowLeftRight, CalendarClock } from "lucide-react";
 import type { SaleItem, SaleWithItems } from "../../types";
-import { DELIVERY_TYPE_LABELS, SALE_STATUS_LABELS, DIAS_AVISO_APARTADO, diasRestantesApartado } from "../../types";
+import { DELIVERY_TYPE_LABELS, SALE_STATUS_LABELS, DIAS_AVISO_APARTADO, diasRestantesApartado, unidadLabel } from "../../types";
 import CobroCajaPanel from "./CobroCajaPanel";
 import CambiarProductoModal from "./CambiarProductoModal";
 import { useAuth } from "../../context/AuthContext";
@@ -116,19 +116,19 @@ export default function DetalleVentaModal({ sale, onClose, onUpdated }: Props) {
                   <div>
                     <p className="text-[11px] text-gigante-muted">Vendido</p>
                     <p className="text-sm font-semibold text-gigante-navy">
-                      {item.quantity} {item.product?.unit}
+                      {item.quantity} {unidadLabel(item.product?.unit)}
                     </p>
                   </div>
                   <div>
                     <p className="text-[11px] text-gigante-muted">Ya entregado</p>
                     <p className="text-sm font-semibold text-emerald-700">
-                      {item.delivered_quantity} {item.product?.unit}
+                      {item.delivered_quantity} {unidadLabel(item.product?.unit)}
                     </p>
                   </div>
                   <div>
                     <p className="text-[11px] text-gigante-muted">Falta</p>
                     <p className={`text-sm font-semibold ${pending > 0 ? "text-gigante-red" : "text-gigante-muted"}`}>
-                      {pending} {item.product?.unit}
+                      {pending} {unidadLabel(item.product?.unit)}
                     </p>
                   </div>
                 </div>
