@@ -18,6 +18,9 @@ alter table public.products add column if not exists bajo_pedido boolean not nul
 alter table public.products add column if not exists por_validar boolean not null default false;
 alter table public.products add column if not exists creado_por uuid references auth.users (id);
 
+-- Si no se captura código, se genera uno (BP-000001, BP-000002...).
+create sequence if not exists public.productos_bajo_pedido_seq;
+
 create index if not exists products_bajo_pedido_idx on public.products (bajo_pedido) where bajo_pedido;
 
 -- 1) Dar de alta -------------------------------------------------------------
@@ -49,7 +52,6 @@ begin
   if public.current_user_role() not in ('gerencia', 'ventas', 'almacen') then
     raise exception 'No tienes permiso para agregar productos bajo pedido';
   end if;
-  if v_code is null then raise exception 'Escribe el código del producto'; end if;
   if v_name is null then raise exception 'Escribe la descripción del producto'; end if;
   if p_precio is null or p_precio <= 0 then raise exception 'Escribe el precio (mayor a cero)'; end if;
 
@@ -59,9 +61,17 @@ begin
     raise exception 'Unidad no válida';
   end;
 
-  select code || ' — ' || name into v_dup from public.products where lower(trim(code)) = lower(v_code) limit 1;
-  if v_dup is not null then
-    raise exception 'Ya existe un producto con ese código: %', v_dup;
+  if v_code is null then
+    -- Sin código: se genera uno que no choque con los existentes.
+    loop
+      v_code := 'BP-' || lpad(nextval('public.productos_bajo_pedido_seq')::text, 6, '0');
+      exit when not exists (select 1 from public.products where lower(trim(code)) = lower(v_code));
+    end loop;
+  else
+    select code || ' — ' || name into v_dup from public.products where lower(trim(code)) = lower(v_code) limit 1;
+    if v_dup is not null then
+      raise exception 'Ya existe un producto con ese código: %', v_dup;
+    end if;
   end if;
   select code || ' — ' || name into v_dup from public.products where lower(trim(name)) = lower(v_name) limit 1;
   if v_dup is not null then
@@ -125,7 +135,6 @@ begin
   if not exists (select 1 from public.products where id = p_id and bajo_pedido) then
     raise exception 'Solo se pueden editar productos bajo pedido';
   end if;
-  if v_code is null then raise exception 'Escribe el código del producto'; end if;
   if v_name is null then raise exception 'Escribe la descripción del producto'; end if;
   if p_precio is null or p_precio <= 0 then raise exception 'Escribe el precio (mayor a cero)'; end if;
 
@@ -135,9 +144,14 @@ begin
     raise exception 'Unidad no válida';
   end;
 
-  select code || ' — ' || name into v_dup from public.products where lower(trim(code)) = lower(v_code) and id <> p_id limit 1;
-  if v_dup is not null then
-    raise exception 'Ya existe otro producto con ese código: %', v_dup;
+  -- Código en blanco: se conserva el que ya tenía.
+  if v_code is null then
+    select code into v_code from public.products where id = p_id;
+  else
+    select code || ' — ' || name into v_dup from public.products where lower(trim(code)) = lower(v_code) and id <> p_id limit 1;
+    if v_dup is not null then
+      raise exception 'Ya existe otro producto con ese código: %', v_dup;
+    end if;
   end if;
 
   if v_ext is not null then

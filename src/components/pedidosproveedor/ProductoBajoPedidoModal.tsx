@@ -41,7 +41,6 @@ export default function ProductoBajoPedidoModal({ products, producto, onClose, o
   async function guardar() {
     setError(null);
     const n = Number(precio);
-    if (!code.trim()) return setError("Escribe el código.");
     if (!name.trim()) return setError("Escribe la descripción.");
     if (!n || n <= 0) return setError("Escribe el precio.");
     setGuardando(true);
@@ -87,8 +86,8 @@ export default function ProductoBajoPedidoModal({ products, producto, onClose, o
             </span>
           </label>
           <label className="block text-xs font-medium text-gigante-navy">
-            Código (del catálogo)
-            <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Ej. WPC-16290-ROB" className={campo} />
+            Código del catálogo (opcional)
+            <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Ej. WPC-16290-ROB — si lo dejas vacío se genera uno (BP-000001)" className={campo} />
           </label>
           <label className="block text-xs font-medium text-gigante-navy">
             Descripción
