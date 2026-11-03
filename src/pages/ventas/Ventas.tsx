@@ -24,7 +24,7 @@ type FiltroVentas = "todas" | "caja" | "almacen";
 
 export default function Ventas() {
   const { profile } = useAuth();
-  const { products } = useProducts();
+  const { todos: products, reload: reloadProducts } = useProducts(); // incluye productos bajo pedido
   const { sales, loading, error, reload } = useSales();
   const { nameFor } = useProfileNames();
   const [showModal, setShowModal] = useState(false);
@@ -280,6 +280,7 @@ export default function Ventas() {
       {showPedidoProv && (
         <NuevoPedidoProveedorModal
           products={products}
+          onProductsChanged={reloadProducts}
           onClose={() => setShowPedidoProv(false)}
           onSaved={(folio) => {
             setShowPedidoProv(false);
@@ -289,7 +290,12 @@ export default function Ventas() {
         />
       )}
       {showModal && (
-        <NuevaVentaModal products={products} onClose={() => setShowModal(false)} onSuccess={handleSuccess} />
+        <NuevaVentaModal
+          products={products}
+          onClose={() => setShowModal(false)}
+          onSuccess={handleSuccess}
+          onProductsChanged={reloadProducts}
+        />
       )}
       {cobrando && (
         <CobrarVentaModal

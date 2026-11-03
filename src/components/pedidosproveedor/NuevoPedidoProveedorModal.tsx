@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 import ProductSearchSelect from "../common/ProductSearchSelect";
+import ProductoBajoPedidoModal from "./ProductoBajoPedidoModal";
 import { crearPedidoProveedor } from "../../hooks/usePedidosProveedor";
 import type { Product } from "../../types";
 
@@ -8,16 +9,19 @@ interface Props {
   products: Product[];
   onClose: () => void;
   onSaved: (folio: string) => void;
+  /** Recarga el catálogo después de agregar un producto bajo pedido. */
+  onProductsChanged?: () => Promise<unknown> | void;
 }
 
 /** Ventas captura lo que un cliente pidió y no hay: le avisa a Almacén para que lo pida al proveedor. */
-export default function NuevoPedidoProveedorModal({ products, onClose, onSaved }: Props) {
+export default function NuevoPedidoProveedorModal({ products, onClose, onSaved, onProductsChanged }: Props) {
   const [cliente, setCliente] = useState("");
   const [telefono, setTelefono] = useState("");
   const [productId, setProductId] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [cantidad, setCantidad] = useState("");
   const [nota, setNota] = useState("");
+  const [altaProducto, setAltaProducto] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -69,7 +73,13 @@ export default function NuevoPedidoProveedorModal({ products, onClose, onSaved }
           </label>
           <div>
             <p className="text-xs font-medium text-gigante-navy mb-1">Producto (si ya está en el catálogo)</p>
-            <ProductSearchSelect products={products} value={productId} onChange={setProductId} showStock />
+            <ProductSearchSelect
+              products={products}
+              value={productId}
+              onChange={setProductId}
+              showStock
+              onAgregarNuevo={onProductsChanged ? () => setAltaProducto(true) : undefined}
+            />
           </div>
           <label className="block text-xs font-medium text-gigante-navy">
             {productId ? "Detalle (opcional)" : "Si no está en el catálogo, escribe qué material es"}
@@ -105,6 +115,18 @@ export default function NuevoPedidoProveedorModal({ products, onClose, onSaved }
           </button>
         </div>
       </div>
+
+      {altaProducto && (
+        <ProductoBajoPedidoModal
+          products={products}
+          onClose={() => setAltaProducto(false)}
+          onSaved={async (id) => {
+            await onProductsChanged?.();
+            setProductId(id);
+            setAltaProducto(false);
+          }}
+        />
+      )}
     </div>
   );
 }

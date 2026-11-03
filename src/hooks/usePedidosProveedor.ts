@@ -104,3 +104,36 @@ export async function cancelarPedidoProveedor(id: string, motivo: string) {
   const { error } = await supabase.rpc("cancelar_pedido_proveedor", { p_id: id, p_motivo: motivo.trim() || null });
   return { error: error?.message ?? null };
 }
+
+export interface ProductoBajoPedidoInput {
+  code: string;
+  name: string;
+  unit: string;
+  precio: number;
+  proveedor: string;
+}
+
+/** Da de alta un producto de catálogo que no está en el inventario (se puede vender y pedir a proveedor). */
+export async function crearProductoBajoPedido(i: ProductoBajoPedidoInput) {
+  const { data, error } = await supabase.rpc("crear_producto_bajo_pedido", {
+    p_code: i.code,
+    p_name: i.name,
+    p_unit: i.unit,
+    p_precio: i.precio,
+    p_proveedor: i.proveedor.trim() || null,
+  });
+  return { id: (data as string | null) ?? null, error: error?.message ?? null };
+}
+
+/** Corrige un producto bajo pedido y lo marca como revisado. */
+export async function editarProductoBajoPedido(id: string, i: ProductoBajoPedidoInput) {
+  const { error } = await supabase.rpc("editar_producto_bajo_pedido", {
+    p_id: id,
+    p_code: i.code,
+    p_name: i.name,
+    p_unit: i.unit,
+    p_precio: i.precio,
+    p_proveedor: i.proveedor.trim() || null,
+  });
+  return { error: error?.message ?? null };
+}

@@ -255,6 +255,12 @@ export interface Product {
   foto_path?: string | null;
   external_id: string | null;
   active: boolean;
+  /** Producto de catálogo que no está en el inventario: se vende y se pide al proveedor. */
+  bajo_pedido?: boolean;
+  /** Lo dio de alta alguien de ventas/almacén y falta que alguien revise código, descripción y precio. */
+  por_validar?: boolean;
+  /** Quién dio de alta el producto bajo pedido. */
+  creado_por?: string | null;
   created_at: string;
 }
 

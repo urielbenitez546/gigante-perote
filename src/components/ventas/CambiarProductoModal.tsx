@@ -15,7 +15,7 @@ interface Props {
 const money = (n: number) => `$${n.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export default function CambiarProductoModal({ sale, item, onClose, onSuccess }: Props) {
-  const { products, loading: loadingProducts } = useProducts();
+  const { todos: products, loading: loadingProducts } = useProducts();
   const pendiente = item.quantity - item.delivered_quantity;
   const [newProductId, setNewProductId] = useState("");
   const [cantidad, setCantidad] = useState(String(pendiente));

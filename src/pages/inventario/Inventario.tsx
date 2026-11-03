@@ -97,7 +97,7 @@ type TabKey = "productos" | "movimientos" | "facturas" | "merma" | "exhibicion" 
 
 export default function Inventario() {
   const { profile } = useAuth();
-  const { products, loading, error, reload } = useProducts();
+  const { products, todos: productosConBajoPedido, loading, error, reload } = useProducts();
   const { movements, loading: loadingMovements, reload: reloadMovements } = useInventoryMovements();
   const { invoices, loading: loadingInvoices, reload: reloadInvoices } = usePurchaseInvoices();
   const { writeOffs, loading: loadingWriteOffs, reload: reloadWriteOffs } = useWriteOffs();
@@ -1230,7 +1230,7 @@ export default function Inventario() {
 
       {showEntradaModal && (
         <RegistrarEntradaModal
-          products={products}
+          products={productosConBajoPedido}
           onClose={() => setShowEntradaModal(false)}
           onSuccess={handleEntradaSuccess}
         />

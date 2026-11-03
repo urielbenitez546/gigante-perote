@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import type { Product, InventoryMovement, DisplayMovement, InventoryCount, DisplayRequest } from "../types";
 
 export function useProducts() {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [todos, setTodos] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -18,7 +18,7 @@ export function useProducts() {
       setError(err.message);
     } else {
       setError(null);
-      setProducts((data as Product[]) ?? []);
+      setTodos((data as Product[]) ?? []);
     }
     setLoading(false);
   }, []);
@@ -27,7 +27,11 @@ export function useProducts() {
     reload();
   }, [reload]);
 
-  return { products, loading, error, reload };
+  // "products" es el inventario real (sin los productos "bajo pedido"); "todos" los incluye
+  // (para vender, cotizar, pedir a proveedor y registrar su entrada cuando llegan).
+  const products = useMemo(() => todos.filter((p) => !p.bajo_pedido), [todos]);
+
+  return { products, todos, loading, error, reload };
 }
 
 export function useInventoryMovements() {

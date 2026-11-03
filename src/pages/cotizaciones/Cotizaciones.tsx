@@ -22,7 +22,7 @@ type Filtro = "abiertas" | "vencidas" | "convertidas" | "canceladas" | "todas";
 export default function Cotizaciones() {
   const { profile } = useAuth();
   const { nameFor } = useProfileNames();
-  const { products } = useProducts();
+  const { todos: products } = useProducts(); // incluye productos bajo pedido
   const { cotizaciones, loading, error, reload } = useCotizaciones();
   const puedeCrear = profile?.role === "ventas" || profile?.role === "gerencia";
 

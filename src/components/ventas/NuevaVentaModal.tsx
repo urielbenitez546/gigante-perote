@@ -8,6 +8,7 @@ import { DELIVERY_TYPE_LABELS, METODO_PAGO_VENTA_LABELS } from "../../types";
 import { registerSale, type SaleItemInput } from "../../hooks/useSales";
 import { marcarCotizacionConvertida } from "../../hooks/useCotizaciones";
 import { crearPedidoProveedor } from "../../hooks/usePedidosProveedor";
+import ProductoBajoPedidoModal from "../pedidosproveedor/ProductoBajoPedidoModal";
 
 const money = (n: number) => `$${n.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -27,6 +28,8 @@ interface Props {
   /** "extra" trae los pedidos a proveedor creados junto con la venta (y los que fallaron). */
   onSuccess: (folio: string, extra?: { pedidos: string[]; fallidos: string[] }) => void;
   desdeCotizacion?: DesdeCotizacion;
+  /** Recarga el catálogo (para que aparezca un producto bajo pedido recién agregado). Si no viene, no se ofrece agregar. */
+  onProductsChanged?: () => Promise<unknown> | void;
 }
 
 interface DraftItem {
@@ -43,7 +46,7 @@ interface DraftItem {
 
 const OPCION_PROVEEDOR = "__proveedor";
 
-export default function NuevaVentaModal({ products, onClose, onSuccess, desdeCotizacion }: Props) {
+export default function NuevaVentaModal({ products, onClose, onSuccess, desdeCotizacion, onProductsChanged }: Props) {
   const [customerName, setCustomerName] = useState(desdeCotizacion?.customer_name ?? "");
   const [customerPhone, setCustomerPhone] = useState(desdeCotizacion?.customer_phone ?? "");
   const [customerAddress, setCustomerAddress] = useState(desdeCotizacion?.customer_address ?? "");
@@ -64,6 +67,7 @@ export default function NuevaVentaModal({ products, onClose, onSuccess, desdeCot
         }))
       : [{ key: crypto.randomUUID(), product_id: "", quantity: 1, delivery_type: "", tipo_precio: "publico", pedir_proveedor: false, cantidad_pedir: null }]
   );
+  const [altaParaItem, setAltaParaItem] = useState<string | null>(null); // key de la línea que agrega un producto nuevo
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -325,6 +329,7 @@ export default function NuevaVentaModal({ products, onClose, onSuccess, desdeCot
                           onChange={(id) => updateItem(item.key, { product_id: id })}
                           showStock
                           size="sm"
+                          onAgregarNuevo={onProductsChanged ? () => setAltaParaItem(item.key) : undefined}
                         />
                       </div>
                       <input
@@ -481,6 +486,20 @@ export default function NuevaVentaModal({ products, onClose, onSuccess, desdeCot
           </div>
         </form>
       </div>
+
+      {altaParaItem && (
+        <ProductoBajoPedidoModal
+          products={products}
+          onClose={() => setAltaParaItem(null)}
+          onSaved={async (id) => {
+            const key = altaParaItem;
+            await onProductsChanged?.();
+            // Producto nuevo: no hay existencia, así que la línea queda como "Pedir a proveedor".
+            updateItem(key, { product_id: id, pedir_proveedor: true, delivery_type: "" });
+            setAltaParaItem(null);
+          }}
+        />
+      )}
     </div>
   );
 }

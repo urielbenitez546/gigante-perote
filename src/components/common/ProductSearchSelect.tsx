@@ -19,6 +19,8 @@ interface Props {
   /** Productos que no se deben ofrecer (ej. el mismo que se está cambiando). */
   excludeIds?: string[];
   size?: "sm" | "md";
+  /** Si viene, la lista ofrece "¿No lo encuentras? Agregar producto de catálogo". */
+  onAgregarNuevo?: () => void;
 }
 
 /**
@@ -34,6 +36,7 @@ export default function ProductSearchSelect({
   showStock = false,
   excludeIds = [],
   size = "md",
+  onAgregarNuevo,
 }: Props) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -146,6 +149,11 @@ export default function ProductSearchSelect({
                         <span className="font-semibold">{p.code}</span> — {p.name}
                       </span>
                       <span className="block text-[10px] text-gigante-muted truncate">
+                        {p.bajo_pedido && (
+                          <span className="text-purple-700 font-semibold">
+                            Bajo pedido{p.por_validar ? " · por validar" : ""} ·{" "}
+                          </span>
+                        )}
                         {p.brand}
                         {showStock && (
                           <>
@@ -162,6 +170,20 @@ export default function ProductSearchSelect({
                 </li>
               );
             })
+          )}
+          {onAgregarNuevo && (
+            <li className="border-t border-gigante-border">
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  onAgregarNuevo();
+                }}
+                className="w-full text-left px-3 py-2 text-xs font-semibold text-gigante-red hover:bg-gigante-bg"
+              >
+                ¿No lo encuentras? + Agregar producto de catálogo
+              </button>
+            </li>
           )}
         </ul>
       )}

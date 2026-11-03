@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { PackagePlus, Plus, Truck, CheckCircle2, XCircle, X } from "lucide-react";
+import { PackagePlus, Plus, Truck, CheckCircle2, XCircle, X, Pencil } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useProducts } from "../../hooks/useInventory";
 import { useProfileNames } from "../../hooks/useProfileNames";
@@ -12,8 +12,9 @@ import {
   type EstadoPedidoProveedor,
   type PedidoProveedor,
 } from "../../hooks/usePedidosProveedor";
-import { tienePermiso, unidadLabel } from "../../types";
+import { tienePermiso, unidadLabel, type Product } from "../../types";
 import NuevoPedidoProveedorModal from "../../components/pedidosproveedor/NuevoPedidoProveedorModal";
+import ProductoBajoPedidoModal from "../../components/pedidosproveedor/ProductoBajoPedidoModal";
 
 type Filtro = "abiertos" | "llegaron" | "cancelados" | "todos";
 
@@ -31,13 +32,16 @@ const soloFecha = (iso: string) => new Date(iso + "T12:00:00").toLocaleDateStrin
 
 export default function PedidosProveedor() {
   const { profile } = useAuth();
-  const { products } = useProducts();
+  const { todos: products, reload: reloadProducts } = useProducts();
   const { nameFor } = useProfileNames();
   const { pedidos, loading, error, reload } = usePedidosProveedor();
 
   const gestiona = tienePermiso(profile, "operar_almacen"); // jefe, auxiliar y Gerencia
   const puedePedir = profile?.role === "ventas" || profile?.role === "gerencia";
 
+  const [vista, setVista] = useState<"pedidos" | "productos">("pedidos");
+  const [altaProducto, setAltaProducto] = useState(false);
+  const [editandoProducto, setEditandoProducto] = useState<Product | null>(null);
   const [filtro, setFiltro] = useState<Filtro>("abiertos");
   const [nuevo, setNuevo] = useState(false);
   const [ok, setOk] = useState<string | null>(null);
@@ -57,6 +61,8 @@ export default function PedidosProveedor() {
     return pedidos;
   }, [pedidos, abiertos, filtro]);
   const porPedir = pedidos.filter((p) => p.estado === "pendiente").length;
+  const bajoPedido = useMemo(() => products.filter((p) => p.bajo_pedido), [products]);
+  const porValidar = bajoPedido.filter((p) => p.por_validar).length;
 
   function puedeCancelar(p: PedidoProveedor) {
     return (p.estado === "pendiente" || p.estado === "pedido") && (gestiona || p.created_by === profile?.id);
@@ -137,6 +143,84 @@ export default function PedidosProveedor() {
         </p>
       )}
 
+      <div className="mt-4 flex gap-2 border-b border-gigante-border">
+        {(
+          [
+            ["pedidos", "Pedidos"],
+            ["productos", `Productos bajo pedido (${bajoPedido.length})${porValidar > 0 ? " · por validar" : ""}`],
+          ] as ["pedidos" | "productos", string][]
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => setVista(key)}
+            className={`text-sm px-3 py-2 -mb-px border-b-2 ${
+              vista === key ? "border-gigante-red text-gigante-navy font-semibold" : "border-transparent text-gigante-muted"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {vista === "productos" && (
+        <div className="mt-4">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <p className="text-sm text-gigante-muted max-w-2xl">
+              Productos de catálogo que no están en el inventario. Se pueden vender y pedir al proveedor; no cuentan como
+              existencia ni salen en Inventario. Ventas, Almacén y Gerencia pueden corregirlos y marcarlos como revisados.
+              Cuando llega el material, Almacén registra su <strong>entrada</strong> en Inventario.
+            </p>
+            <button
+              onClick={() => setAltaProducto(true)}
+              className="flex items-center gap-2 border border-gigante-navy text-gigante-navy text-sm font-semibold rounded-lg px-4 py-2"
+            >
+              <Plus size={16} /> Agregar producto
+            </button>
+          </div>
+          <div className="mt-3 space-y-2">
+            {bajoPedido.length === 0 ? (
+              <p className="bg-white border border-gigante-border rounded-xl p-6 text-sm text-gigante-muted">
+                Todavía no hay productos bajo pedido.
+              </p>
+            ) : (
+              bajoPedido.map((p) => (
+                <div key={p.id} className="bg-white border border-gigante-border rounded-xl p-3 flex items-center justify-between gap-3 flex-wrap">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-gigante-navy">
+                      {p.code} — {p.name}
+                    </p>
+                    <p className="text-xs text-gigante-muted mt-0.5">
+                      ${Number(p.unit_price).toLocaleString("es-MX", { minimumFractionDigits: 2 })} por {unidadLabel(p.unit)}
+                      {p.brand && p.brand !== "Bajo pedido" ? ` · ${p.brand}` : ""} · lo agregó {nameFor(p.creado_por ?? null)}
+                      {p.physical_stock - p.sold_pending > 0
+                        ? ` · disponible: ${fmt(p.physical_stock - p.sold_pending)} ${unidadLabel(p.unit)}`
+                        : ""}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`text-xs rounded-full px-2 py-1 ${
+                        p.por_validar ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"
+                      }`}
+                    >
+                      {p.por_validar ? "Por validar" : "Revisado"}
+                    </span>
+                    <button
+                      onClick={() => setEditandoProducto(p)}
+                      className="flex items-center gap-1.5 border border-gigante-border text-gigante-navy text-xs font-medium rounded-lg px-3 py-2"
+                    >
+                      <Pencil size={13} /> {p.por_validar ? "Revisar" : "Editar"}
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {vista === "pedidos" && (
+        <>
       <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
         {(
           [
@@ -249,16 +333,35 @@ export default function PedidosProveedor() {
           ))
         )}
       </div>
+        </>
+      )}
 
       {nuevo && (
         <NuevoPedidoProveedorModal
           products={products}
+          onProductsChanged={reloadProducts}
           onClose={() => setNuevo(false)}
           onSaved={(folio) => {
             setNuevo(false);
             setOk(folio);
             reload();
             setTimeout(() => setOk(null), 5000);
+          }}
+        />
+      )}
+
+      {(altaProducto || editandoProducto) && (
+        <ProductoBajoPedidoModal
+          products={products}
+          producto={editandoProducto ?? undefined}
+          onClose={() => {
+            setAltaProducto(false);
+            setEditandoProducto(null);
+          }}
+          onSaved={async () => {
+            await reloadProducts();
+            setAltaProducto(false);
+            setEditandoProducto(null);
           }}
         />
       )}
