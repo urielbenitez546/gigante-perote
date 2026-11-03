@@ -161,6 +161,7 @@ export const NAV_MODULES: NavModule[] = [
   { key: "kardex", label: "Kardex", path: "/kardex", roles: ["gerencia", "almacen", "reparto"] },
   { key: "kilometraje", label: "Kilometraje", path: "/kilometraje", roles: ["gerencia", "almacen"], permiso: "ver_km" },
   { key: "ventas", label: "Ventas y Entregas", path: "/ventas", roles: ["gerencia", "ventas", "caja"] },
+  { key: "pedidos-proveedor", label: "Pedidos a proveedor", path: "/pedidos-proveedor", roles: ["gerencia", "ventas", "almacen"] },
   { key: "por-programar", label: "Entregas por programar", path: "/por-programar", roles: ["gerencia", "ventas", "caja", "almacen"], permiso: "programar_entregas", permisoRoles: ["almacen"] },
   { key: "entregas-hoy", label: "Entregas de hoy", path: "/entregas-hoy", roles: ["gerencia", "almacen"] },
   { key: "traslados", label: "Traslados a sucursales", path: "/traslados", roles: ["gerencia", "ventas", "almacen"], permiso: "operar_almacen", permisoRoles: ["almacen"] },

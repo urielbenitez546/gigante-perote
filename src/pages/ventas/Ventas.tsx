@@ -1,11 +1,13 @@
 import { useMemo, useState } from "react";
-import { ShoppingCart, Plus } from "lucide-react";
+import { Link } from "react-router-dom";
+import { ShoppingCart, Plus, PackagePlus } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useProducts } from "../../hooks/useInventory";
 import { useSales } from "../../hooks/useSales";
 import { useProfileNames } from "../../hooks/useProfileNames";
 import { DELIVERY_TYPE_LABELS, SALE_STATUS_LABELS, ESTADO_PAGO_LABELS, tienePermiso, type SaleWithItems } from "../../types";
 import NuevaVentaModal from "../../components/ventas/NuevaVentaModal";
+import NuevoPedidoProveedorModal from "../../components/pedidosproveedor/NuevoPedidoProveedorModal";
 import DetalleVentaModal from "../../components/ventas/DetalleVentaModal";
 import { ESTADO_PAGO_BADGE } from "../../components/ventas/CobroCajaPanel";
 import CobrarVentaModal from "../../components/ventas/CobrarVentaModal";
@@ -26,6 +28,8 @@ export default function Ventas() {
   const { sales, loading, error, reload } = useSales();
   const { nameFor } = useProfileNames();
   const [showModal, setShowModal] = useState(false);
+  const [showPedidoProv, setShowPedidoProv] = useState(false);
+  const [folioPedidoProv, setFolioPedidoProv] = useState<string | null>(null);
   const [successFolio, setSuccessFolio] = useState<string | null>(null);
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
   const selectedSale = selectedSaleId ? sales.find((s) => s.id === selectedSaleId) ?? null : null;
@@ -87,18 +91,32 @@ export default function Ventas() {
           <p className="text-sm text-gigante-muted mt-1">Registro de ventas y su tipo de entrega</p>
         </div>
         {canRegisterSale && (
-          <button
-            onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 bg-gigante-red hover:bg-gigante-redDark text-white text-sm font-semibold rounded-lg px-4 py-2.5"
-          >
-            <Plus size={16} /> Nueva venta
-          </button>
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={() => setShowPedidoProv(true)}
+              className="flex items-center gap-2 border border-gigante-navy text-gigante-navy hover:bg-gigante-bg text-sm font-semibold rounded-lg px-4 py-2.5"
+            >
+              <PackagePlus size={16} /> Pedir a proveedor
+            </button>
+            <button
+              onClick={() => setShowModal(true)}
+              className="flex items-center gap-2 bg-gigante-red hover:bg-gigante-redDark text-white text-sm font-semibold rounded-lg px-4 py-2.5"
+            >
+              <Plus size={16} /> Nueva venta
+            </button>
+          </div>
         )}
       </div>
 
       {successFolio && (
         <p className="mt-4 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
           Venta <strong>{successFolio}</strong> registrada correctamente.
+        </p>
+      )}
+      {folioPedidoProv && (
+        <p className="mt-4 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+          Pedido a proveedor <strong>{folioPedidoProv}</strong> enviado a Almacén. Lo puedes seguir en{" "}
+          <Link to="/pedidos-proveedor" className="underline font-semibold">Pedidos a proveedor</Link>.
         </p>
       )}
       {error && (
@@ -242,6 +260,17 @@ export default function Ventas() {
         )}
       </div>
 
+      {showPedidoProv && (
+        <NuevoPedidoProveedorModal
+          products={products}
+          onClose={() => setShowPedidoProv(false)}
+          onSaved={(folio) => {
+            setShowPedidoProv(false);
+            setFolioPedidoProv(folio);
+            setTimeout(() => setFolioPedidoProv(null), 8000);
+          }}
+        />
+      )}
       {showModal && (
         <NuevaVentaModal products={products} onClose={() => setShowModal(false)} onSuccess={handleSuccess} />
       )}

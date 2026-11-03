@@ -23,6 +23,7 @@ import {
   Fuel,
   FileText,
   Wallet,
+  PackagePlus,
   type LucideIcon,
 } from "lucide-react";
 
@@ -34,6 +35,7 @@ export const MODULE_ICONS: Record<string, LucideIcon> = {
   "por-programar": CalendarClock,
   "entregas-hoy": CalendarCheck,
   traslados: ArrowRightLeft,
+  "pedidos-proveedor": PackagePlus,
   combustible: Fuel,
   cotizaciones: FileText,
   ventas: ShoppingCart,

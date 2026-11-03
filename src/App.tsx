@@ -24,6 +24,7 @@ import Kilometraje from "./pages/kilometraje/Kilometraje";
 import PorProgramar from "./pages/programacion/PorProgramar";
 import EntregasHoy from "./pages/programacion/EntregasHoy";
 import Traslados from "./pages/traslados/Traslados";
+import PedidosProveedor from "./pages/pedidosproveedor/PedidosProveedor";
 import Combustible from "./pages/combustible/Combustible";
 import Cotizaciones from "./pages/cotizaciones/Cotizaciones";
 import ListaPrecios from "./pages/listaprecios/ListaPrecios";
@@ -118,6 +119,14 @@ export default function App() {
               element={
                 <ProtectedRoute allowedRoles={["gerencia"]}>
                   <ListaPrecios />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/pedidos-proveedor"
+              element={
+                <ProtectedRoute allowedRoles={["gerencia", "ventas", "almacen"]}>
+                  <PedidosProveedor />
                 </ProtectedRoute>
               }
             />
