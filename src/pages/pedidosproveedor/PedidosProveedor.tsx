@@ -185,6 +185,9 @@ export default function PedidosProveedor() {
               <p className="text-xs text-gigante-muted mt-2">
                 Lo pidió {nameFor(p.created_by)} · {fechaHora(p.created_at)}
               </p>
+              {p.venta_folio && (
+                <p className="text-xs text-gigante-navy font-medium mt-1">Viene de la venta {p.venta_folio}</p>
+              )}
               {p.nota && <p className="text-xs text-gigante-muted mt-1">Nota: {p.nota}</p>}
               {p.estado === "pedido" && (
                 <p className="text-xs text-sky-800 mt-1">

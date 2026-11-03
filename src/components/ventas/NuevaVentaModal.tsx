@@ -7,6 +7,7 @@ import ProductSearchSelect from "../common/ProductSearchSelect";
 import { DELIVERY_TYPE_LABELS, METODO_PAGO_VENTA_LABELS } from "../../types";
 import { registerSale, type SaleItemInput } from "../../hooks/useSales";
 import { marcarCotizacionConvertida } from "../../hooks/useCotizaciones";
+import { crearPedidoProveedor } from "../../hooks/usePedidosProveedor";
 
 const money = (n: number) => `$${n.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -23,7 +24,8 @@ export interface DesdeCotizacion {
 interface Props {
   products: Product[];
   onClose: () => void;
-  onSuccess: (folio: string) => void;
+  /** "extra" trae los pedidos a proveedor creados junto con la venta (y los que fallaron). */
+  onSuccess: (folio: string, extra?: { pedidos: string[]; fallidos: string[] }) => void;
   desdeCotizacion?: DesdeCotizacion;
 }
 
@@ -33,7 +35,13 @@ interface DraftItem {
   quantity: number;
   delivery_type: DeliveryType | ""; // "" = usa el tipo general de la venta
   tipo_precio: TipoPrecio;
+  /** El vendedor eligió "Pedir a proveedor" para este producto (no hay o hay poco). */
+  pedir_proveedor: boolean;
+  /** Cantidad a pedir al proveedor; null = automática (lo que falta). */
+  cantidad_pedir: number | null;
 }
+
+const OPCION_PROVEEDOR = "__proveedor";
 
 export default function NuevaVentaModal({ products, onClose, onSuccess, desdeCotizacion }: Props) {
   const [customerName, setCustomerName] = useState(desdeCotizacion?.customer_name ?? "");
@@ -51,8 +59,10 @@ export default function NuevaVentaModal({ products, onClose, onSuccess, desdeCot
           quantity: i.quantity,
           delivery_type: "" as DeliveryType | "",
           tipo_precio: i.tipo_precio,
+          pedir_proveedor: false,
+          cantidad_pedir: null,
         }))
-      : [{ key: crypto.randomUUID(), product_id: "", quantity: 1, delivery_type: "", tipo_precio: "publico" }]
+      : [{ key: crypto.randomUUID(), product_id: "", quantity: 1, delivery_type: "", tipo_precio: "publico", pedir_proveedor: false, cantidad_pedir: null }]
   );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,6 +70,13 @@ export default function NuevaVentaModal({ products, onClose, onSuccess, desdeCot
   const availableFor = (productId: string) => {
     const p = products.find((prod) => prod.id === productId);
     return p ? p.physical_stock - p.sold_pending : 0;
+  };
+
+  /** Lo que falta para completar lo que pide el cliente (si hay de sobra, pide toda la cantidad). */
+  const cantidadAPedir = (item: DraftItem) => {
+    if (item.cantidad_pedir != null && item.cantidad_pedir > 0) return item.cantidad_pedir;
+    const falta = item.quantity - Math.max(availableFor(item.product_id), 0);
+    return falta > 0 ? falta : item.quantity;
   };
 
   const effectiveType = (item: DraftItem): DeliveryType => item.delivery_type || deliveryType;
@@ -75,7 +92,7 @@ export default function NuevaVentaModal({ products, onClose, onSuccess, desdeCot
   function addItem() {
     setItems((prev) => [
       ...prev,
-      { key: crypto.randomUUID(), product_id: "", quantity: 1, delivery_type: "", tipo_precio: "publico" },
+      { key: crypto.randomUUID(), product_id: "", quantity: 1, delivery_type: "", tipo_precio: "publico", pedir_proveedor: false, cantidad_pedir: null },
     ]);
   }
 
@@ -104,9 +121,13 @@ export default function NuevaVentaModal({ products, onClose, onSuccess, desdeCot
       return;
     }
     for (const item of items) {
+      if (item.pedir_proveedor) continue; // lo que falta se pide al proveedor
       if (item.quantity > availableFor(item.product_id)) {
         const p = products.find((prod) => prod.id === item.product_id);
-        setError(`No hay suficiente disponible de "${p?.name}". Disponible: ${availableFor(item.product_id)}.`);
+        setError(
+          `No hay suficiente disponible de "${p?.name}". Disponible: ${availableFor(item.product_id)}. ` +
+            `Elige otro producto o, en ese producto, la opción "Pedir a proveedor".`
+        );
         return;
       }
     }
@@ -138,7 +159,25 @@ export default function NuevaVentaModal({ products, onClose, onSuccess, desdeCot
       // La venta ya quedó registrada; si esto falla, la cotización solo se queda abierta.
       await marcarCotizacionConvertida(desdeCotizacion.id, folio);
     }
-    onSuccess(folio);
+
+    // Los productos marcados "Pedir a proveedor" generan su pedido, ligado a esta venta.
+    const pedidos: string[] = [];
+    const fallidos: string[] = [];
+    for (const item of items.filter((i) => i.pedir_proveedor)) {
+      const p = products.find((prod) => prod.id === item.product_id);
+      const r = await crearPedidoProveedor({
+        cliente: customerName.trim(),
+        telefono: customerPhone,
+        productId: item.product_id,
+        descripcion: "",
+        cantidad: cantidadAPedir(item),
+        nota: `Pedido desde la venta ${folio}`,
+        ventaFolio: folio,
+      });
+      if (r.folio) pedidos.push(r.folio);
+      else fallidos.push(p?.name ?? "producto");
+    }
+    onSuccess(folio, pedidos.length || fallidos.length ? { pedidos, fallidos } : undefined);
   }
 
   return (
@@ -308,9 +347,18 @@ export default function NuevaVentaModal({ products, onClose, onSuccess, desdeCot
                     </div>
                     <div className="flex items-center justify-between mt-1.5">
                       <select
-                        value={item.delivery_type}
-                        onChange={(e) => updateItem(item.key, { delivery_type: e.target.value as DeliveryType | "" })}
-                        className="text-[11px] rounded-lg border border-gigante-border px-2 py-1.5"
+                        value={item.pedir_proveedor ? OPCION_PROVEEDOR : item.delivery_type}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          if (v === OPCION_PROVEEDOR) {
+                            updateItem(item.key, { pedir_proveedor: true, delivery_type: "" });
+                          } else {
+                            updateItem(item.key, { pedir_proveedor: false, delivery_type: v as DeliveryType | "" });
+                          }
+                        }}
+                        className={`text-[11px] rounded-lg border px-2 py-1.5 ${
+                          item.pedir_proveedor ? "border-amber-500 bg-amber-50 text-amber-900 font-medium" : "border-gigante-border"
+                        }`}
                       >
                         <option value="">Entrega: igual que la venta</option>
                         {Object.entries(DELIVERY_TYPE_LABELS).map(([value, label]) => (
@@ -318,6 +366,9 @@ export default function NuevaVentaModal({ products, onClose, onSuccess, desdeCot
                             Entrega: {label}
                           </option>
                         ))}
+                        {item.product_id && (
+                          <option value={OPCION_PROVEEDOR}>📦 Pedir a proveedor (no hay / hay poco)</option>
+                        )}
                       </select>
                       <span className="text-[10px] text-gigante-muted whitespace-nowrap">
                         {item.product_id ? `disp: ${disponible}` : ""}
@@ -350,18 +401,46 @@ export default function NuevaVentaModal({ products, onClose, onSuccess, desdeCot
                       if (!p) return null;
                       const estado = calcularSemaforo(p);
                       const unidad = PRODUCT_UNIT_LABELS[p.unit];
+                      if (item.pedir_proveedor) {
+                        return (
+                          <div className="mt-1.5 text-[11px] rounded-md px-2 py-1.5 bg-amber-50 text-amber-900 space-y-1">
+                            <p>
+                              📦 Se pedirá al proveedor. Al registrar la venta, Almacén recibe el aviso en{" "}
+                              <strong>Pedidos a proveedor</strong> y te avisa cuando llegue.
+                              {item.quantity > disponible
+                                ? ` Ahorita hay ${Math.max(disponible, 0)} ${unidad} disponibles.`
+                                : ""}
+                            </p>
+                            <label className="flex items-center gap-2">
+                              Cantidad a pedir:
+                              <input
+                                type="number"
+                                min="0.01"
+                                step="any"
+                                value={cantidadAPedir(item)}
+                                onChange={(e) =>
+                                  updateItem(item.key, { cantidad_pedir: e.target.value ? Number(e.target.value) : null })
+                                }
+                                className="w-20 rounded-lg border border-amber-300 bg-white px-2 py-1 text-xs"
+                              />
+                              <span>{unidad}</span>
+                            </label>
+                          </div>
+                        );
+                      }
                       if (item.quantity > disponible) {
                         return (
                           <p className="mt-1.5 text-[11px] rounded-md px-2 py-1 bg-red-50 text-red-700">
                             🔴 No alcanza: pides {item.quantity} y solo hay {Math.max(disponible, 0)} {unidad} disponibles.
-                            Ofrece otro producto.
+                            Ofrece otro producto o elige <strong>«Pedir a proveedor»</strong> en la lista de Entrega de este
+                            producto.
                           </p>
                         );
                       }
                       if (estado === "amarillo") {
                         return (
                           <p className="mt-1.5 text-[11px] rounded-md px-2 py-1 bg-amber-50 text-amber-800">
-                            🟡 Se está acabando: quedan {disponible} {unidad}. Confirma en almacén antes de prometer más.
+                            🟡 Se está acabando: quedan {disponible} {unidad}. Confirma en almacén antes de prometer más, o elige «Pedir a proveedor».
                           </p>
                         );
                       }

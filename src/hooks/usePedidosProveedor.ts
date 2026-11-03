@@ -19,6 +19,7 @@ export interface PedidoProveedor {
   descripcion: string;
   cantidad: number;
   nota: string | null;
+  venta_folio: string | null;
   estado: EstadoPedidoProveedor;
   proveedor: string | null;
   fecha_estimada: string | null;
@@ -68,6 +69,8 @@ export interface PedidoProveedorInput {
   descripcion: string;
   cantidad: number;
   nota: string;
+  /** Folio de la venta de la que sale el pedido (cuando se pide desde Nueva venta). */
+  ventaFolio?: string;
 }
 
 export async function crearPedidoProveedor(i: PedidoProveedorInput) {
@@ -78,6 +81,7 @@ export async function crearPedidoProveedor(i: PedidoProveedorInput) {
     p_descripcion: i.descripcion.trim() || null,
     p_cantidad: i.cantidad,
     p_nota: i.nota.trim() || null,
+    p_venta_folio: i.ventaFolio?.trim() || null,
   });
   return { folio: (data as string | null) ?? null, error: error?.message ?? null };
 }

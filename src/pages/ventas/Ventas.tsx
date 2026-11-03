@@ -31,6 +31,7 @@ export default function Ventas() {
   const [showPedidoProv, setShowPedidoProv] = useState(false);
   const [folioPedidoProv, setFolioPedidoProv] = useState<string | null>(null);
   const [successFolio, setSuccessFolio] = useState<string | null>(null);
+  const [pedidosDeVenta, setPedidosDeVenta] = useState<{ pedidos: string[]; fallidos: string[] } | null>(null);
   const [selectedSaleId, setSelectedSaleId] = useState<string | null>(null);
   const selectedSale = selectedSaleId ? sales.find((s) => s.id === selectedSaleId) ?? null : null;
   const esCaja = profile?.role === "caja";
@@ -51,11 +52,15 @@ export default function Ventas() {
 
   const canRegisterSale = profile?.role === "gerencia" || profile?.role === "ventas";
 
-  function handleSuccess(folio: string) {
+  function handleSuccess(folio: string, extra?: { pedidos: string[]; fallidos: string[] }) {
     setShowModal(false);
     setSuccessFolio(folio);
+    setPedidosDeVenta(extra ?? null);
     reload();
-    setTimeout(() => setSuccessFolio(null), 5000);
+    setTimeout(() => {
+      setSuccessFolio(null);
+      setPedidosDeVenta(null);
+    }, extra ? 10000 : 5000);
   }
 
   /** Botón de cobro directo en la lista: Confirmar cobro (venta nueva) o Corregir cobro (ya pasó a almacén). */
@@ -111,6 +116,18 @@ export default function Ventas() {
       {successFolio && (
         <p className="mt-4 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
           Venta <strong>{successFolio}</strong> registrada correctamente.
+          {pedidosDeVenta && pedidosDeVenta.pedidos.length > 0 && (
+            <>
+              {" "}Se mandó a Almacén el pedido a proveedor <strong>{pedidosDeVenta.pedidos.join(", ")}</strong>.{" "}
+              <Link to="/pedidos-proveedor" className="underline font-semibold">Ver pedidos</Link>.
+            </>
+          )}
+          {pedidosDeVenta && pedidosDeVenta.fallidos.length > 0 && (
+            <span className="block text-gigante-red mt-1">
+              No se pudo crear el pedido a proveedor de: {pedidosDeVenta.fallidos.join(", ")}. Créalo con el botón
+              «Pedir a proveedor».
+            </span>
+          )}
         </p>
       )}
       {folioPedidoProv && (
