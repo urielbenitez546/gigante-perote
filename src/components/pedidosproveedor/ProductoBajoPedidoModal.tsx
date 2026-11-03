@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { crearProductoBajoPedido, editarProductoBajoPedido } from "../../hooks/usePedidosProveedor";
-import { PRODUCT_UNIT_LABELS, type Product, type ProductUnit } from "../../types";
+import { PRODUCT_UNIT_LABELS, productoId, type Product, type ProductUnit } from "../../types";
 import { normalizeText } from "../../lib/search";
 
 interface Props {
@@ -17,6 +17,7 @@ interface Props {
 /** Alta (o revisión) de un producto de catálogo "bajo pedido": código, descripción, unidad y precio. */
 export default function ProductoBajoPedidoModal({ products, producto, onClose, onSaved }: Props) {
   const editando = !!producto;
+  const [externalId, setExternalId] = useState(producto ? productoId(producto) : "");
   const [code, setCode] = useState(producto?.code ?? "");
   const [name, setName] = useState(producto?.name ?? "");
   const [unit, setUnit] = useState<ProductUnit>(producto?.unit ?? "pieza");
@@ -44,7 +45,7 @@ export default function ProductoBajoPedidoModal({ products, producto, onClose, o
     if (!name.trim()) return setError("Escribe la descripción.");
     if (!n || n <= 0) return setError("Escribe el precio.");
     setGuardando(true);
-    const datos = { code: code.trim(), name: name.trim(), unit, precio: n, proveedor };
+    const datos = { code: code.trim(), name: name.trim(), unit, precio: n, proveedor, externalId: externalId.trim() };
     if (producto) {
       const { error: err } = await editarProductoBajoPedido(producto.id, datos);
       setGuardando(false);
@@ -78,6 +79,13 @@ export default function ProductoBajoPedidoModal({ products, producto, onClose, o
         </p>
 
         <div className="space-y-3">
+          <label className="block text-xs font-medium text-gigante-navy">
+            ID de SIGAM (opcional)
+            <input value={externalId} onChange={(e) => setExternalId(e.target.value)} placeholder="Solo si el producto ya tiene ID en el sistema" className={campo} />
+            <span className="block text-[10px] text-gigante-muted font-normal mt-1">
+              Déjalo vacío si no está en SIGAM. Si le pones un ID que no viene en el Excel de SIGAM, la recarga de inventario lo pone en 0.
+            </span>
+          </label>
           <label className="block text-xs font-medium text-gigante-navy">
             Código (del catálogo)
             <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Ej. WPC-16290-ROB" className={campo} />

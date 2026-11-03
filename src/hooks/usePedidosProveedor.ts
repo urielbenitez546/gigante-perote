@@ -111,6 +111,8 @@ export interface ProductoBajoPedidoInput {
   unit: string;
   precio: number;
   proveedor: string;
+  /** ID de SIGAM; solo si el producto ya lo tiene (opcional). */
+  externalId?: string;
 }
 
 /** Da de alta un producto de catálogo que no está en el inventario (se puede vender y pedir a proveedor). */
@@ -121,6 +123,7 @@ export async function crearProductoBajoPedido(i: ProductoBajoPedidoInput) {
     p_unit: i.unit,
     p_precio: i.precio,
     p_proveedor: i.proveedor.trim() || null,
+    p_external_id: i.externalId?.trim() || null,
   });
   return { id: (data as string | null) ?? null, error: error?.message ?? null };
 }
@@ -134,6 +137,7 @@ export async function editarProductoBajoPedido(id: string, i: ProductoBajoPedido
     p_unit: i.unit,
     p_precio: i.precio,
     p_proveedor: i.proveedor.trim() || null,
+    p_external_id: i.externalId?.trim() || null,
   });
   return { error: error?.message ?? null };
 }
