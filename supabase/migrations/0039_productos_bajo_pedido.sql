@@ -175,4 +175,24 @@ $$;
 
 grant execute on function public.editar_producto_bajo_pedido(uuid, text, text, text, numeric, text, text) to authenticated;
 
+-- 3) Pasar a inventario normal (cuando el producto ya está dado de alta en el inventario) ------
+create or replace function public.pasar_bajo_pedido_a_inventario(p_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if public.current_user_role() not in ('gerencia', 'almacen') then
+    raise exception 'Solo Almacén y Gerencia pasan un producto al inventario normal';
+  end if;
+  update public.products set bajo_pedido = false, por_validar = false where id = p_id and bajo_pedido;
+  if not found then
+    raise exception 'El producto no existe o ya es un producto normal';
+  end if;
+end;
+$$;
+
+grant execute on function public.pasar_bajo_pedido_a_inventario(uuid) to authenticated;
+
 notify pgrst, 'reload schema';

@@ -8,6 +8,7 @@ import {
   cancelarPedidoProveedor,
   marcarPedidoProveedorLlego,
   marcarPedidoProveedorPedido,
+  pasarBajoPedidoAInventario,
   usePedidosProveedor,
   type EstadoPedidoProveedor,
   type PedidoProveedor,
@@ -52,6 +53,7 @@ export default function PedidosProveedor() {
   const [motivo, setMotivo] = useState("");
   const [trabajando, setTrabajando] = useState(false);
   const [errAccion, setErrAccion] = useState<string | null>(null);
+  const [pasando, setPasando] = useState<Product | null>(null);
 
   const abiertos = useMemo(() => pedidos.filter((p) => p.estado === "pendiente" || p.estado === "pedido"), [pedidos]);
   const visibles = useMemo(() => {
@@ -116,7 +118,10 @@ export default function PedidosProveedor() {
         </div>
         {puedePedir && (
           <button
-            onClick={() => setNuevo(true)}
+            onClick={() => {
+              reloadProducts();
+              setNuevo(true);
+            }}
             className="flex items-center gap-2 bg-gigante-red hover:bg-gigante-redDark text-white text-sm font-semibold rounded-lg px-4 py-2.5"
           >
             <Plus size={16} /> Pedir a proveedor
@@ -152,7 +157,10 @@ export default function PedidosProveedor() {
         ).map(([key, label]) => (
           <button
             key={key}
-            onClick={() => setVista(key)}
+            onClick={() => {
+              if (key === "productos") reloadProducts();
+              setVista(key);
+            }}
             className={`text-sm px-3 py-2 -mb-px border-b-2 ${
               vista === key ? "border-gigante-red text-gigante-navy font-semibold" : "border-transparent text-gigante-muted"
             }`}
@@ -211,6 +219,17 @@ export default function PedidosProveedor() {
                     >
                       <Pencil size={13} /> {p.por_validar ? "Revisar" : "Editar"}
                     </button>
+                    {gestiona && (
+                      <button
+                        onClick={() => {
+                          setErrAccion(null);
+                          setPasando(p);
+                        }}
+                        className="border border-gigante-border text-gigante-navy text-xs font-medium rounded-lg px-3 py-2"
+                      >
+                        Pasar a inventario
+                      </button>
+                    )}
                   </div>
                 </div>
               ))
@@ -364,6 +383,39 @@ export default function PedidosProveedor() {
             setEditandoProducto(null);
           }}
         />
+      )}
+
+      {pasando && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md p-5">
+            <h2 className="text-lg font-bold text-gigante-navy mb-2">Pasar a inventario normal</h2>
+            <p className="text-sm text-gigante-muted">
+              <strong>{pasando.code}</strong> — {pasando.name}. Úsalo cuando este producto ya esté dado de alta en el
+              inventario. Dejará de ser “bajo pedido” y saldrá en Inventario, Kardex y alertas. Las ventas que ya lo
+              apartaron se conservan.
+            </p>
+            {errAccion && <p className="text-xs text-gigante-red bg-gigante-red/10 rounded-lg px-3 py-2 mt-3">{errAccion}</p>}
+            <div className="flex gap-3 pt-4">
+              <button onClick={() => setPasando(null)} className="flex-1 border border-gigante-border text-gigante-navy rounded-lg py-2.5 text-sm font-medium">
+                Cancelar
+              </button>
+              <button
+                disabled={trabajando}
+                onClick={async () => {
+                  setTrabajando(true);
+                  const { error: err } = await pasarBajoPedidoAInventario(pasando.id);
+                  setTrabajando(false);
+                  if (err) return setErrAccion(err);
+                  setPasando(null);
+                  reloadProducts();
+                }}
+                className="flex-1 bg-gigante-red hover:bg-gigante-redDark disabled:opacity-60 text-white rounded-lg py-2.5 text-sm font-semibold"
+              >
+                {trabajando ? "Pasando..." : "Pasar a inventario"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {pidiendo && (

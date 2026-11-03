@@ -141,3 +141,9 @@ export async function editarProductoBajoPedido(id: string, i: ProductoBajoPedido
   });
   return { error: error?.message ?? null };
 }
+
+/** El producto ya está en el inventario: deja de ser "bajo pedido" y sale en Inventario como cualquier otro. */
+export async function pasarBajoPedidoAInventario(id: string) {
+  const { error } = await supabase.rpc("pasar_bajo_pedido_a_inventario", { p_id: id });
+  return { error: error?.message ?? null };
+}

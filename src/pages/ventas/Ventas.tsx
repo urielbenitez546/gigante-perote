@@ -98,13 +98,19 @@ export default function Ventas() {
         {canRegisterSale && (
           <div className="flex gap-2 flex-wrap">
             <button
-              onClick={() => setShowPedidoProv(true)}
+              onClick={() => {
+                reloadProducts(); // trae los productos bajo pedido que otros vendedores agregaron
+                setShowPedidoProv(true);
+              }}
               className="flex items-center gap-2 border border-gigante-navy text-gigante-navy hover:bg-gigante-bg text-sm font-semibold rounded-lg px-4 py-2.5"
             >
               <PackagePlus size={16} /> Pedir a proveedor
             </button>
             <button
-              onClick={() => setShowModal(true)}
+              onClick={() => {
+                reloadProducts(); // trae los productos bajo pedido que otros vendedores agregaron
+                setShowModal(true);
+              }}
               className="flex items-center gap-2 bg-gigante-red hover:bg-gigante-redDark text-white text-sm font-semibold rounded-lg px-4 py-2.5"
             >
               <Plus size={16} /> Nueva venta
