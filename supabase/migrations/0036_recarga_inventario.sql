@@ -36,6 +36,7 @@ declare
   n_ceros int := 0;
   n_fila int;
   n_enlazados int := 0;
+  n_conciliadas int := 0;
   v_hay_bp boolean;
   v_filtro_bp text := '';
   ids_creados text := '';
@@ -672,10 +673,17 @@ begin
      and not exists (select 1 from _lista l where l.ext = p.external_id::text)' || v_filtro_bp;
   get diagnostics n_ceros = row_count;
 
+  -- 4b) Ventas "sin existencia en el sistema" (por confirmar) cuyo producto ya tiene existencia
+  --     suficiente con esta carga: se confirman solas (si ya corriste la 0040).
+  if exists (select 1 from pg_proc where proname = 'conciliar_existencia_por_confirmar') then
+    execute 'select public.conciliar_existencia_por_confirmar()' into n_conciliadas;
+  end if;
+
   raise notice '== Respaldo en el esquema %', respaldo;
   raise notice '== Productos creados: %', n_creados;
   if n_creados > 0 then raise notice '== IDs creados:%', ids_creados; end if;
   raise notice '== Productos actualizados (unidad y existencia): %', n_actualizados;
+  raise notice '== Líneas de venta por confirmar que ya quedaron respaldadas por el inventario: %', n_conciliadas;
   raise notice '== Productos bajo pedido enlazados por ID y pasados a inventario normal: %', n_enlazados;
   raise notice '== Productos que ya no vienen en el inventario y quedaron en 0: %', n_ceros;
   if ceros is not null then raise notice E'%', ceros; end if;

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { PackagePlus, Plus, Truck, CheckCircle2, XCircle, X, Pencil } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useProducts } from "../../hooks/useInventory";
@@ -9,6 +10,10 @@ import {
   marcarPedidoProveedorLlego,
   marcarPedidoProveedorPedido,
   pasarBajoPedidoAInventario,
+  confirmarExistenciaLinea,
+  conciliarExistenciaConInventario,
+  useLineasSinExistencia,
+  type LineaSinExistencia,
   usePedidosProveedor,
   type EstadoPedidoProveedor,
   type PedidoProveedor,
@@ -40,7 +45,15 @@ export default function PedidosProveedor() {
   const gestiona = tienePermiso(profile, "operar_almacen"); // jefe, auxiliar y Gerencia
   const puedePedir = profile?.role === "ventas" || profile?.role === "gerencia";
 
-  const [vista, setVista] = useState<"pedidos" | "productos">("pedidos");
+  const [searchParams] = useSearchParams();
+  const { lineas, reload: reloadLineas } = useLineasSinExistencia();
+  const [vista, setVista] = useState<"pedidos" | "productos" | "existencia">(
+    searchParams.get("tab") === "existencia" ? "existencia" : "pedidos"
+  );
+  const [filtroExist, setFiltroExist] = useState<"por_confirmar" | "revisadas" | "todas">("por_confirmar");
+  const [rechazando, setRechazando] = useState<LineaSinExistencia | null>(null);
+  const [notaRechazo, setNotaRechazo] = useState("");
+  const [msgExist, setMsgExist] = useState<string | null>(null);
   const [altaProducto, setAltaProducto] = useState(false);
   const [editandoProducto, setEditandoProducto] = useState<Product | null>(null);
   const [filtro, setFiltro] = useState<Filtro>("abiertos");
@@ -65,6 +78,66 @@ export default function PedidosProveedor() {
   const porPedir = pedidos.filter((p) => p.estado === "pendiente").length;
   const bajoPedido = useMemo(() => products.filter((p) => p.bajo_pedido), [products]);
   const porValidar = bajoPedido.filter((p) => p.por_validar).length;
+
+  const lineasPorConfirmar = useMemo(() => lineas.filter((l) => l.existencia_estado === "por_confirmar"), [lineas]);
+  const lineasVisibles = useMemo(() => {
+    if (filtroExist === "por_confirmar") return lineasPorConfirmar;
+    if (filtroExist === "revisadas") return lineas.filter((l) => l.existencia_estado !== "por_confirmar");
+    return lineas;
+  }, [lineas, lineasPorConfirmar, filtroExist]);
+  // Resumen por vendedor (lo ve Gerencia): cuántas ventas sin existencia hizo cada quien y cómo resultaron.
+  const resumenVendedores = useMemo(() => {
+    const m = new Map<string, { total: number; confirmadas: number; noHay: number; pendientes: number }>();
+    for (const l of lineas) {
+      const k = l.sale?.created_by ?? "";
+      const r = m.get(k) ?? { total: 0, confirmadas: 0, noHay: 0, pendientes: 0 };
+      r.total += 1;
+      if (l.existencia_estado === "confirmada") r.confirmadas += 1;
+      else if (l.existencia_estado === "no_hay") r.noHay += 1;
+      else r.pendientes += 1;
+      m.set(k, r);
+    }
+    return [...m.entries()].sort((a, b) => b[1].total - a[1].total);
+  }, [lineas]);
+  const diasSinConfirmar = (l: LineaSinExistencia) =>
+    l.sale ? Math.floor((Date.now() - new Date(l.sale.created_at).getTime()) / 86400000) : 0;
+
+  async function confirmarHay(l: LineaSinExistencia) {
+    setErrAccion(null);
+    setTrabajando(true);
+    const { error: err } = await confirmarExistenciaLinea(l.id, true);
+    setTrabajando(false);
+    if (err) return setErrAccion(err);
+    reloadLineas();
+  }
+
+  async function confirmarNoHay() {
+    if (!rechazando) return;
+    setErrAccion(null);
+    setTrabajando(true);
+    const { error: err } = await confirmarExistenciaLinea(rechazando.id, false, notaRechazo);
+    setTrabajando(false);
+    if (err) return setErrAccion(err);
+    setRechazando(null);
+    setNotaRechazo("");
+    reloadLineas();
+    reload(); // el pedido a proveedor que se creó solo
+  }
+
+  async function compararConInventario() {
+    setErrAccion(null);
+    setMsgExist(null);
+    setTrabajando(true);
+    const { confirmadas, error: err } = await conciliarExistenciaConInventario();
+    setTrabajando(false);
+    if (err) return setErrAccion(err);
+    setMsgExist(
+      confirmadas > 0
+        ? `${confirmadas} línea(s) ya quedaron respaldadas por el inventario y se confirmaron solas.`
+        : "Ninguna línea tiene todavía existencia suficiente en el sistema."
+    );
+    reloadLineas();
+  }
 
   function puedeCancelar(p: PedidoProveedor) {
     return (p.estado === "pendiente" || p.estado === "pedido") && (gestiona || p.created_by === profile?.id);
@@ -139,7 +212,7 @@ export default function PedidosProveedor() {
           No se pudieron cargar los pedidos: {error}
         </p>
       )}
-      {errAccion && !pidiendo && !cancelando && (
+      {errAccion && vista !== "existencia" && !pidiendo && !cancelando && !pasando && !rechazando && (
         <p className="mt-4 text-sm text-gigante-red bg-gigante-red/10 rounded-lg px-3 py-2">{errAccion}</p>
       )}
       {gestiona && porPedir > 0 && (
@@ -152,13 +225,15 @@ export default function PedidosProveedor() {
         {(
           [
             ["pedidos", "Pedidos"],
+            ["existencia", `Por confirmar existencia (${lineasPorConfirmar.length})`],
             ["productos", `Productos bajo pedido (${bajoPedido.length})${porValidar > 0 ? " · por validar" : ""}`],
-          ] as ["pedidos" | "productos", string][]
+          ] as ["pedidos" | "productos" | "existencia", string][]
         ).map(([key, label]) => (
           <button
             key={key}
             onClick={() => {
               if (key === "productos") reloadProducts();
+              if (key === "existencia") reloadLineas();
               setVista(key);
             }}
             className={`text-sm px-3 py-2 -mb-px border-b-2 ${
@@ -169,6 +244,143 @@ export default function PedidosProveedor() {
           </button>
         ))}
       </div>
+
+      {vista === "existencia" && (
+        <div className="mt-4">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <p className="text-sm text-gigante-muted max-w-2xl">
+              Productos que Ventas vendió porque <strong>sí están en la sucursal pero no aparecen en el sistema</strong>. Se
+              pueden cobrar, pero <strong>no se entregan</strong> hasta que Almacén confirme que sí están. Si no están, se
+              mandan solos a Pedidos a proveedor. Cuando se carga el inventario, los que ya tienen existencia se confirman solos.
+            </p>
+            {gestiona && (
+              <button
+                onClick={compararConInventario}
+                disabled={trabajando}
+                className="border border-gigante-navy text-gigante-navy text-sm font-semibold rounded-lg px-4 py-2 disabled:opacity-60"
+              >
+                Comparar con inventario
+              </button>
+            )}
+          </div>
+          {msgExist && (
+            <p className="mt-3 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">{msgExist}</p>
+          )}
+          {errAccion && !pidiendo && !cancelando && !pasando && !rechazando && (
+            <p className="mt-3 text-sm text-gigante-red bg-gigante-red/10 rounded-lg px-3 py-2">{errAccion}</p>
+          )}
+
+          {profile?.role === "gerencia" && resumenVendedores.length > 0 && (
+            <div className="mt-3 bg-white border border-gigante-border rounded-xl p-3">
+              <p className="text-xs font-semibold text-gigante-navy mb-2">Ventas sin existencia por vendedor</p>
+              <div className="space-y-1">
+                {resumenVendedores.map(([id, r]) => (
+                  <p key={id || "?"} className="text-xs text-gigante-navy">
+                    <strong>{nameFor(id || null)}</strong>: {r.total} en total · {r.confirmadas} sí estaban ·{" "}
+                    <span className={r.noHay > 0 ? "text-red-700 font-semibold" : ""}>{r.noHay} no estaban</span> ·{" "}
+                    {r.pendientes} por confirmar
+                  </p>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+            {(
+              [
+                ["por_confirmar", `Por confirmar (${lineasPorConfirmar.length})`],
+                ["revisadas", "Ya revisadas"],
+                ["todas", "Todas"],
+              ] as ["por_confirmar" | "revisadas" | "todas", string][]
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setFiltroExist(key)}
+                className={`whitespace-nowrap text-xs rounded-full px-3 py-1.5 border ${
+                  filtroExist === key ? "bg-gigante-navy text-white border-gigante-navy" : "border-gigante-border text-gigante-navy bg-white"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-3 space-y-2">
+            {lineasVisibles.length === 0 ? (
+              <p className="bg-white border border-gigante-border rounded-xl p-6 text-sm text-gigante-muted">
+                {lineas.length === 0 ? "Todavía no se ha vendido nada sin existencia en el sistema." : "No hay líneas con este filtro."}
+              </p>
+            ) : (
+              lineasVisibles.map((l) => {
+                const dias = diasSinConfirmar(l);
+                const urgente = l.existencia_estado === "por_confirmar" && dias >= 2;
+                return (
+                  <div key={l.id} className={`bg-white border rounded-xl p-3 ${urgente ? "border-red-300" : "border-gigante-border"}`}>
+                    <div className="flex items-start justify-between gap-3 flex-wrap">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gigante-navy">
+                          {l.sale?.folio} · {l.sale?.customer_name}
+                        </p>
+                        <p className="text-sm text-gigante-navy mt-0.5">
+                          {fmt(l.quantity)} {unidadLabel(l.product?.unit)} de {l.product?.name}
+                          {l.product?.code ? <span className="text-gigante-muted"> ({l.product.code})</span> : null}
+                        </p>
+                        <p className="text-xs text-gigante-muted mt-1">
+                          Lo vendió {nameFor(l.sale?.created_by ?? null)}
+                          {l.sale ? ` · ${fechaHora(l.sale.created_at)}` : ""}
+                        </p>
+                        {l.existencia_nota && <p className="text-xs text-gigante-muted mt-0.5">Dónde está (según el vendedor): {l.existencia_nota}</p>}
+                        {l.existencia_estado === "por_confirmar" && urgente && (
+                          <p className="text-xs text-red-700 font-semibold mt-1">Lleva {dias} días sin confirmarse.</p>
+                        )}
+                        {l.existencia_estado !== "por_confirmar" && (
+                          <p className="text-xs text-gigante-muted mt-1">
+                            {l.existencia_respaldo === "inventario"
+                              ? "Se confirmó solo: ya llegó en la carga del inventario."
+                              : `Revisó ${nameFor(l.existencia_revisada_por)}${l.existencia_revisada_at ? ` · ${fechaHora(l.existencia_revisada_at)}` : ""}`}
+                          </p>
+                        )}
+                      </div>
+                      <span
+                        className={`text-xs rounded-full px-2 py-1 ${
+                          l.existencia_estado === "por_confirmar"
+                            ? "bg-amber-100 text-amber-800"
+                            : l.existencia_estado === "confirmada"
+                            ? "bg-emerald-100 text-emerald-800"
+                            : "bg-red-100 text-red-700"
+                        }`}
+                      >
+                        {l.existencia_estado === "por_confirmar" ? "Por confirmar" : l.existencia_estado === "confirmada" ? "Sí estaba" : "No había"}
+                      </span>
+                    </div>
+                    {gestiona && l.existencia_estado === "por_confirmar" && (
+                      <div className="flex gap-2 mt-3 flex-wrap">
+                        <button
+                          onClick={() => confirmarHay(l)}
+                          disabled={trabajando}
+                          className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white text-xs font-semibold rounded-lg px-3 py-2"
+                        >
+                          <CheckCircle2 size={14} /> Sí está
+                        </button>
+                        <button
+                          onClick={() => {
+                            setErrAccion(null);
+                            setNotaRechazo("");
+                            setRechazando(l);
+                          }}
+                          className="flex items-center gap-1.5 border border-red-300 text-red-700 text-xs font-medium rounded-lg px-3 py-2"
+                        >
+                          <XCircle size={14} /> No está
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
 
       {vista === "productos" && (
         <div className="mt-4">
@@ -383,6 +595,35 @@ export default function PedidosProveedor() {
             setEditandoProducto(null);
           }}
         />
+      )}
+
+      {rechazando && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md p-5">
+            <h2 className="text-lg font-bold text-gigante-navy mb-2">No está — {rechazando.sale?.folio}</h2>
+            <p className="text-sm text-gigante-muted">
+              {fmt(rechazando.quantity)} de {rechazando.product?.name}. Se manda solo a <strong>Pedidos a proveedor</strong> y se le
+              avisa a Ventas para que le diga al cliente o cambie el producto.
+            </p>
+            <label className="block text-xs font-medium text-gigante-navy mt-3">
+              Nota (opcional)
+              <input value={notaRechazo} onChange={(e) => setNotaRechazo(e.target.value)} placeholder="Ej. no estaba en bodega" className={campo} />
+            </label>
+            {errAccion && <p className="text-xs text-gigante-red bg-gigante-red/10 rounded-lg px-3 py-2 mt-3">{errAccion}</p>}
+            <div className="flex gap-3 pt-4">
+              <button onClick={() => setRechazando(null)} className="flex-1 border border-gigante-border text-gigante-navy rounded-lg py-2.5 text-sm font-medium">
+                Volver
+              </button>
+              <button
+                onClick={confirmarNoHay}
+                disabled={trabajando}
+                className="flex-1 bg-gigante-red hover:bg-gigante-redDark disabled:opacity-60 text-white rounded-lg py-2.5 text-sm font-semibold"
+              >
+                {trabajando ? "Guardando..." : "Confirmar que no está"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {pasando && (

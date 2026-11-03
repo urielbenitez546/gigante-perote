@@ -37,6 +37,9 @@ export interface SaleItemInput {
   delivery_type?: DeliveryType;
   /** 'publico' (precio normal, default) o 'promocion' (aplica el % de descuento del producto). */
   tipo_precio?: TipoPrecio;
+  /** "Sí hay, pero no está en el sistema": queda por confirmar en almacén antes de entregar. */
+  sin_existencia?: boolean;
+  existencia_nota?: string;
 }
 
 export interface DatosVentaExtra {

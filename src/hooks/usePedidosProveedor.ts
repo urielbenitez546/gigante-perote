@@ -147,3 +147,69 @@ export async function pasarBajoPedidoAInventario(id: string) {
   const { error } = await supabase.rpc("pasar_bajo_pedido_a_inventario", { p_id: id });
   return { error: error?.message ?? null };
 }
+
+export type EstadoExistencia = "por_confirmar" | "confirmada" | "no_hay";
+
+/** Línea de venta que se vendió "sin existencia en el sistema". */
+export interface LineaSinExistencia {
+  id: string;
+  sale_id: string;
+  quantity: number;
+  delivered_quantity: number;
+  existencia_estado: EstadoExistencia;
+  existencia_nota: string | null;
+  existencia_respaldo: "almacen" | "inventario" | null;
+  existencia_revisada_por: string | null;
+  existencia_revisada_at: string | null;
+  sale: { folio: string; customer_name: string; created_by: string | null; created_at: string } | null;
+  product: { code: string; name: string; unit: string } | null;
+}
+
+export function useLineasSinExistencia() {
+  const [lineas, setLineas] = useState<LineaSinExistencia[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const reload = useCallback(async () => {
+    const { data, error: err } = await supabase
+      .from("sale_items")
+      .select(
+        "id, sale_id, quantity, delivered_quantity, existencia_estado, existencia_nota, existencia_respaldo, existencia_revisada_por, existencia_revisada_at, sale:sales(folio, customer_name, created_by, created_at), product:products(code, name, unit)"
+      )
+      .not("existencia_estado", "is", null)
+      .limit(500);
+    if (err) {
+      // Si todavía no se corrió el SQL 0040, la columna no existe: la sección se queda vacía.
+      setError(err.message);
+      setLineas([]);
+    } else {
+      setError(null);
+      const rows = ((data as unknown as LineaSinExistencia[]) ?? []).slice();
+      rows.sort((a, b) => (b.sale?.created_at ?? "").localeCompare(a.sale?.created_at ?? ""));
+      setLineas(rows);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    reload();
+  }, [reload]);
+
+  return { lineas, loading, error, reload };
+}
+
+/** Almacén (o Gerencia) confirma si el producto vendido sin existencia en el sistema sí está. */
+export async function confirmarExistenciaLinea(itemId: string, hay: boolean, nota = "") {
+  const { error } = await supabase.rpc("confirmar_existencia_item", {
+    p_item_id: itemId,
+    p_hay: hay,
+    p_nota: nota.trim() || null,
+  });
+  return { error: error?.message ?? null };
+}
+
+/** Confirma solas las líneas cuyo producto ya tiene existencia suficiente en el sistema. */
+export async function conciliarExistenciaConInventario() {
+  const { data, error } = await supabase.rpc("conciliar_existencia_por_confirmar");
+  return { confirmadas: (data as number | null) ?? 0, error: error?.message ?? null };
+}

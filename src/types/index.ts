@@ -411,6 +411,9 @@ export interface SaleItem {
   delivery_type: DeliveryType | null;
   delivered_quantity: number;
   tipo_precio: TipoPrecio;
+  /** Vendido sin existencia en el sistema: por_confirmar (almacén debe ver que sí está), confirmada o no_hay. */
+  existencia_estado?: "por_confirmar" | "confirmada" | "no_hay" | null;
+  existencia_nota?: string | null;
   product?: Pick<Product, "code" | "name" | "unit">;
 }
 

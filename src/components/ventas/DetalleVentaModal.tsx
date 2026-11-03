@@ -104,6 +104,20 @@ export default function DetalleVentaModal({ sale, onClose, onUpdated }: Props) {
                     <span className="ml-1.5 font-semibold text-gigante-red">Precio Promoción</span>
                   )}
                 </p>
+                {item.existencia_estado === "por_confirmar" && (
+                  <p className="text-[11px] mt-1 rounded-md px-2 py-1 bg-amber-50 text-amber-800">
+                    ⏳ Vendido sin existencia en el sistema: Almacén debe confirmar que sí está antes de entregarlo.
+                    {item.existencia_nota ? ` (${item.existencia_nota})` : ""}
+                  </p>
+                )}
+                {item.existencia_estado === "confirmada" && (
+                  <p className="text-[11px] mt-1 text-emerald-700">✅ Almacén confirmó que sí había existencia.</p>
+                )}
+                {item.existencia_estado === "no_hay" && (
+                  <p className="text-[11px] mt-1 rounded-md px-2 py-1 bg-red-50 text-red-700">
+                    🔴 Almacén revisó y no había existencia: se mandó a pedir al proveedor.
+                  </p>
+                )}
                 {canChangeItems && pending > 0 && (
                   <button
                     onClick={() => setChangingItem(item)}

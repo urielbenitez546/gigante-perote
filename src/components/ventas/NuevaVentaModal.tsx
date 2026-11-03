@@ -42,9 +42,13 @@ interface DraftItem {
   pedir_proveedor: boolean;
   /** Cantidad a pedir al proveedor; null = automática (lo que falta). */
   cantidad_pedir: number | null;
+  /** "Sí hay, pero no está en el sistema": se vende y Almacén confirma que sí está antes de entregar. */
+  sin_existencia: boolean;
+  existencia_nota: string;
 }
 
 const OPCION_PROVEEDOR = "__proveedor";
+const OPCION_SIN_EXISTENCIA = "__sin_existencia";
 
 export default function NuevaVentaModal({ products, onClose, onSuccess, desdeCotizacion, onProductsChanged }: Props) {
   const [customerName, setCustomerName] = useState(desdeCotizacion?.customer_name ?? "");
@@ -62,10 +66,9 @@ export default function NuevaVentaModal({ products, onClose, onSuccess, desdeCot
           quantity: i.quantity,
           delivery_type: "" as DeliveryType | "",
           tipo_precio: i.tipo_precio,
-          pedir_proveedor: false,
-          cantidad_pedir: null,
+          pedir_proveedor: false, cantidad_pedir: null, sin_existencia: false, existencia_nota: ""
         }))
-      : [{ key: crypto.randomUUID(), product_id: "", quantity: 1, delivery_type: "", tipo_precio: "publico", pedir_proveedor: false, cantidad_pedir: null }]
+      : [{ key: crypto.randomUUID(), product_id: "", quantity: 1, delivery_type: "", tipo_precio: "publico", pedir_proveedor: false, cantidad_pedir: null, sin_existencia: false, existencia_nota: "" }]
   );
   const [altaParaItem, setAltaParaItem] = useState<string | null>(null); // key de la línea que agrega un producto nuevo
   const [submitting, setSubmitting] = useState(false);
@@ -96,7 +99,7 @@ export default function NuevaVentaModal({ products, onClose, onSuccess, desdeCot
   function addItem() {
     setItems((prev) => [
       ...prev,
-      { key: crypto.randomUUID(), product_id: "", quantity: 1, delivery_type: "", tipo_precio: "publico", pedir_proveedor: false, cantidad_pedir: null },
+      { key: crypto.randomUUID(), product_id: "", quantity: 1, delivery_type: "", tipo_precio: "publico", pedir_proveedor: false, cantidad_pedir: null, sin_existencia: false, existencia_nota: "" },
     ]);
   }
 
@@ -124,8 +127,14 @@ export default function NuevaVentaModal({ products, onClose, onSuccess, desdeCot
       setError("Agrega al menos un producto con cantidad válida.");
       return;
     }
+    const sinNota = items.find((i) => i.sin_existencia && !i.existencia_nota.trim());
+    if (sinNota) {
+      const p = products.find((prod) => prod.id === sinNota.product_id);
+      setError(`Escribe dónde está "${p?.name}" (nota obligatoria en "Sí hay, pero no está en el sistema").`);
+      return;
+    }
     for (const item of items) {
-      if (item.pedir_proveedor) continue; // lo que falta se pide al proveedor
+      if (item.pedir_proveedor || item.sin_existencia) continue; // se pide al proveedor / almacén lo confirma
       if (item.quantity > availableFor(item.product_id)) {
         const p = products.find((prod) => prod.id === item.product_id);
         setError(
@@ -136,12 +145,15 @@ export default function NuevaVentaModal({ products, onClose, onSuccess, desdeCot
       }
     }
 
-    const payloadItems: SaleItemInput[] = items.map(({ product_id, quantity, delivery_type, tipo_precio }) => ({
-      product_id,
-      quantity,
-      tipo_precio,
-      ...(delivery_type ? { delivery_type } : {}),
-    }));
+    const payloadItems: SaleItemInput[] = items.map(
+      ({ product_id, quantity, delivery_type, tipo_precio, sin_existencia, existencia_nota }) => ({
+        product_id,
+        quantity,
+        tipo_precio,
+        ...(delivery_type ? { delivery_type } : {}),
+        ...(sin_existencia ? { sin_existencia: true, existencia_nota: existencia_nota.trim() } : {}),
+      })
+    );
 
     setSubmitting(true);
     const { folio, error: rpcError } = await registerSale(
@@ -352,17 +364,27 @@ export default function NuevaVentaModal({ products, onClose, onSuccess, desdeCot
                     </div>
                     <div className="flex items-center justify-between mt-1.5">
                       <select
-                        value={item.pedir_proveedor ? OPCION_PROVEEDOR : item.delivery_type}
+                        value={item.pedir_proveedor ? OPCION_PROVEEDOR : item.sin_existencia ? OPCION_SIN_EXISTENCIA : item.delivery_type}
                         onChange={(e) => {
                           const v = e.target.value;
                           if (v === OPCION_PROVEEDOR) {
-                            updateItem(item.key, { pedir_proveedor: true, delivery_type: "" });
+                            updateItem(item.key, { pedir_proveedor: true, sin_existencia: false, delivery_type: "" });
+                          } else if (v === OPCION_SIN_EXISTENCIA) {
+                            updateItem(item.key, { sin_existencia: true, pedir_proveedor: false, delivery_type: "" });
                           } else {
-                            updateItem(item.key, { pedir_proveedor: false, delivery_type: v as DeliveryType | "" });
+                            updateItem(item.key, {
+                              pedir_proveedor: false,
+                              sin_existencia: false,
+                              delivery_type: v as DeliveryType | "",
+                            });
                           }
                         }}
                         className={`text-[11px] rounded-lg border px-2 py-1.5 ${
-                          item.pedir_proveedor ? "border-amber-500 bg-amber-50 text-amber-900 font-medium" : "border-gigante-border"
+                          item.pedir_proveedor
+                            ? "border-amber-500 bg-amber-50 text-amber-900 font-medium"
+                            : item.sin_existencia
+                            ? "border-emerald-500 bg-emerald-50 text-emerald-900 font-medium"
+                            : "border-gigante-border"
                         }`}
                       >
                         <option value="">Entrega: igual que la venta</option>
@@ -371,6 +393,9 @@ export default function NuevaVentaModal({ products, onClose, onSuccess, desdeCot
                             Entrega: {label}
                           </option>
                         ))}
+                        {item.product_id && (
+                          <option value={OPCION_SIN_EXISTENCIA}>✅ Sí hay, pero no está en el sistema</option>
+                        )}
                         {item.product_id && (
                           <option value={OPCION_PROVEEDOR}>📦 Pedir a proveedor (no hay / hay poco)</option>
                         )}
@@ -406,6 +431,25 @@ export default function NuevaVentaModal({ products, onClose, onSuccess, desdeCot
                       if (!p) return null;
                       const estado = calcularSemaforo(p);
                       const unidad = PRODUCT_UNIT_LABELS[p.unit];
+                      if (item.sin_existencia) {
+                        return (
+                          <div className="mt-1.5 text-[11px] rounded-md px-2 py-1.5 bg-emerald-50 text-emerald-900 space-y-1">
+                            <p>
+                              ✅ Se vende aunque el sistema no lo tenga. <strong>Almacén debe confirmar que sí está</strong> antes
+                              de entregarlo (le llega el aviso al registrar la venta). Si no está, se manda a pedir al proveedor.
+                            </p>
+                            <label className="block">
+                              ¿Dónde está? (obligatorio)
+                              <input
+                                value={item.existencia_nota}
+                                onChange={(e) => updateItem(item.key, { existencia_nota: e.target.value })}
+                                placeholder="Ej. Bodega, pasillo 3 / lo vi en exhibición"
+                                className="mt-1 w-full rounded-lg border border-emerald-300 bg-white px-2 py-1 text-xs"
+                              />
+                            </label>
+                          </div>
+                        );
+                      }
                       if (item.pedir_proveedor) {
                         return (
                           <div className="mt-1.5 text-[11px] rounded-md px-2 py-1.5 bg-amber-50 text-amber-900 space-y-1">
@@ -437,8 +481,8 @@ export default function NuevaVentaModal({ products, onClose, onSuccess, desdeCot
                         return (
                           <p className="mt-1.5 text-[11px] rounded-md px-2 py-1 bg-red-50 text-red-700">
                             🔴 No alcanza: pides {item.quantity} y solo hay {Math.max(disponible, 0)} {unidad} disponibles.
-                            Ofrece otro producto o elige <strong>«Pedir a proveedor»</strong> en la lista de Entrega de este
-                            producto.
+                            Ofrece otro producto o, en la lista de Entrega de este producto, elige{" "}
+                            <strong>«Sí hay, pero no está en el sistema»</strong> o <strong>«Pedir a proveedor»</strong>.
                           </p>
                         );
                       }
