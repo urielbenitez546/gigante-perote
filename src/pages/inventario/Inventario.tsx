@@ -13,6 +13,7 @@ import {
 import { usePurchaseInvoices, useWriteOffs } from "../../hooks/usePurchases";
 import { useProfileNames } from "../../hooks/useProfileNames";
 import RegistrarEntradaModal from "../../components/inventario/RegistrarEntradaModal";
+import NuevoProductoModal from "../../components/inventario/NuevoProductoModal";
 import ReportarIncidenteModal from "../../components/inventario/ReportarIncidenteModal";
 import RegistrarFacturaModal from "../../components/inventario/RegistrarFacturaModal";
 import RegistrarMermaModal from "../../components/inventario/RegistrarMermaModal";
@@ -140,6 +141,8 @@ export default function Inventario() {
     setSearchParams({});
   }
   const [showEntradaModal, setShowEntradaModal] = useState(false);
+  const [showNuevoProducto, setShowNuevoProducto] = useState(false);
+  const [productoCreado, setProductoCreado] = useState<string | null>(null);
   const [showFacturaModal, setShowFacturaModal] = useState(false);
   const [showMermaModal, setShowMermaModal] = useState(false);
   const [showIncidenteModal, setShowIncidenteModal] = useState(false);
@@ -338,6 +341,12 @@ export default function Inventario() {
               <ClipboardCheck size={16} /> Conteo físico
             </button>
             <button
+              onClick={() => setShowNuevoProducto(true)}
+              className="flex items-center gap-2 border border-gigante-border text-gigante-navy text-sm font-semibold rounded-lg px-4 py-2.5"
+            >
+              <Plus size={16} /> Nuevo producto
+            </button>
+            <button
               onClick={() => setShowEntradaModal(true)}
               className="flex items-center gap-2 bg-gigante-red hover:bg-gigante-redDark text-white text-sm font-semibold rounded-lg px-4 py-2.5"
             >
@@ -347,6 +356,11 @@ export default function Inventario() {
         )}
       </div>
 
+      {productoCreado && (
+        <p className="mt-4 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+          Producto <strong>{productoCreado}</strong> creado. Ya lo pueden vender y le puedes registrar entradas.
+        </p>
+      )}
       {error && (
         <p className="mt-4 text-sm text-gigante-red bg-gigante-red/10 rounded-lg px-3 py-2">
           No se pudo cargar el inventario: {error}
@@ -1228,6 +1242,19 @@ export default function Inventario() {
         </div>
       )}
 
+      {showNuevoProducto && (
+        <NuevoProductoModal
+          products={productosConBajoPedido}
+          onClose={() => setShowNuevoProducto(false)}
+          onSaved={(nombre) => {
+            setShowNuevoProducto(false);
+            setProductoCreado(nombre);
+            reload();
+            reloadMovements();
+            setTimeout(() => setProductoCreado(null), 8000);
+          }}
+        />
+      )}
       {showEntradaModal && (
         <RegistrarEntradaModal
           products={productosConBajoPedido}

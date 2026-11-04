@@ -472,3 +472,29 @@ export async function marcarExhibidosInicial() {
   const { data, error } = await supabase.rpc("marcar_exhibidos_inicial");
   return { marcados: (data as number | null) ?? 0, error: error?.message ?? null };
 }
+
+export interface NuevoProductoInput {
+  externalId: string;
+  code: string;
+  name: string;
+  brand: string;
+  unit: string;
+  precio: number;
+  existencia: number;
+  categoria: string;
+}
+
+/** Almacén/Gerencia crean un producto nuevo (con su existencia inicial). */
+export async function crearProductoInventario(i: NuevoProductoInput) {
+  const { data, error } = await supabase.rpc("crear_producto_inventario", {
+    p_external_id: i.externalId.trim() || null,
+    p_code: i.code.trim() || null,
+    p_name: i.name,
+    p_brand: i.brand.trim() || null,
+    p_unit: i.unit,
+    p_precio: i.precio,
+    p_existencia: i.existencia,
+    p_categoria: i.categoria.trim() || null,
+  });
+  return { id: (data as string | null) ?? null, error: error?.message ?? null };
+}
