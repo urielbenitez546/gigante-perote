@@ -104,6 +104,15 @@ export default function DetalleVentaModal({ sale, onClose, onUpdated }: Props) {
                     <span className="ml-1.5 font-semibold text-gigante-red">Precio Promoción</span>
                   )}
                 </p>
+                {item.motivo_precio && (
+                  <p className="text-[11px] mt-1 rounded-md px-2 py-1 bg-blue-50 text-blue-900">
+                    💲 Precio modificado{item.precio_original != null
+                      ? ` (antes $${Number(item.precio_original).toLocaleString("es-MX", { minimumFractionDigits: 2 })})`
+                      : ""}
+                    . Motivo: <strong>{item.motivo_precio}</strong>
+                    {item.observacion_precio ? ` — ${item.observacion_precio}` : ""}
+                  </p>
+                )}
                 {item.existencia_estado === "por_confirmar" && (
                   <p className="text-[11px] mt-1 rounded-md px-2 py-1 bg-amber-50 text-amber-800">
                     ⏳ Vendido sin existencia en el sistema: Almacén debe confirmar que sí está antes de entregarlo.

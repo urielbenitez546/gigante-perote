@@ -2,7 +2,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import { X, Plus, Trash2 } from "lucide-react";
 import type { Product, DeliveryType, TipoPrecio, MetodoPagoVenta } from "../../types";
 import { calcularSemaforo, PRODUCT_UNIT_LABELS, precioPublico } from "../../types";
-import { precioSegunTipo } from "../../lib/precioVenta";
+import { precioSegunTipo, MOTIVOS_CAMBIO_PRECIO } from "../../lib/precioVenta";
 import ProductSearchSelect from "../common/ProductSearchSelect";
 import { DELIVERY_TYPE_LABELS, METODO_PAGO_VENTA_LABELS } from "../../types";
 import { registerSale, type SaleItemInput } from "../../hooks/useSales";
@@ -45,6 +45,11 @@ interface DraftItem {
   /** "Sí hay, pero no está en el sistema": se vende y Almacén confirma que sí está antes de entregar. */
   sin_existencia: boolean;
   existencia_nota: string;
+  /** Cambio de precio de esta línea (como la "Petición de cambio de precio" de SIGAM). */
+  cambiar_precio: boolean;
+  precio_nuevo: string;
+  motivo_precio: string;
+  observacion_precio: string;
 }
 
 const OPCION_PROVEEDOR = "__proveedor";
@@ -66,9 +71,9 @@ export default function NuevaVentaModal({ products, onClose, onSuccess, desdeCot
           quantity: i.quantity,
           delivery_type: "" as DeliveryType | "",
           tipo_precio: i.tipo_precio,
-          pedir_proveedor: false, cantidad_pedir: null, sin_existencia: false, existencia_nota: ""
+          pedir_proveedor: false, cantidad_pedir: null, sin_existencia: false, existencia_nota: "", cambiar_precio: false, precio_nuevo: "", motivo_precio: "", observacion_precio: ""
         }))
-      : [{ key: crypto.randomUUID(), product_id: "", quantity: 1, delivery_type: "", tipo_precio: "publico", pedir_proveedor: false, cantidad_pedir: null, sin_existencia: false, existencia_nota: "" }]
+      : [{ key: crypto.randomUUID(), product_id: "", quantity: 1, delivery_type: "", tipo_precio: "publico", pedir_proveedor: false, cantidad_pedir: null, sin_existencia: false, existencia_nota: "", cambiar_precio: false, precio_nuevo: "", motivo_precio: "", observacion_precio: "" }]
   );
   const [altaParaItem, setAltaParaItem] = useState<string | null>(null); // key de la línea que agrega un producto nuevo
   const [submitting, setSubmitting] = useState(false);
@@ -89,17 +94,24 @@ export default function NuevaVentaModal({ products, onClose, onSuccess, desdeCot
   const effectiveType = (item: DraftItem): DeliveryType => item.delivery_type || deliveryType;
   const needsAddress = items.some((i) => effectiveType(i) === "domicilio");
 
+  /** Precio por unidad de la línea: el nuevo si el vendedor lo cambió, si no el del producto. */
+  const precioLinea = (item: DraftItem, p: Product) => {
+    const nuevo = item.cambiar_precio && item.precio_nuevo !== "" ? Number(item.precio_nuevo) : NaN;
+    return Number.isFinite(nuevo) ? nuevo : precioSegunTipo(p, item.tipo_precio);
+  };
+
   const total = useMemo(() => {
     return items.reduce((sum, item) => {
       const p = products.find((prod) => prod.id === item.product_id);
-      return sum + (p ? precioSegunTipo(p, item.tipo_precio) * item.quantity : 0);
+      return sum + (p ? precioLinea(item, p) * item.quantity : 0);
     }, 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, products]);
 
   function addItem() {
     setItems((prev) => [
       ...prev,
-      { key: crypto.randomUUID(), product_id: "", quantity: 1, delivery_type: "", tipo_precio: "publico", pedir_proveedor: false, cantidad_pedir: null, sin_existencia: false, existencia_nota: "" },
+      { key: crypto.randomUUID(), product_id: "", quantity: 1, delivery_type: "", tipo_precio: "publico", pedir_proveedor: false, cantidad_pedir: null, sin_existencia: false, existencia_nota: "", cambiar_precio: false, precio_nuevo: "", motivo_precio: "", observacion_precio: "" },
     ]);
   }
 
@@ -133,6 +145,27 @@ export default function NuevaVentaModal({ products, onClose, onSuccess, desdeCot
       setError(`Escribe dónde está "${p?.name}" (nota obligatoria en "Sí hay, pero no está en el sistema").`);
       return;
     }
+    for (const item of items.filter((i) => i.cambiar_precio)) {
+      const p = products.find((prod) => prod.id === item.product_id);
+      const nombre = p?.name ?? "producto";
+      const nuevo = Number(item.precio_nuevo);
+      if (item.precio_nuevo.trim() === "" || !Number.isFinite(nuevo) || nuevo < 0) {
+        setError(`Escribe el precio nuevo de "${nombre}" (o quita el cambio de precio).`);
+        return;
+      }
+      if (p && Math.round(nuevo * 100) === Math.round(precioSegunTipo(p, item.tipo_precio) * 100)) {
+        setError(`El precio nuevo de "${nombre}" es igual al actual; quita el cambio de precio.`);
+        return;
+      }
+      if (!item.motivo_precio) {
+        setError(`Elige el motivo del cambio de precio de "${nombre}".`);
+        return;
+      }
+      if (!item.observacion_precio.trim()) {
+        setError(`Escribe una observación que explique el cambio de precio de "${nombre}".`);
+        return;
+      }
+    }
     for (const item of items) {
       if (item.pedir_proveedor || item.sin_existencia) continue; // se pide al proveedor / almacén lo confirma
       if (item.quantity > availableFor(item.product_id)) {
@@ -146,12 +179,15 @@ export default function NuevaVentaModal({ products, onClose, onSuccess, desdeCot
     }
 
     const payloadItems: SaleItemInput[] = items.map(
-      ({ product_id, quantity, delivery_type, tipo_precio, sin_existencia, existencia_nota }) => ({
+      ({ product_id, quantity, delivery_type, tipo_precio, sin_existencia, existencia_nota, cambiar_precio, precio_nuevo, motivo_precio, observacion_precio }) => ({
         product_id,
         quantity,
         tipo_precio,
         ...(delivery_type ? { delivery_type } : {}),
         ...(sin_existencia ? { sin_existencia: true, existencia_nota: existencia_nota.trim() } : {}),
+        ...(cambiar_precio
+          ? { precio_nuevo: Number(precio_nuevo), motivo_precio, observacion_precio: observacion_precio.trim() }
+          : {}),
       })
     );
 
@@ -423,6 +459,80 @@ export default function NuevaVentaModal({ products, onClose, onSuccess, desdeCot
                               Precio Promoción{p.precio_lista != null ? "" : ` (-${p.descuento_porcentaje}%)`} — {money(precioSegunTipo(p, "promocion"))}
                             </option>
                           </select>
+                        </div>
+                      );
+                    })()}
+                    {(() => {
+                      const p = products.find((prod) => prod.id === item.product_id);
+                      if (!p) return null;
+                      const actual = precioSegunTipo(p, item.tipo_precio);
+                      if (!item.cambiar_precio) {
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => updateItem(item.key, { cambiar_precio: true })}
+                            className="mt-1.5 text-[11px] font-semibold text-gigante-red hover:underline"
+                          >
+                            💲 Cambiar precio de este producto
+                          </button>
+                        );
+                      }
+                      return (
+                        <div className="mt-1.5 text-[11px] rounded-md border border-gigante-border bg-gigante-bg px-2 py-2 space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <p className="font-semibold text-gigante-navy">Petición de cambio de precio</p>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                updateItem(item.key, { cambiar_precio: false, precio_nuevo: "", motivo_precio: "", observacion_precio: "" })
+                              }
+                              className="text-gigante-muted hover:text-gigante-red"
+                            >
+                              Quitar
+                            </button>
+                          </div>
+                          <label className="block">
+                            Motivo del cambio (obligatorio)
+                            <select
+                              value={item.motivo_precio}
+                              onChange={(e) => updateItem(item.key, { motivo_precio: e.target.value })}
+                              className="mt-0.5 w-full rounded-lg border border-gigante-border bg-white px-2 py-1 text-xs"
+                            >
+                              <option value="">Selecciona un motivo...</option>
+                              {MOTIVOS_CAMBIO_PRECIO.map((m) => (
+                                <option key={m} value={m}>
+                                  {m}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <div className="flex items-center gap-2">
+                            <span className="text-gigante-muted">Precio actual: {money(actual)}</span>
+                            <span>→</span>
+                            <input
+                              type="number"
+                              min="0"
+                              step="any"
+                              inputMode="decimal"
+                              value={item.precio_nuevo}
+                              onChange={(e) => updateItem(item.key, { precio_nuevo: e.target.value })}
+                              placeholder="Precio nuevo"
+                              className="w-28 rounded-lg border border-gigante-border bg-white px-2 py-1 text-xs"
+                            />
+                          </div>
+                          <label className="block">
+                            Observaciones (obligatorio)
+                            <textarea
+                              rows={2}
+                              value={item.observacion_precio}
+                              onChange={(e) => updateItem(item.key, { observacion_precio: e.target.value })}
+                              placeholder="Ej. Cliente compra 99 m² y pidió precio de mayoreo"
+                              className="mt-0.5 w-full rounded-lg border border-gigante-border bg-white px-2 py-1 text-xs"
+                            />
+                          </label>
+                          <p className="text-gigante-muted">
+                            Solo cambia el precio de esta venta, no el del catálogo. Queda registrado y le llega aviso a Gerencia.
+                          </p>
                         </div>
                       );
                     })()}

@@ -10,3 +10,25 @@ export function precioSegunTipo(p: Product, tipo: TipoPrecio): number {
   }
   return precioPublico(p);
 }
+
+/** Motivos para cambiar el precio de una línea de venta (los mismos que usa SIGAM). */
+export const MOTIVOS_CAMBIO_PRECIO = [
+  "ALZA",
+  "CLIENTE FRECUENTE",
+  "SUBDISTRIBUIDOR",
+  "POQUITERO",
+  "PROMOCION",
+  "MATERIAL DE EXHIBICION",
+  "AUTORIZACION ESPECIAL",
+  "MATERIAL DAÑADO/ INCOMPLETO",
+  "COMPETENCIA",
+  "CONVENIO",
+  "DESCUENTO A COLABORADOR",
+  "MARCA DE SALIDA",
+  "MARMOLES DE POZA RICA",
+  "VENTA POR VOLUMEN",
+  "OBSOLETOS",
+  "DESCONTINUADO",
+  "OUTLET",
+  "MAYOREO",
+] as const;

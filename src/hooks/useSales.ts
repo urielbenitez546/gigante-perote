@@ -40,6 +40,10 @@ export interface SaleItemInput {
   /** "Sí hay, pero no está en el sistema": queda por confirmar en almacén antes de entregar. */
   sin_existencia?: boolean;
   existencia_nota?: string;
+  /** Cambio de precio en la línea: precio nuevo + motivo + observación (los tres obligatorios). */
+  precio_nuevo?: number;
+  motivo_precio?: string;
+  observacion_precio?: string;
 }
 
 export interface DatosVentaExtra {

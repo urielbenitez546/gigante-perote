@@ -414,6 +414,10 @@ export interface SaleItem {
   /** Vendido sin existencia en el sistema: por_confirmar (almacén debe ver que sí está), confirmada o no_hay. */
   existencia_estado?: "por_confirmar" | "confirmada" | "no_hay" | null;
   existencia_nota?: string | null;
+  /** Si el vendedor cambió el precio: el precio que traía antes, el motivo y la observación. */
+  precio_original?: number | null;
+  motivo_precio?: string | null;
+  observacion_precio?: string | null;
   product?: Pick<Product, "code" | "name" | "unit">;
 }
 
