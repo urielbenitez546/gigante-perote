@@ -56,13 +56,20 @@ export default function Inicio() {
   const stats = useMemo(() => {
     const hoy = new Date();
     const ventasHoy = sales
-      .filter((s) => isToday(s.created_at, hoy))
+      .filter((s) => s.status !== "cancelada" && isToday(s.created_at, hoy))
       .reduce((sum, s) => sum + s.total, 0);
 
-    const repartosHoy = deliveries.filter((d) => d.status === "pendiente" || d.status === "en_camino").length;
+    // Igual que las pantallas de Repartos y Retiros: solo cuentan las ventas que Caja ya cobró y
+    // liberó a almacén (las que esperan cobro no aparecen allá, así que tampoco aquí).
+    const repartosHoy = deliveries.filter(
+      (d) => (d.status === "pendiente" || d.status === "en_camino") && !!d.sale.liberada_almacen_at && d.sale.status !== "cancelada"
+    ).length;
 
-    const porRecogerSucursal = sales.filter((s) =>
-      s.sale_items.some((it) => it.delivery_type === "retiro_sucursal" && it.delivered_quantity < it.quantity)
+    const porRecogerSucursal = sales.filter(
+      (s) =>
+        !!s.liberada_almacen_at &&
+        s.status !== "cancelada" &&
+        s.sale_items.some((it) => (it.delivery_type ?? s.delivery_type) === "retiro_sucursal" && it.delivered_quantity < it.quantity)
     ).length;
 
     const cobrosPendientes = deliveries.filter((d) => d.status === "entregado" && !d.payment_confirmed_at).length;
@@ -116,7 +123,10 @@ export default function Inicio() {
   }, [sales, deliveries]);
 
   const proximosRepartos = useMemo(
-    () => deliveries.filter((d) => d.status === "pendiente" || d.status === "en_camino").slice(0, 5),
+    () =>
+      deliveries
+        .filter((d) => (d.status === "pendiente" || d.status === "en_camino") && !!d.sale.liberada_almacen_at && d.sale.status !== "cancelada")
+        .slice(0, 5),
     [deliveries]
   );
 
