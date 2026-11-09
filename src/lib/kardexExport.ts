@@ -1,4 +1,3 @@
-import { descargarLibro } from "./cobranzaExcel";
 
 // ============================================================
 // Exportar el Kardex de UN producto: Excel (.xlsx) o página
@@ -52,118 +51,174 @@ function nombreArchivo(d: KardexExportDatos, ext: string) {
   return `Kardex_${limpio}_${hoy}.${ext}`;
 }
 
+/** Descarga el libro tal cual (sin forzar horizontal/A4: el Kardex va vertical en carta). */
+async function descargarLibro(wb: import("exceljs").Workbook, nombre: string) {
+  const buf = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buf as ArrayBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = nombre;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
 export async function exportarKardexExcel(d: KardexExportDatos) {
   const mod = await import("exceljs");
   const ExcelJS = (mod as unknown as { default?: typeof mod }).default ?? mod;
   const wb = new ExcelJS.Workbook();
   wb.creator = "El Gigante de los Azulejos y Mármoles — Perote";
   const ws = wb.addWorksheet("Kardex", {
-    pageSetup: { orientation: "portrait", paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0, margins: { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.2, footer: 0.2 } },
-    views: [{ state: "frozen", ySplit: 8 }],
+    pageSetup: {
+      orientation: "portrait",
+      paperSize: 1 as never, // 1 = carta
+      fitToPage: true,
+      fitToWidth: 1,
+      fitToHeight: 0,
+      horizontalCentered: true,
+      margins: { left: 0.4, right: 0.4, top: 0.4, bottom: 0.5, header: 0.2, footer: 0.2 },
+    },
+    views: [{ showGridLines: false }],
   });
-  ws.columns = [
-    { width: 17 }, // fecha
-    { width: 24 }, // nombre
-    { width: 30 }, // concepto
-    { width: 24 }, // referencia
-    { width: 11 }, // entrada
-    { width: 11 }, // salida
-    { width: 13 }, // existencia
-  ];
+  // Mismas 5 columnas del formato de papel: Fecha | Nombre | Entrada | Salida | Existencia
+  ws.columns = [{ width: 18 }, { width: 46 }, { width: 14 }, { width: 14 }, { width: 16 }];
 
-  ws.mergeCells("A1:G1");
-  const t = ws.getCell("A1");
-  t.value = "KARDEX DE PRODUCTO — FO-GIGANTE-KAR-00";
-  t.font = { name: "Calibri", size: 15, bold: true, color: { argb: AZUL } };
-  ws.mergeCells("A2:G2");
-  ws.getCell("A2").value = "EL GIGANTE DE LOS AZULEJOS Y MÁRMOLES — SUCURSAL PEROTE";
-  ws.getCell("A2").font = { name: "Calibri", size: 10, color: { argb: "FF6B7280" } };
+  const NEGRO = "FF333333";
+  const lado = { style: "medium" as const, color: { argb: NEGRO } };
+  const fino = { style: "thin" as const, color: { argb: "FF555555" } };
+  const caja = (r1: number, c1: number, r2: number, c2: number, b: typeof lado | typeof fino = lado) => {
+    for (let r = r1; r <= r2; r++)
+      for (let c = c1; c <= c2; c++) {
+        const cell = ws.getCell(r, c);
+        cell.border = {
+          top: r === r1 ? b : cell.border?.top,
+          bottom: r === r2 ? b : cell.border?.bottom,
+          left: c === c1 ? b : cell.border?.left,
+          right: c === c2 ? b : cell.border?.right,
+        };
+      }
+  };
+  const poner = (ref: string, valor: string, o: { bold?: boolean; size?: number; color?: string; fill?: string; h?: "left" | "center" | "right"; wrap?: boolean } = {}) => {
+    const c = ws.getCell(ref);
+    c.value = valor;
+    c.font = { name: "Arial", size: o.size ?? 9, bold: o.bold ?? false, color: { argb: o.color ?? "FF111111" } };
+    c.alignment = { horizontal: o.h ?? "center", vertical: "middle", wrapText: o.wrap ?? true };
+    if (o.fill) c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: o.fill } };
+  };
 
-  const datos: [string, string][] = [
-    ["ID", d.id || "—"],
-    ["Código", d.codigo],
-    ["Descripción", d.descripcion],
-    ["Unidad", d.unidad],
-  ];
-  datos.forEach(([k, v], i) => {
-    const r = 3 + i;
-    ws.getCell(r, 1).value = k;
-    ws.getCell(r, 1).font = { name: "Calibri", bold: true, color: { argb: AZUL } };
-    ws.mergeCells(r, 2, r, 7);
-    ws.getCell(r, 2).value = v;
-    ws.getCell(r, 2).font = { name: "Calibri", bold: true, size: 11 };
-    ws.getCell(r, 2).alignment = { horizontal: "left" };
+  // ---------- Encabezado (igual que la hoja FO-GIGANTE-KAR-00) ----------
+  [1, 2, 3].forEach((r) => (ws.getRow(r).height = 24));
+  ws.mergeCells("A1:A3");
+  poner("A1", "EL GIGANTE\nDE LOS AZULEJOS Y MÁRMOLES", { bold: true, size: 14 });
+  ws.mergeCells("B1:B3");
+  poner("B1", "FO-GIGANTE-KAR-00\nFecha de aplicación:\n2024/09/18", { bold: true, size: 11, color: "FFFFFFFF", fill: "FF3A3A3A" });
+  poner("C1", "FECHA DE\nELABORACIÓN", { size: 8 });
+  poner("D1", "2024/09/17", { size: 9 });
+  poner("E1", "ELABORÓ:\nCarlos Tabueña", { size: 8 });
+  poner("C2", "FECHA DE\nREVISIÓN", { size: 8 });
+  poner("D2", "2024/09/18", { size: 9 });
+  poner("E2", "REVISIÓN: 00", { size: 9 });
+  poner("C3", "APROBÓ:", { size: 8 });
+  ws.mergeCells("D3:E3");
+  poner("D3", "Representante del Comité de Cumplimiento\nfecha: 2024/09/18", { size: 8 });
+  caja(1, 1, 3, 5);
+  for (let r = 1; r <= 3; r++) for (let c = 1; c <= 5; c++) {
+    const cell = ws.getCell(r, c);
+    cell.border = { top: lado, bottom: lado, left: lado, right: lado };
+  }
+
+  ws.mergeCells("A4:E4");
+  ws.getRow(4).height = 20;
+  poner("A4", "FORMATO PARA KARDEX", { bold: true, size: 10 });
+  for (let c = 1; c <= 5; c++) ws.getCell(4, c).border = { bottom: lado, left: c === 1 ? lado : undefined, right: c === 5 ? lado : undefined };
+
+  ws.getRow(5).height = 8;
+
+  // ---------- ID y Descripción ----------
+  ws.getRow(6).height = 22;
+  poner("A6", "ID", { h: "left", size: 10 });
+  ws.mergeCells("B6:E6");
+  poner("B6", `${d.id || "—"}   ·   ${d.codigo}`, { bold: true, size: 12, h: "left" });
+  ws.getRow(7).height = 32;
+  poner("A7", "Descripción", { h: "left", size: 10 });
+  ws.mergeCells("B7:E7");
+  poner("B7", d.descripcion, { bold: true, size: 12, h: "left" });
+  for (let r = 6; r <= 7; r++) for (let c = 1; c <= 5; c++) ws.getCell(r, c).border = { top: fino, bottom: fino, left: fino, right: fino };
+
+  ws.getRow(8).height = 8;
+
+  // ---------- Tabla de movimientos ----------
+  const hdr = 9;
+  ws.getRow(hdr).height = 22;
+  ["Fecha", "Nombre", "Entrada", "Salida", "Existencia"].forEach((h, i) => {
+    poner(`${"ABCDE"[i]}${hdr}`, h, { size: 10 });
+    ws.getCell(hdr, i + 1).border = { top: lado, bottom: fino, left: fino, right: fino };
   });
 
-  const hdr = 8;
-  ["Fecha", "Nombre", "Concepto", "Referencia", "Entrada", "Salida", "Existencia"].forEach((h, i) => {
-    const c = ws.getCell(hdr, i + 1);
-    c.value = h;
-    c.font = { name: "Calibri", bold: true, color: { argb: "FFFFFFFF" } };
-    c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: AZUL } };
-    c.alignment = { horizontal: i >= 4 ? "right" : "left", vertical: "middle" };
-  });
-
+  const ALTO = 20;
+  const FILAS_MIN = 27; // la hoja se completa con renglones rayados en blanco, como la de papel
   let r = hdr + 1;
-  const borde = { style: "thin" as const, color: { argb: "FFD1D5DB" } };
-  const filaBase = (n: number, anulada: boolean) => {
-    for (let c = 1; c <= 7; c++) {
+  const celdasFila = (n: number, anulada: boolean) => {
+    ws.getRow(n).height = anulada ? 30 : ALTO;
+    for (let c = 1; c <= 5; c++) {
       const cell = ws.getCell(n, c);
-      cell.border = { top: borde, bottom: borde, left: borde, right: borde };
-      cell.alignment = { vertical: "top", wrapText: c === 3 || c === 4, horizontal: c >= 5 ? "right" : "left" };
-      cell.font = { name: "Calibri", size: 10, color: { argb: anulada ? "FF9CA3AF" : "FF111827" }, strike: anulada && c <= 4 };
+      cell.border = { top: fino, bottom: fino, left: fino, right: fino };
+      cell.alignment = { vertical: "middle", horizontal: c <= 2 ? "left" : "center", wrapText: c === 2 };
+      cell.font = { name: "Arial", size: 10, bold: c >= 3, color: { argb: anulada ? "FF888888" : "FF111111" }, strike: anulada };
       if (anulada) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: GRIS } };
     }
   };
 
-  // Renglón inicial
-  ws.getCell(r, 2).value = "Existencia antes del primer renglón";
-  ws.getCell(r, 7).value = d.existenciaInicial;
-  filaBase(r, false);
-  ws.getCell(r, 2).font = { name: "Calibri", size: 10, italic: true, color: { argb: "FF6B7280" } };
-  ws.getCell(r, 7).font = { name: "Calibri", size: 10, bold: true };
+  // Existencia inicial
+  celdasFila(r, false);
+  ws.getCell(r, 2).value = "Existencia inicial";
+  ws.getCell(r, 2).font = { name: "Arial", size: 9, italic: true, color: { argb: "FF555555" } };
+  ws.getCell(r, 5).value = d.existenciaInicial;
   r++;
   const primera = r;
 
   for (const x of d.renglones) {
-    ws.getCell(r, 1).value = fechaHora(x.fechaISO);
-    ws.getCell(r, 2).value = x.nombre;
-    ws.getCell(r, 3).value = x.concepto;
-    ws.getCell(r, 4).value = x.anulado ? `${x.referencia ? x.referencia + " · " : ""}${x.anulado}` : x.referencia;
-    if (x.entrada != null) ws.getCell(r, 5).value = x.entrada;
-    if (x.salida != null) ws.getCell(r, 6).value = x.salida;
-    ws.getCell(r, 7).value = x.existencia;
-    filaBase(r, !!x.anulado);
-    if (!x.anulado) {
-      ws.getCell(r, 5).font = { name: "Calibri", size: 10, bold: true, color: { argb: "FF047857" } };
-      ws.getCell(r, 6).font = { name: "Calibri", size: 10, bold: true, color: { argb: ROJO } };
-      ws.getCell(r, 7).font = { name: "Calibri", size: 10, bold: true };
-    }
-    if (x.anulado) ws.getRow(r).height = 40;
-    for (const c of [5, 6, 7]) ws.getCell(r, c).numFmt = "#,##0.###";
+    celdasFila(r, !!x.anulado);
+    ws.getCell(r, 1).value = fechaDia(x.fechaISO);
+    const detalle = [x.referencia, x.concepto].filter(Boolean).join(" · ");
+    ws.getCell(r, 2).value = `${x.nombre}${detalle ? "  —  " + detalle : ""}${x.anulado ? "\n" + x.anulado : ""}`;
+    if (x.entrada != null) ws.getCell(r, 3).value = x.entrada;
+    if (x.salida != null) ws.getCell(r, 4).value = x.salida;
+    ws.getCell(r, 5).value = x.existencia;
     r++;
   }
   const ultima = r - 1;
-  ws.getCell(hdr + 1, 7).numFmt = "#,##0.###";
+  // Renglones en blanco hasta llenar la hoja
+  const usados = d.renglones.length + 1;
+  for (let i = usados; i < FILAS_MIN; i++) {
+    celdasFila(r, false);
+    r++;
+  }
+  for (let rr = primera - 1; rr < r; rr++) for (const c of [3, 4, 5]) ws.getCell(rr, c).numFmt = "General";
+  caja(hdr, 1, r - 1, 5);
 
   // Totales (los renglones anulados no traen entrada/salida, no suman)
-  ws.getCell(r, 4).value = "TOTALES";
-  ws.getCell(r, 5).value = { formula: `SUM(E${primera}:E${Math.max(ultima, primera)})`, result: d.renglones.reduce((s, x) => s + (x.entrada ?? 0), 0) };
-  ws.getCell(r, 6).value = { formula: `SUM(F${primera}:F${Math.max(ultima, primera)})`, result: d.renglones.reduce((s, x) => s + (x.salida ?? 0), 0) };
-  ws.getCell(r, 7).value = d.existenciaActual;
-  for (let c = 4; c <= 7; c++) {
+  r++;
+  ws.getCell(r, 2).value = "TOTAL ENTRADAS / SALIDAS / EXISTENCIA ACTUAL";
+  ws.getCell(r, 3).value = { formula: `SUM(C${primera}:C${Math.max(ultima, primera)})`, result: d.renglones.reduce((s, x) => s + (x.entrada ?? 0), 0) };
+  ws.getCell(r, 4).value = { formula: `SUM(D${primera}:D${Math.max(ultima, primera)})`, result: d.renglones.reduce((s, x) => s + (x.salida ?? 0), 0) };
+  ws.getCell(r, 5).value = d.existenciaActual;
+  for (let c = 2; c <= 5; c++) {
     const cell = ws.getCell(r, c);
-    cell.font = { name: "Calibri", bold: true, size: 11, color: { argb: AZUL } };
-    cell.border = { top: { style: "medium", color: { argb: AZUL } } };
-    cell.alignment = { horizontal: c === 4 ? "right" : "right" };
-    if (c >= 5) cell.numFmt = "#,##0.###";
+    cell.font = { name: "Arial", bold: true, size: 10, color: { argb: AZUL } };
+    cell.alignment = { horizontal: c === 2 ? "right" : "center", vertical: "middle" };
+    cell.border = { top: lado };
+    if (c >= 3) cell.numFmt = "General";
   }
   r += 2;
-  ws.mergeCells(r, 1, r, 7);
+  ws.mergeCells(r, 1, r, 5);
   ws.getCell(r, 1).value = `Generado el ${fechaHora(new Date().toISOString())} · Existencia actual: ${d.existenciaActual.toLocaleString("es-MX", { maximumFractionDigits: 3 })} ${d.unidad}`;
-  ws.getCell(r, 1).font = { name: "Calibri", size: 9, italic: true, color: { argb: "FF6B7280" } };
+  ws.getCell(r, 1).font = { name: "Arial", size: 8, italic: true, color: { argb: "FF6B7280" } };
 
-  ws.pageSetup.printTitlesRow = `${hdr}:${hdr}`;
+  ws.pageSetup.printTitlesRow = "1:9";
+  ws.headerFooter.oddFooter = "&RPágina &P de &N";
   await descargarLibro(wb, nombreArchivo(d, "xlsx"));
 }
 
