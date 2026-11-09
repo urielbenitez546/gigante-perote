@@ -143,9 +143,11 @@ export default function EtiquetaKardexModal({ product, onClose }: Props) {
     // vertical, una arriba y otra abajo (cada una de 199 × 128 mm = media carta), para cortar por la mitad.
     // K escala letras y alturas; W escala el ancho disponible de cada celda.
     const media = tamano === "media";
-    // Tamaño de la etiqueta en mm: llena la hoja carta casi completa (márgenes de 5 mm).
-    const LW = media ? 205 : 267;
-    const LH = media ? 131 : 201;
+    // Tamaño de la etiqueta en mm. El margen de 7 mm por los cuatro lados lo ponemos nosotros (no el
+    // navegador): así queda centrada y la impresora no le corta el borde, sin importar el margen que
+    // tenga elegido la ventana de impresión.
+    const LW = media ? 201 : 265;
+    const LH = media ? 130 : 201;
     const W = (LW * 3.7795) / 994; // escala del ancho respecto al diseño base (994 px de ancho, 190 mm de alto)
     const HK = LH / 190; // escala de las alturas de cada fila
     const K = Math.min(W, HK); // escala de las letras
@@ -226,19 +228,21 @@ export default function EtiquetaKardexModal({ product, onClose }: Props) {
       <html><head><title>Etiqueta Kardex — ${esc(product.code)}</title>
       <style>
         /* Hoja completa: no se fuerza la orientación; la etiqueta se acomoda sola a como esté el papel en la ventana de impresión. */
-        @page { ${media ? "size: letter portrait; " : ""}margin: 5mm; }
+        @page { ${media ? "size: letter portrait; " : ""}margin: 0; }
         * { box-sizing: border-box; }
         html, body { margin: 0; padding: 0; }
         body { font-family: Arial, Helvetica, sans-serif; color: #000; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-        .hoja { page-break-after: always; break-inside: avoid; }
+        /* Cada .hoja es una hoja carta; el padding de 7 mm es el margen seguro para la impresora. */
+        .hoja { box-sizing: border-box; page-break-after: always; break-inside: avoid; overflow: hidden; padding: 7mm; width: ${media ? "215mm" : "279mm"}; height: ${media ? "279mm" : "215mm"}; }
         .pagina { width: ${LW}mm; height: ${LH}mm; break-inside: avoid; ${media ? "margin-bottom: 4mm;" : ""} }
+        .pagina:last-child { margin-bottom: 0; }
         ${
           media
             ? ""
             : `/* Si el papel está en vertical (es lo normal en tablet y celular), la etiqueta se gira para llenar toda la hoja. */
         @media print and (orientation: portrait) {
-          .hoja { position: relative; width: 205mm; height: 268mm; }
-          .pagina { position: absolute; top: 0; left: 0; transform-origin: 0 0; transform: translateX(${LH}mm) rotate(90deg); }
+          .hoja { position: relative; width: 215mm; height: 279mm; }
+          .pagina { position: absolute; top: 7mm; left: 7mm; transform-origin: 0 0; transform: translateX(${LH}mm) rotate(90deg); }
         }`
         }
         table.et { width: 100%; height: 100%; border-collapse: collapse; table-layout: fixed; border: ${media ? 3 : 4}px solid #000;
