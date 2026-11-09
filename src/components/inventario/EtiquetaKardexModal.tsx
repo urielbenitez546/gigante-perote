@@ -105,6 +105,7 @@ export default function EtiquetaKardexModal({ product, onClose }: Props) {
   const [tipoEt, setTipoEt] = useState<TipoEtiqueta>(() => tipoSugerido(product));
   const [filas, setFilas] = useState<Fila[]>(() => filasPara(tipoSugerido(product), product));
   const [copias, setCopias] = useState(1);
+  const [tamano, setTamano] = useState<"completa" | "media">("completa");
   const [fondo, setFondo] = useState(false);
 
   const url = `${window.location.origin}/producto/${product.id}`;
@@ -138,6 +139,13 @@ export default function EtiquetaKardexModal({ product, onClose }: Props) {
       const cajas = num(f[2]?.valor ?? "");
       if (m2 != null && cajas != null) f[4].valor = (Math.round(m2 * cajas * 10) / 10).toString();
     }
+    // Hoja completa: carta horizontal (263 × 190 mm). Media hoja: dos etiquetas horizontales por hoja carta
+    // vertical, una arriba y otra abajo (cada una de 199 × 128 mm = media carta), para cortar por la mitad.
+    // K escala letras y alturas; W escala el ancho disponible de cada celda.
+    const media = tamano === "media";
+    const K = media ? 0.675 : 1;
+    const W = media ? 0.756 : 1;
+    const KL = media ? 0.78 : 1; // las letras chicas de los nombres de renglón se reducen menos para que se lean
     const L = (i: number) => esc((f[i]?.label ?? "").trim().toUpperCase());
     const V = (i: number) => esc((f[i]?.valor ?? "").trim());
     const U = (i: number) => esc((f[i]?.unidad ?? "").trim());
@@ -145,12 +153,13 @@ export default function EtiquetaKardexModal({ product, onClose }: Props) {
     // para que ninguna fila crezca y la etiqueta siempre quede en una sola hoja.
     const fs = (t: string, ancho: number, max: number) => {
       const l = t.trim().length;
-      return l === 0 ? max : Math.max(11, Math.min(max, Math.floor(ancho / (0.7 * l))));
+      const tope = Math.round(max * K);
+      return l === 0 ? tope : Math.max(Math.round(9 * K) + 2, Math.min(tope, Math.floor((ancho * W) / (0.7 * l))));
     };
     // Lo mismo para los nombres de renglón: se ajusta a la palabra más larga (las demás se parten en líneas).
     const fl = (t: string, ancho: number, max: number) => {
       const w = Math.max(1, ...t.trim().split(/\s+/).map((x) => x.length));
-      return Math.max(9, Math.min(max, Math.floor(ancho / (0.7 * w))));
+      return Math.max(8, Math.min(Math.round(max * KL), Math.floor((ancho * W) / (0.7 * w))));
     };
     const LS = (i: number, ancho: number, max: number) => `style="font-size:${fl(f[i]?.label ?? "", ancho, max)}px"`;
     const US = (i: number) => `style="font-size:${fs(f[i]?.unidad ?? "", 46, 18)}px"`;
@@ -159,10 +168,10 @@ export default function EtiquetaKardexModal({ product, onClose }: Props) {
     const stMarca = `style="font-size:${fs(product.brand || "", 400, 35)}px"`;
     const stCodigo = `style="font-size:${fs(product.code, 750, 25)}px"`;
     const largo = product.name.length;
-    const tamDesc = largo > 90 ? 30 : largo > 60 ? 38 : 49;
+    const tamDesc = Math.round((largo > 90 ? 30 : largo > 60 ? 38 : 49) * K);
 
-    const etiqueta = (ultima: boolean) => `
-      <div class="pagina"${ultima ? ' style="page-break-after:auto"' : ""}>
+    const etiqueta = (_ultima: boolean) => `
+      <div class="pagina">
         <table class="et">
           <colgroup>
             <col style="width:9.2%"><col style="width:12.9%"><col style="width:11.7%"><col style="width:10%">
@@ -200,35 +209,42 @@ export default function EtiquetaKardexModal({ product, onClose }: Props) {
           </tr>
         </table>
       </div>`;
-    const etiquetas = Array.from({ length: n }, (_, i) => etiqueta(i === n - 1)).join("");
+    // Hoja completa: una etiqueta por hoja. Media hoja: de dos en dos.
+    const porHoja = media ? 2 : 1;
+    const hojas = Math.ceil(n / porHoja);
+    const etiquetas = Array.from({ length: hojas }, (_, h) => {
+      const enEstaHoja = Math.min(porHoja, n - h * porHoja);
+      return `<div class="hoja"${h === hojas - 1 ? ' style="page-break-after:auto"' : ""}>${Array.from({ length: enEstaHoja }, () => etiqueta(true)).join("")}</div>`;
+    }).join("");
     const win = window.open("", "_blank", "width=1000,height=760");
     if (!win) return;
     win.document.write(`
       <html><head><title>Etiqueta Kardex — ${esc(product.code)}</title>
       <style>
-        @page { size: letter landscape; margin: 8mm; }
+        @page { size: ${media ? "letter portrait" : "letter landscape"}; margin: 8mm; }
         * { box-sizing: border-box; }
         html, body { margin: 0; padding: 0; }
         body { font-family: Arial, Helvetica, sans-serif; color: #000; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-        .pagina { width: 263mm; height: 190mm; page-break-after: always; break-inside: avoid; }
-        table.et { width: 100%; height: 100%; border-collapse: collapse; table-layout: fixed; border: 4px solid #000;
+        .hoja { page-break-after: always; break-inside: avoid; }
+        .pagina { width: ${media ? "199mm" : "263mm"}; height: ${media ? "128.3mm" : "190mm"}; break-inside: avoid; ${media ? "margin-bottom: 4mm;" : ""} }
+        table.et { width: 100%; height: 100%; border-collapse: collapse; table-layout: fixed; border: ${media ? 3 : 4}px solid #000;
                    ${fondo ? "background:#fde047;" : ""} }
-        .et td, .et th { border: 2px solid #000; padding: 0 1.5mm; overflow: hidden; }
-        .et th.lab { text-align: left; font-weight: bold; font-size: 22px; line-height: 1.1; }
-        .et th.lab.chica { font-size: 15px; }
-        .et td.val { text-align: center; font-weight: bold; font-size: 46px; white-space: nowrap; }
-        .et td.uni { font-weight: bold; font-size: 18px; text-align: left; padding-left: 1mm; white-space: nowrap; }
-        tr.rA { height: 58mm; }  tr.rB { height: 9mm; }  tr.rC { height: 65mm; }
-        tr.rD { height: 13mm; }  tr.rE { height: 15mm; } tr.rF { height: 30mm; }
+        .et td, .et th { border: ${media ? 1.5 : 2}px solid #000; padding: 0 ${(1.5 * K).toFixed(2)}mm; overflow: hidden; }
+        .et th.lab { text-align: left; font-weight: bold; font-size: ${Math.round(22 * K)}px; line-height: 1.1; }
+        .et th.lab.chica { font-size: ${Math.round(15 * KL)}px; }
+        .et td.val { text-align: center; font-weight: bold; font-size: ${Math.round(46 * K)}px; white-space: nowrap; }
+        .et td.uni { font-weight: bold; font-size: ${Math.round(18 * K)}px; text-align: left; padding-left: 1mm; white-space: nowrap; }
+        tr.rA { height: ${(58 * K).toFixed(1)}mm; }  tr.rB { height: ${(9 * K).toFixed(1)}mm; }  tr.rC { height: ${(65 * K).toFixed(1)}mm; }
+        tr.rD { height: ${(13 * K).toFixed(1)}mm; }  tr.rE { height: ${(15 * K).toFixed(1)}mm; } tr.rF { height: ${(30 * K).toFixed(1)}mm; }
         td.qrc { text-align: center; vertical-align: middle; padding: 1mm; }
-        img.qr { width: 52mm; height: 52mm; display: block; margin: 0 auto; }
+        img.qr { width: ${(52 * K).toFixed(1)}mm; height: ${(52 * K).toFixed(1)}mm; display: block; margin: 0 auto; }
         td.idc { text-align: center; vertical-align: middle; }
-        .idl { font-size: 42px; font-weight: bold; line-height: 1.1; }
-        .idn { font-size: 112px; font-weight: bold; line-height: 1.05; white-space: nowrap; }
-        td.medio { text-align: center; font-weight: bold; font-size: 35px; }
+        .idl { font-size: ${Math.round(42 * K)}px; font-weight: bold; line-height: 1.1; }
+        .idn { font-size: ${Math.round(112 * K)}px; font-weight: bold; line-height: 1.05; white-space: nowrap; }
+        td.medio { text-align: center; font-weight: bold; font-size: ${Math.round(35 * K)}px; }
         td.desc { text-align: center; vertical-align: middle; font-weight: bold; line-height: 1.15; }
-        td.cod { font-weight: bold; font-size: 25px; padding-left: 3mm; white-space: nowrap; }
-        td.marca { font-weight: bold; font-size: 35px; padding-left: 3mm; white-space: nowrap; }
+        td.cod { font-weight: bold; font-size: ${Math.round(25 * K)}px; padding-left: 3mm; white-space: nowrap; }
+        td.marca { font-weight: bold; font-size: ${Math.round(35 * K)}px; padding-left: 3mm; white-space: nowrap; }
       </style></head>
       <body>${etiquetas}
       <script>window.onload = () => window.print();</script></body></html>
@@ -311,17 +327,31 @@ export default function EtiquetaKardexModal({ product, onClose }: Props) {
               );
             })}
           </div>
-          <label className="block text-xs font-medium text-gigante-navy">
-            Copias (una por hoja)
-            <input
-              type="number"
-              min={1}
-              max={50}
-              value={copias}
-              onChange={(e) => setCopias(Number(e.target.value))}
-              className={campo}
-            />
-          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block text-xs font-medium text-gigante-navy">
+              Tamaño
+              <select value={tamano} onChange={(e) => setTamano(e.target.value as "completa" | "media")} className={campo}>
+                <option value="completa">Hoja completa (carta horizontal)</option>
+                <option value="media">Media hoja (2 horizontales por hoja carta)</option>
+              </select>
+            </label>
+            <label className="block text-xs font-medium text-gigante-navy">
+              Copias
+              <input
+                type="number"
+                min={1}
+                max={50}
+                value={copias}
+                onChange={(e) => setCopias(Number(e.target.value))}
+                className={campo}
+              />
+            </label>
+          </div>
+          <p className="text-[11px] text-gigante-muted">
+            {tamano === "completa"
+              ? "Una etiqueta por hoja carta, en horizontal. En la ventana de impresión deja la orientación en “Horizontal”."
+              : "Se imprimen de dos en dos en una hoja carta vertical; córtala por la mitad y cada mitad queda como etiqueta horizontal de media hoja."}
+          </p>
           <label className="flex items-center gap-2 text-xs text-gigante-navy">
             <input type="checkbox" checked={fondo} onChange={(e) => setFondo(e.target.checked)} />
             Imprimir fondo amarillo (déjalo apagado si metes la hoja amarilla)
