@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
-import { X, Printer, Plus } from "lucide-react";
-import { PRODUCT_UNIT_LABELS, ROTACION_LABELS, productoId, type Product } from "../../types";
+import { X, Printer } from "lucide-react";
+import { ROTACION_LABELS, productoId, type Product } from "../../types";
 
 interface Props {
   product: Product;
@@ -24,6 +24,8 @@ const TIPOS: Record<TipoEtiqueta, string> = {
 interface Fila {
   label: string;
   valor: string;
+  /** Solo en el renglón junto a la marca y en el TOTAL: la unidad que va a la derecha (m2, pzas…). */
+  unidad?: string;
 }
 
 /** Tipo de etiqueta sugerido por la unidad y el nombre del producto. */
@@ -36,73 +38,88 @@ function tipoSugerido(p: Product): TipoEtiqueta {
   return "pieza";
 }
 
-/** Renglones que se llenan a mano según el tipo; lo que el sistema ya sabe viene precargado. */
+/**
+ * Renglones de abajo de la etiqueta, igual que la hoja amarilla física:
+ *   [0] el dato que va a la derecha de la MARCA (en pisos: "PIEZA … m2")
+ *   [1] a [4] la fila de abajo: medida por caja, cajas por tarima, cajas por cama y TOTAL.
+ * Lo que el sistema ya sabe viene precargado; el resto se escribe a mano.
+ */
 function filasPara(tipo: TipoEtiqueta, p: Product): Fila[] {
   switch (tipo) {
     case "piso":
       return [
-        { label: "M² por caja", valor: p.medida_caja ?? "" },
-        { label: "Cajas por tarima", valor: "" },
-        { label: "M² por pza", valor: "" },
+        { label: "PIEZA", valor: "", unidad: "m2" },
+        { label: "M2 POR CAJA:", valor: p.medida_caja ?? "" },
+        { label: "CAJAS POR TARIMA", valor: "" },
+        { label: "CAJAS POR CAMA", valor: "" },
+        { label: "TOTAL", valor: "", unidad: "m2" },
       ];
     case "bulto":
       return [
-        { label: "Peso por bulto", valor: p.medida ?? "" },
-        { label: "Bultos por tarima", valor: "" },
-        { label: "Rendimiento / uso", valor: "" },
+        { label: "RENDIMIENTO", valor: "", unidad: "" },
+        { label: "PESO POR BULTO", valor: p.medida ?? "" },
+        { label: "BULTOS POR TARIMA", valor: "" },
+        { label: "BULTOS POR CAMA", valor: "" },
+        { label: "TOTAL", valor: "", unidad: "bultos" },
       ];
     case "pieza":
       return [
-        { label: "Medida / capacidad", valor: p.medida ?? "" },
-        { label: "Color", valor: p.color ?? "" },
-        { label: "Piezas por tarima", valor: "" },
+        { label: "COLOR", valor: p.color ?? "", unidad: "" },
+        { label: "MEDIDA / CAPACIDAD", valor: p.medida ?? "" },
+        { label: "PIEZAS POR TARIMA", valor: "" },
+        { label: "PIEZAS POR CAMA", valor: "" },
+        { label: "TOTAL", valor: "", unidad: "pzas" },
       ];
     case "rollo":
       return [
-        { label: "Largo por rollo", valor: p.medida ?? "" },
-        { label: "Rollos por tarima", valor: "" },
-        { label: "Calibre / ancho", valor: "" },
+        { label: "CALIBRE / ANCHO", valor: "", unidad: "" },
+        { label: "LARGO POR ROLLO", valor: p.medida ?? "" },
+        { label: "ROLLOS POR TARIMA", valor: "" },
+        { label: "ROLLOS POR CAMA", valor: "" },
+        { label: "TOTAL", valor: "", unidad: "rollos" },
       ];
     default:
       return [
-        { label: "Medida", valor: p.medida ?? "" },
-        { label: "Color", valor: p.color ?? "" },
+        { label: "COLOR", valor: p.color ?? "", unidad: "" },
+        { label: "MEDIDA", valor: p.medida ?? "" },
         { label: "", valor: "" },
+        { label: "", valor: "" },
+        { label: "TOTAL", valor: "", unidad: "" },
       ];
   }
 }
 
 /**
  * Etiqueta amarilla del Kardex (la que va en el protector de plástico del
- * anaquel). Se llena sola con los datos del producto; solo "cajas por
- * tarima" y "m² por pieza" se escriben a mano porque el sistema no los
- * guarda. El QR abre el Kardex de este producto al escanearlo.
+ * anaquel). Misma distribución que la hoja física (ID grande, capa de
+ * movimiento, descripción, código, marca y la fila de cajas por tarima /
+ * total), ocupando toda la hoja carta horizontal. En el lugar del logo va
+ * el QR, que abre el Kardex de este producto al escanearlo.
  *
- * Los renglones de abajo cambian según el tipo de producto (piso, bulto,
- * pieza, rollo u otro) y se pueden renombrar, quitar o agregar.
+ * Se llena sola con los datos del producto; "cajas por tarima", "cajas por
+ * cama" y "m² por pieza" se escriben a mano porque el sistema no los guarda.
+ * Los renglones de abajo cambian según el tipo de producto.
  */
 export default function EtiquetaKardexModal({ product, onClose }: Props) {
   const [qr, setQr] = useState<string | null>(null);
   const [tipoEt, setTipoEt] = useState<TipoEtiqueta>(() => tipoSugerido(product));
   const [filas, setFilas] = useState<Fila[]>(() => filasPara(tipoSugerido(product), product));
   const [copias, setCopias] = useState(1);
-  const [porHoja, setPorHoja] = useState<1 | 2>(1);
   const [fondo, setFondo] = useState(false);
 
   const url = `${window.location.origin}/producto/${product.id}`;
 
   useEffect(() => {
-    QRCode.toDataURL(url, { width: 300, margin: 1 }).then(setQr).catch(() => setQr(null));
+    QRCode.toDataURL(url, { width: 700, margin: 1 }).then(setQr).catch(() => setQr(null));
   }, [url]);
 
   const id = productoId(product) || product.code;
-  const seVendePor = PRODUCT_UNIT_LABELS[product.unit].toUpperCase();
 
   function cambiarTipo(t: TipoEtiqueta) {
     setTipoEt(t);
     setFilas(filasPara(t, product));
   }
-  function editarFila(i: number, campo: keyof Fila, valor: string) {
+  function editarFila(i: number, campo: "label" | "valor" | "unidad", valor: string) {
     setFilas((fs) => fs.map((f, j) => (j === i ? { ...f, [campo]: valor } : f)));
   }
   const tipo = ROTACION_LABELS[product.rotacion].toUpperCase();
@@ -110,52 +127,110 @@ export default function EtiquetaKardexModal({ product, onClose }: Props) {
   function imprimir() {
     if (!qr) return;
     const n = Math.max(1, Math.min(50, Math.floor(copias) || 1));
-    const etiqueta = (pagina: number) => `
-      <div class="et">
-        <div class="cab">
-          <div class="id"><span>ID :</span><b>${esc(id)}</b></div>
-          <div class="tipo">${esc(tipo)}</div>
-        </div>
-        <div class="cuerpo">
-          <div class="desc">${esc(product.name)}</div>
-          <table>
-            <tr><th>CÓDIGO</th><td>${esc(product.code)}</td></tr>
-            <tr><th>MARCA</th><td>${esc(product.brand || "")}</td></tr>
-            <tr><th>SE VENDE POR</th><td>${esc(seVendePor)}</td></tr>
-            ${filas
-              .filter((f) => f.label.trim() !== "")
-              .map((f) => `<tr><th>${esc(f.label.trim().toUpperCase())}</th><td>${esc(f.valor)}</td></tr>`)
-              .join("")}
-          </table>
-          <img src="${qr}" class="qr" />
-        </div>
-        <div class="pie">Página ${pagina} de ____ · FO-GIGANTE-KAR-00</div>
+    const num = (t: string) => {
+      const v = Number(t.replace(",", ".").trim());
+      return t.trim() !== "" && Number.isFinite(v) ? v : null;
+    };
+    // En pisos, el TOTAL se calcula solo (cajas por tarima × m² por caja) si no se escribió.
+    const f = filas.map((x) => ({ ...x }));
+    if (tipoEt === "piso" && f[4] && f[4].valor.trim() === "") {
+      const m2 = num(f[1]?.valor ?? "");
+      const cajas = num(f[2]?.valor ?? "");
+      if (m2 != null && cajas != null) f[4].valor = (Math.round(m2 * cajas * 10) / 10).toString();
+    }
+    const L = (i: number) => esc((f[i]?.label ?? "").trim().toUpperCase());
+    const V = (i: number) => esc((f[i]?.valor ?? "").trim());
+    const U = (i: number) => esc((f[i]?.unidad ?? "").trim());
+    // Letra que se achica sola cuando el texto no cabe en la celda (ancho en px, tamaño máximo en px),
+    // para que ninguna fila crezca y la etiqueta siempre quede en una sola hoja.
+    const fs = (t: string, ancho: number, max: number) => {
+      const l = t.trim().length;
+      return l === 0 ? max : Math.max(11, Math.min(max, Math.floor(ancho / (0.7 * l))));
+    };
+    // Lo mismo para los nombres de renglón: se ajusta a la palabra más larga (las demás se parten en líneas).
+    const fl = (t: string, ancho: number, max: number) => {
+      const w = Math.max(1, ...t.trim().split(/\s+/).map((x) => x.length));
+      return Math.max(9, Math.min(max, Math.floor(ancho / (0.7 * w))));
+    };
+    const LS = (i: number, ancho: number, max: number) => `style="font-size:${fl(f[i]?.label ?? "", ancho, max)}px"`;
+    const US = (i: number) => `style="font-size:${fs(f[i]?.unidad ?? "", 46, 18)}px"`;
+    const VS = (i: number, ancho: number) => `style="font-size:${fs(f[i]?.valor ?? "", ancho, 46)}px"`;
+    const stId = `style="font-size:${fs(id, 750, 112)}px"`;
+    const stMarca = `style="font-size:${fs(product.brand || "", 400, 35)}px"`;
+    const stCodigo = `style="font-size:${fs(product.code, 750, 25)}px"`;
+    const largo = product.name.length;
+    const tamDesc = largo > 90 ? 30 : largo > 60 ? 38 : 49;
+
+    const etiqueta = (ultima: boolean) => `
+      <div class="pagina"${ultima ? ' style="page-break-after:auto"' : ""}>
+        <table class="et">
+          <colgroup>
+            <col style="width:9.2%"><col style="width:12.9%"><col style="width:11.7%"><col style="width:10%">
+            <col style="width:11.2%"><col style="width:8.8%"><col style="width:9.4%"><col style="width:21.3%"><col style="width:5.5%">
+          </colgroup>
+          <tr class="rA">
+            <td colspan="2" class="qrc"><img src="${qr}" class="qr" /></td>
+            <td colspan="7" class="idc"><div class="idl">ID :</div><div class="idn" ${stId}>${esc(id)}</div></td>
+          </tr>
+          <tr class="rB">
+            <th colspan="2" class="lab chica">CAPA DE MOVIMIENTO:</th>
+            <td colspan="7" class="medio">${esc(tipo)}</td>
+          </tr>
+          <tr class="rC">
+            <th colspan="2" class="lab">DESCRIPCION :</th>
+            <td colspan="7" class="desc" style="font-size:${tamDesc}px">${esc(product.name)}</td>
+          </tr>
+          <tr class="rD">
+            <th colspan="2" class="lab">CODIGO :</th>
+            <td colspan="7" class="cod" ${stCodigo}>${esc(product.code)}</td>
+          </tr>
+          <tr class="rE">
+            <th colspan="2" class="lab">MARCA :</th>
+            <td colspan="4" class="marca" ${stMarca}>${esc(product.brand || "")}</td>
+            <th class="lab" ${LS(0, 78, 22)}>${L(0)}</th>
+            <td class="val" ${VS(0, 195)}>${V(0)}</td>
+            <td class="uni" ${US(0)}>${U(0)}</td>
+          </tr>
+          <tr class="rF">
+            <th class="lab chica" ${LS(1, 78, 15)}>${L(1)}</th><td class="val" ${VS(1, 112)}>${V(1)}</td>
+            <th class="lab chica" ${LS(2, 100, 15)}>${L(2)}</th><td class="val" ${VS(2, 88)}>${V(2)}</td>
+            <th class="lab chica" ${LS(3, 95, 15)}>${L(3)}</th><td class="val" ${VS(3, 76)}>${V(3)}</td>
+            <th class="lab chica" ${LS(4, 78, 15)}>${L(4)}</th><td class="val" ${VS(4, 195)}>${V(4)}</td>
+            <td class="uni" ${US(4)}>${U(4)}</td>
+          </tr>
+        </table>
       </div>`;
-    const etiquetas = Array.from({ length: n }, (_, i) => etiqueta(i + 1)).join("");
-    const win = window.open("", "_blank", "width=900,height=700");
+    const etiquetas = Array.from({ length: n }, (_, i) => etiqueta(i === n - 1)).join("");
+    const win = window.open("", "_blank", "width=1000,height=760");
     if (!win) return;
     win.document.write(`
       <html><head><title>Etiqueta Kardex — ${esc(product.code)}</title>
       <style>
         @page { size: letter landscape; margin: 8mm; }
         * { box-sizing: border-box; }
-        body { font-family: Arial, Helvetica, sans-serif; margin: 0; color: #000; }
-        .hoja { display: grid; grid-template-columns: 1fr; gap: 6mm; }
-        .et { border: 2px solid #000; padding: 5mm; page-break-inside: avoid; ${fondo ? "background:#fde047;" : ""}
-              height: ${porHoja === 1 ? "190mm" : "92mm"}; display:flex; flex-direction:column; }
-        .cab { display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #000; padding-bottom:3mm; }
-        .id span { font-size: ${porHoja === 1 ? "34px" : "22px"}; font-weight:bold; margin-right:8px; }
-        .id b { font-size: ${porHoja === 1 ? "84px" : "46px"}; }
-        .tipo { font-size: ${porHoja === 1 ? "30px" : "20px"}; font-weight:bold; }
-        .cuerpo { flex:1; display:grid; grid-template-columns: 1fr auto; gap: 4mm; align-content:start; padding-top:3mm; }
-        .desc { grid-column: 1 / 3; font-size: ${porHoja === 1 ? "34px" : "22px"}; font-weight:bold; text-align:center; }
-        table { border-collapse: collapse; width: 100%; font-size: ${porHoja === 1 ? "22px" : "14px"}; }
-        th { text-align:left; border:1px solid #000; padding: 2mm; width: 45%; }
-        td { border:1px solid #000; padding: 2mm; font-weight:bold; }
-        .qr { width: ${porHoja === 1 ? "60mm" : "36mm"}; height: ${porHoja === 1 ? "60mm" : "36mm"}; align-self:center; }
-        .pie { font-size: 11px; text-align:right; }
+        html, body { margin: 0; padding: 0; }
+        body { font-family: Arial, Helvetica, sans-serif; color: #000; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .pagina { width: 263mm; height: 190mm; page-break-after: always; break-inside: avoid; }
+        table.et { width: 100%; height: 100%; border-collapse: collapse; table-layout: fixed; border: 4px solid #000;
+                   ${fondo ? "background:#fde047;" : ""} }
+        .et td, .et th { border: 2px solid #000; padding: 0 1.5mm; overflow: hidden; }
+        .et th.lab { text-align: left; font-weight: bold; font-size: 22px; line-height: 1.1; }
+        .et th.lab.chica { font-size: 15px; }
+        .et td.val { text-align: center; font-weight: bold; font-size: 46px; white-space: nowrap; }
+        .et td.uni { font-weight: bold; font-size: 18px; text-align: left; padding-left: 1mm; white-space: nowrap; }
+        tr.rA { height: 58mm; }  tr.rB { height: 9mm; }  tr.rC { height: 65mm; }
+        tr.rD { height: 13mm; }  tr.rE { height: 15mm; } tr.rF { height: 30mm; }
+        td.qrc { text-align: center; vertical-align: middle; padding: 1mm; }
+        img.qr { width: 52mm; height: 52mm; display: block; margin: 0 auto; }
+        td.idc { text-align: center; vertical-align: middle; }
+        .idl { font-size: 42px; font-weight: bold; line-height: 1.1; }
+        .idn { font-size: 112px; font-weight: bold; line-height: 1.05; white-space: nowrap; }
+        td.medio { text-align: center; font-weight: bold; font-size: 35px; }
+        td.desc { text-align: center; vertical-align: middle; font-weight: bold; line-height: 1.15; }
+        td.cod { font-weight: bold; font-size: 25px; padding-left: 3mm; white-space: nowrap; }
+        td.marca { font-weight: bold; font-size: 35px; padding-left: 3mm; white-space: nowrap; }
       </style></head>
-      <body><div class="hoja">${etiquetas}</div>
+      <body>${etiquetas}
       <script>window.onload = () => window.print();</script></body></html>
     `);
     win.document.close();
@@ -185,7 +260,8 @@ export default function EtiquetaKardexModal({ product, onClose }: Props) {
           </p>
         </div>
         <p className="text-xs text-gigante-muted mb-3">
-          ID, tipo, descripción, código, marca y unidad se llenan solos. Los renglones cambian según el tipo de producto:
+          Igual que la hoja amarilla física, pero con el QR en lugar del logo y ocupando toda la hoja. ID, capa de movimiento,
+          descripción, código y marca se llenan solos. Abajo escribes lo que el sistema no sabe:
         </p>
 
         <div className="space-y-3">
@@ -201,62 +277,51 @@ export default function EtiquetaKardexModal({ product, onClose }: Props) {
           </label>
           <div className="space-y-2">
             <p className="text-[11px] text-gigante-muted">
-              Renglones de la etiqueta (puedes cambiar el nombre, llenarlos o quitarlos). “Se vende por: {seVendePor.toLowerCase()}” sale solo.
+              Renglón 1 va junto a la marca; los otros 4 son la fila de abajo. Puedes cambiar los nombres, llenarlos o dejarlos en blanco.
+              {tipoEt === "piso" && " En pisos, el TOTAL se calcula solo (m² por caja × cajas por tarima) si lo dejas vacío."}
             </p>
-            {filas.map((f, i) => (
-              <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center">
-                <input
-                  value={f.label}
-                  onChange={(e) => editarFila(i, "label", e.target.value)}
-                  placeholder="Nombre del renglón"
-                  className={`${campo} !py-1.5 font-medium`}
-                />
-                <input
-                  value={f.valor}
-                  onChange={(e) => editarFila(i, "valor", e.target.value)}
-                  placeholder="Valor"
-                  className={`${campo} !py-1.5`}
-                />
-                <button
-                  type="button"
-                  onClick={() => setFilas((fs) => fs.filter((_, j) => j !== i))}
-                  aria-label="Quitar renglón"
-                  className="text-gigante-muted hover:text-gigante-red"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-            ))}
-            {filas.length < 6 && (
-              <button
-                type="button"
-                onClick={() => setFilas((fs) => [...fs, { label: "", valor: "" }])}
-                className="inline-flex items-center gap-1 text-xs font-medium text-gigante-navy underline"
-              >
-                <Plus size={13} /> Agregar renglón
-              </button>
-            )}
+            {filas.map((f, i) => {
+              const tieneUnidad = i === 0 || i === filas.length - 1;
+              return (
+                <div key={i} className="grid grid-cols-[1fr_1fr_4.5rem] gap-2 items-center">
+                  <input
+                    value={f.label}
+                    onChange={(e) => editarFila(i, "label", e.target.value)}
+                    placeholder="Nombre del renglón"
+                    className={`${campo} !py-1.5 font-medium`}
+                  />
+                  <input
+                    value={f.valor}
+                    onChange={(e) => editarFila(i, "valor", e.target.value)}
+                    placeholder="Valor"
+                    className={`${campo} !py-1.5`}
+                  />
+                  {tieneUnidad ? (
+                    <input
+                      value={f.unidad ?? ""}
+                      onChange={(e) => editarFila(i, "unidad", e.target.value)}
+                      placeholder="Unidad"
+                      aria-label="Unidad"
+                      className={`${campo} !py-1.5`}
+                    />
+                  ) : (
+                    <span />
+                  )}
+                </div>
+              );
+            })}
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block text-xs font-medium text-gigante-navy">
-              Copias
-              <input
-                type="number"
-                min={1}
-                max={50}
-                value={copias}
-                onChange={(e) => setCopias(Number(e.target.value))}
-                className={campo}
-              />
-            </label>
-            <label className="block text-xs font-medium text-gigante-navy">
-              Etiquetas por hoja
-              <select value={porHoja} onChange={(e) => setPorHoja(Number(e.target.value) as 1 | 2)} className={campo}>
-                <option value={1}>1 (hoja completa)</option>
-                <option value={2}>2 (media hoja)</option>
-              </select>
-            </label>
-          </div>
+          <label className="block text-xs font-medium text-gigante-navy">
+            Copias (una por hoja)
+            <input
+              type="number"
+              min={1}
+              max={50}
+              value={copias}
+              onChange={(e) => setCopias(Number(e.target.value))}
+              className={campo}
+            />
+          </label>
           <label className="flex items-center gap-2 text-xs text-gigante-navy">
             <input type="checkbox" checked={fondo} onChange={(e) => setFondo(e.target.checked)} />
             Imprimir fondo amarillo (déjalo apagado si metes la hoja amarilla)
