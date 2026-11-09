@@ -171,65 +171,122 @@ const esc = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const num = (n: number) => n.toLocaleString("es-MX", { maximumFractionDigits: 3 });
 
-/** Abre una página limpia con el Kardex y lanza la impresión (ahí mismo se puede "Guardar como PDF"). */
+function fechaDia(iso: string) {
+  return new Date(iso).toLocaleDateString("es-MX", { timeZone: ZONA, day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+/** Renglones por hoja en el formato impreso (la hoja se completa con renglones en blanco, como la de papel). */
+const FILAS_POR_HOJA = 27;
+
+/**
+ * Abre el Kardex en el mismo formato que la hoja de papel FO-GIGANTE-KAR-00 (encabezado con logo,
+ * datos del formato, ID y descripción, y la tabla Fecha / Nombre / Entrada / Salida / Existencia
+ * con renglones rayados hasta llenar la hoja) y lanza la impresión; ahí mismo se puede guardar como PDF.
+ * Si existe /logo-gigante.png en el sitio, se usa como logo; si no, sale el nombre en letras.
+ */
 export function imprimirKardex(d: KardexExportDatos): boolean {
   const w = window.open("", "_blank");
   if (!w) return false;
-  const totE = d.renglones.reduce((s, x) => s + (x.entrada ?? 0), 0);
-  const totS = d.renglones.reduce((s, x) => s + (x.salida ?? 0), 0);
-  const filas = d.renglones
-    .map(
-      (x) => `<tr class="${x.anulado ? "an" : ""}">
-        <td>${esc(fechaHora(x.fechaISO))}</td>
-        <td><b>${esc(x.nombre)}</b><br><span class="s">${esc(x.concepto)}${x.referencia ? " · " + esc(x.referencia) : ""}</span>${
-          x.anulado ? `<br><span class="s rojo">${esc(x.anulado)}</span>` : ""
-        }</td>
-        <td class="n ent">${x.entrada != null ? num(x.entrada) : ""}</td>
-        <td class="n sal">${x.salida != null ? num(x.salida) : ""}</td>
-        <td class="n"><b>${num(x.existencia)}</b></td></tr>`
-    )
-    .join("");
+
+  type Fila = { fecha: string; nombre: string; detalle: string; ent: string; sal: string; exi: string; an: boolean };
+  const datos: Fila[] = [
+    { fecha: "", nombre: "", detalle: "Existencia inicial", ent: "", sal: "", exi: num(d.existenciaInicial), an: false },
+    ...d.renglones.map((x) => ({
+      fecha: fechaDia(x.fechaISO),
+      nombre: x.nombre,
+      detalle: `${x.referencia ? x.referencia : ""}${x.referencia && x.concepto ? " · " : ""}${x.concepto}${x.anulado ? " — " + x.anulado : ""}`,
+      ent: x.entrada != null ? num(x.entrada) : "",
+      sal: x.salida != null ? num(x.salida) : "",
+      exi: num(x.existencia),
+      an: !!x.anulado,
+    })),
+  ];
+  const paginas = Math.max(1, Math.ceil(datos.length / FILAS_POR_HOJA));
+  const logo = `${window.location.origin}/logo-gigante.png`;
+
+  const encabezado = `
+  <table class="enc">
+    <tr>
+      <td class="logo" rowspan="2">
+        <img src="${esc(logo)}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+        <div class="marca" style="display:none"><b>EL GIGANTE</b><span>DE LOS AZULEJOS Y MÁRMOLES</span></div>
+      </td>
+      <td class="oscuro" colspan="2"><b>FO-GIGANTE-KAR-00</b><br><b>Fecha de aplicación:<br>2024/09/18</b></td>
+      <td class="c">FECHA DE<br>ELABORACIÓN</td>
+      <td class="c">2024/09/17</td>
+      <td class="c" colspan="2"><b>ELABORÓ:</b><br>Carlos Tabueña</td>
+    </tr>
+    <tr>
+      <td class="c">FECHA DE<br>REVISIÓN</td>
+      <td class="c">2024/09/18</td>
+      <td class="c">REVISIÓN:</td>
+      <td class="c">00</td>
+      <td class="c">APROBÓ:</td>
+      <td class="c peq">Representante del Comité de Cumplimiento<br>fecha: 2024/09/18</td>
+    </tr>
+  </table>
+  <div class="barra">FORMATO PARA KARDEX</div>
+  <table class="idt"><tr>
+    <td class="k">ID</td><td class="idv">${esc(d.id || "—")}</td>
+    <td class="k">Descripción</td><td class="vac"></td><td class="desc">${esc(d.descripcion)}</td>
+  </tr></table>`;
+
+  const hojas: string[] = [];
+  for (let p = 0; p < paginas; p++) {
+    const trozo = datos.slice(p * FILAS_POR_HOJA, (p + 1) * FILAS_POR_HOJA);
+    let filas = "";
+    for (let i = 0; i < FILAS_POR_HOJA; i++) {
+      const f = trozo[i];
+      if (!f) {
+        filas += `<tr><td></td><td></td><td></td><td></td><td></td></tr>`;
+        continue;
+      }
+      filas += `<tr class="${f.an ? "an" : ""}">
+        <td>${esc(f.fecha)}</td>
+        <td class="nom"><b>${esc(f.nombre)}</b>${f.detalle ? ` <span class="det">${esc(f.detalle)}</span>` : ""}</td>
+        <td class="n">${esc(f.ent)}</td><td class="n">${esc(f.sal)}</td><td class="n ex">${esc(f.exi)}</td></tr>`;
+    }
+    hojas.push(`<section class="pg">${encabezado}
+      <table class="mov">
+        <thead><tr><th style="width:15%">Fecha</th><th>Nombre</th><th style="width:14%">Entrada</th><th style="width:14%">Salida</th><th style="width:16%">Existencia</th></tr></thead>
+        <tbody>${filas}</tbody>
+      </table>
+      <div class="pie">página ${p + 1} de ${paginas}</div></section>`);
+  }
+
   w.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Kardex ${esc(d.id || d.codigo)}</title>
 <style>
-@page { size: letter portrait; margin: 12mm; }
+@page { size: letter portrait; margin: 8mm; }
 * { box-sizing: border-box; }
-body { font-family: Arial, Helvetica, sans-serif; color: #111827; font-size: 11px; margin: 0; }
-h1 { font-size: 16px; margin: 0; color: #1f3a5f; }
-.sub { color: #6b7280; font-size: 10px; margin: 2px 0 10px; }
-.ficha { display: grid; grid-template-columns: auto 1fr; border: 1px solid #9ca3af; margin-bottom: 10px; }
-.ficha div { padding: 4px 8px; border-bottom: 1px solid #d1d5db; }
-.ficha .k { background: #f3f4f6; font-weight: bold; color: #1f3a5f; border-right: 1px solid #d1d5db; }
-.ficha div:nth-last-child(-n+2) { border-bottom: 0; }
-table { width: 100%; border-collapse: collapse; }
-th { background: #1f3a5f; color: #fff; text-align: left; padding: 5px 6px; font-size: 10.5px; }
-th.n, td.n { text-align: right; }
-td { border: 1px solid #d1d5db; padding: 4px 6px; vertical-align: top; }
-thead { display: table-header-group; }
-tr { break-inside: avoid; }
-.s { color: #6b7280; font-size: 9.5px; }
-.rojo { color: #c8102e; }
-.ent { color: #047857; font-weight: bold; }
-.sal { color: #c8102e; font-weight: bold; }
-tr.an td { background: #f3f4f6; color: #9ca3af; text-decoration: line-through; }
-tr.an td .s.rojo { text-decoration: none; display: inline-block; }
-tr.tot td { border-top: 2px solid #1f3a5f; font-weight: bold; color: #1f3a5f; }
-.pie { margin-top: 8px; color: #6b7280; font-size: 9px; }
-</style></head><body>
-<h1>KARDEX DE PRODUCTO</h1>
-<div class="sub">FO-GIGANTE-KAR-00 · El Gigante de los Azulejos y Mármoles — Sucursal Perote</div>
-<div class="ficha">
-  <div class="k">ID</div><div><b>${esc(d.id || "—")}</b> · ${esc(d.codigo)}</div>
-  <div class="k">Descripción</div><div>${esc(d.descripcion)}</div>
-  <div class="k">Unidad</div><div>${esc(d.unidad)}</div>
-</div>
-<table>
-<thead><tr><th style="width:105px">Fecha</th><th>Nombre / concepto</th><th class="n" style="width:62px">Entrada</th><th class="n" style="width:62px">Salida</th><th class="n" style="width:78px">Existencia</th></tr></thead>
-<tbody>
-<tr><td>—</td><td><i style="color:#6b7280">Existencia antes del primer renglón</i></td><td></td><td></td><td class="n"><b>${num(d.existenciaInicial)}</b></td></tr>
-${filas}
-<tr class="tot"><td></td><td style="text-align:right">TOTALES</td><td class="n">${num(totE)}</td><td class="n">${num(totS)}</td><td class="n">${num(d.existenciaActual)}</td></tr>
-</tbody></table>
-<div class="pie">Generado el ${esc(fechaHora(new Date().toISOString()))} · Existencia actual: ${num(d.existenciaActual)} ${esc(d.unidad)}. Los renglones tachados fueron anulados.</div>
+body { font-family: Arial, Helvetica, sans-serif; color: #111; margin: 0; font-size: 10px; }
+.pg { position: relative; width: 100%; height: 262mm; page-break-after: always; overflow: hidden; }
+.pg:last-child { page-break-after: auto; }
+table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.enc td { border: 1.5px solid #333; padding: 2mm 1.5mm; text-align: center; vertical-align: middle; font-size: 9.5px; }
+.enc .logo { width: 30%; }
+.enc .logo img { max-width: 100%; max-height: 24mm; }
+.marca b { display: block; font-size: 17px; letter-spacing: .5px; }
+.marca span { display: block; font-size: 6.5px; letter-spacing: .3px; }
+.enc .oscuro { background: #3a3a3a; color: #fff; font-size: 10.5px; width: 24%; line-height: 1.25; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.enc .c { font-size: 8.5px; line-height: 1.3; }
+.enc .peq { font-size: 7px; }
+.barra { border: 1.5px solid #333; border-top: 0; text-align: center; font-weight: bold; padding: 2.2mm 0; font-size: 10px; letter-spacing: .3px; }
+.idt { margin-top: 5mm; border: 1.5px solid #333; }
+.idt td { border: 1px solid #333; padding: 2.2mm 2mm; font-size: 10px; }
+.idt .k { width: 11%; font-weight: normal; text-align: left; }
+.idt .idv { width: 21%; text-align: center; font-weight: bold; font-size: 11px; }
+.idt .vac { width: 5%; }
+.idt .desc { font-weight: bold; font-size: 11px; }
+.idt td:nth-child(3) { width: 14%; }
+.mov { margin-top: 3mm; border: 1.5px solid #333; }
+.mov th { border: 1px solid #333; padding: 2.5mm 1mm; font-weight: normal; font-size: 10px; text-align: center; }
+.mov td { border: 1px solid #555; height: 7mm; padding: 0 1.5mm; font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mov td.n { text-align: center; font-weight: bold; }
+.mov td.ex { font-size: 11px; }
+.mov .det { font-size: 8px; color: #555; font-weight: normal; }
+.mov tr.an td { color: #888; text-decoration: line-through; background: #f1f1f1; }
+.pie { position: absolute; right: 2mm; bottom: 0; font-size: 10px; color: #444; }
+</style></head><body>${hojas.join("")}
 <script>window.onload=function(){setTimeout(function(){window.print();},300)}</script>
 </body></html>`);
   w.document.close();
