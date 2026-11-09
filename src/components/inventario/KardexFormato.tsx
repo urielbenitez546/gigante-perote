@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ClipboardCheck, Paperclip, Tag } from "lucide-react";
+import { ClipboardCheck, FileSpreadsheet, Paperclip, Printer, Tag } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import {
   registerInventoryEntry,
@@ -13,6 +13,7 @@ import {
 } from "../../hooks/useInventory";
 import { signedPhotoUrl, uploadPhoto } from "../../lib/storage";
 import { useProfileNames } from "../../hooks/useProfileNames";
+import { exportarKardexExcel, imprimirKardex, type KardexExportDatos } from "../../lib/kardexExport";
 import ElegirFoto from "../common/ElegirFoto";
 import ConteoFisicoModal from "./ConteoFisicoModal";
 import EtiquetaKardexModal from "./EtiquetaKardexModal";
@@ -58,6 +59,7 @@ export default function KardexFormato({ product, onChanged }: Props) {
   const [msg, setMsg] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null);
   const [conteoAbierto, setConteoAbierto] = useState(false);
   const [etiquetaAbierta, setEtiquetaAbierta] = useState(false);
+  const [exportando, setExportando] = useState(false);
   const [foto, setFoto] = useState<File | null>(null);
   const [fotoEsDelProducto, setFotoEsDelProducto] = useState(true);
   const vistaFoto = useMemo(() => (foto ? URL.createObjectURL(foto) : null), [foto]);
@@ -77,6 +79,46 @@ export default function KardexFormato({ product, onChanged }: Props) {
     }
     return { filas: asc.map((e, i) => ({ e, existencia: resultado[i] })), inicial: r3(despues) };
   }, [entries, stock]);
+
+  // Datos para exportar a Excel / imprimir (los renglones anulados salen tachados, sin mover la existencia).
+  function datosExport(): KardexExportDatos {
+    return {
+      id: productoId(product) || "",
+      codigo: product.code,
+      descripcion: product.name,
+      unidad,
+      existenciaActual: r3(stock),
+      existenciaInicial: inicial,
+      renglones: filas.map(({ e, existencia }) => ({
+        fechaISO: e.fecha,
+        nombre: nameFor(e.created_by),
+        concepto: e.detalle,
+        referencia: e.referencia ?? "",
+        entrada: !e.anulado && e.delta > 0 ? r3(e.delta) : null,
+        salida: !e.anulado && e.delta < 0 ? r3(Math.abs(e.delta)) : null,
+        existencia,
+        anulado: e.anulado ? `Anulado por ${nameFor(e.anulado.por)} el ${fechaCorta(e.anulado.fecha)}: ${e.anulado.motivo}` : null,
+      })),
+    };
+  }
+
+  async function bajarExcel() {
+    setMsg(null);
+    setExportando(true);
+    try {
+      await exportarKardexExcel(datosExport());
+    } catch (err) {
+      setMsg({ tipo: "error", texto: `No se pudo crear el Excel: ${err instanceof Error ? err.message : "error desconocido"}` });
+    }
+    setExportando(false);
+  }
+
+  function imprimir() {
+    setMsg(null);
+    if (!imprimirKardex(datosExport())) {
+      setMsg({ tipo: "error", texto: "El navegador bloqueó la ventana. Permite las ventanas emergentes de este sitio e inténtalo otra vez." });
+    }
+  }
 
   const nEntrada = Number(entrada) || 0;
   const nSalida = Number(salida) || 0;
@@ -199,10 +241,26 @@ export default function KardexFormato({ product, onChanged }: Props) {
 
   return (
     <div className="bg-white border border-gigante-border rounded-2xl p-4 mt-4">
-      <div className="flex items-start justify-between gap-3 mb-3">
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
         <div>
           <h2 className="text-sm font-bold text-gigante-navy">Formato para Kardex</h2>
           <p className="text-[11px] text-gigante-muted">FO-GIGANTE-KAR-00</p>
+        </div>
+        <div className="flex gap-2 flex-wrap justify-end">
+          <button
+            onClick={bajarExcel}
+            disabled={loading || exportando}
+            className="flex items-center gap-1.5 border border-gigante-border text-gigante-navy text-xs font-medium rounded-lg px-3 py-2 hover:bg-gigante-bg disabled:opacity-60"
+          >
+            <FileSpreadsheet size={14} /> {exportando ? "Creando..." : "Excel"}
+          </button>
+          <button
+            onClick={imprimir}
+            disabled={loading}
+            className="flex items-center gap-1.5 border border-gigante-border text-gigante-navy text-xs font-medium rounded-lg px-3 py-2 hover:bg-gigante-bg disabled:opacity-60"
+          >
+            <Printer size={14} /> Imprimir / PDF
+          </button>
         </div>
         {puedeEntrada && (
           <div className="flex gap-2 flex-wrap justify-end">
