@@ -143,9 +143,13 @@ export default function EtiquetaKardexModal({ product, onClose }: Props) {
     // vertical, una arriba y otra abajo (cada una de 199 × 128 mm = media carta), para cortar por la mitad.
     // K escala letras y alturas; W escala el ancho disponible de cada celda.
     const media = tamano === "media";
-    const K = media ? 0.675 : 1;
-    const W = media ? 0.756 : 1;
-    const KL = media ? 0.78 : 1; // las letras chicas de los nombres de renglón se reducen menos para que se lean
+    // Tamaño de la etiqueta en mm: llena la hoja carta casi completa (márgenes de 5 mm).
+    const LW = media ? 205 : 267;
+    const LH = media ? 131 : 201;
+    const W = (LW * 3.7795) / 994; // escala del ancho respecto al diseño base (994 px de ancho, 190 mm de alto)
+    const HK = LH / 190; // escala de las alturas de cada fila
+    const K = Math.min(W, HK); // escala de las letras
+    const KL = media ? 0.78 : K; // las letras chicas de los nombres de renglón se reducen menos para que se lean
     const L = (i: number) => esc((f[i]?.label ?? "").trim().toUpperCase());
     const V = (i: number) => esc((f[i]?.valor ?? "").trim());
     const U = (i: number) => esc((f[i]?.unidad ?? "").trim());
@@ -221,12 +225,22 @@ export default function EtiquetaKardexModal({ product, onClose }: Props) {
     win.document.write(`
       <html><head><title>Etiqueta Kardex — ${esc(product.code)}</title>
       <style>
-        @page { size: ${media ? "letter portrait" : "letter landscape"}; margin: 8mm; }
+        /* Hoja completa: no se fuerza la orientación; la etiqueta se acomoda sola a como esté el papel en la ventana de impresión. */
+        @page { ${media ? "size: letter portrait; " : ""}margin: 5mm; }
         * { box-sizing: border-box; }
         html, body { margin: 0; padding: 0; }
         body { font-family: Arial, Helvetica, sans-serif; color: #000; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         .hoja { page-break-after: always; break-inside: avoid; }
-        .pagina { width: ${media ? "199mm" : "263mm"}; height: ${media ? "128.3mm" : "190mm"}; break-inside: avoid; ${media ? "margin-bottom: 4mm;" : ""} }
+        .pagina { width: ${LW}mm; height: ${LH}mm; break-inside: avoid; ${media ? "margin-bottom: 4mm;" : ""} }
+        ${
+          media
+            ? ""
+            : `/* Si el papel está en vertical (es lo normal en tablet y celular), la etiqueta se gira para llenar toda la hoja. */
+        @media print and (orientation: portrait) {
+          .hoja { position: relative; width: 205mm; height: 268mm; }
+          .pagina { position: absolute; top: 0; left: 0; transform-origin: 0 0; transform: translateX(${LH}mm) rotate(90deg); }
+        }`
+        }
         table.et { width: 100%; height: 100%; border-collapse: collapse; table-layout: fixed; border: ${media ? 3 : 4}px solid #000;
                    ${fondo ? "background:#fde047;" : ""} }
         .et td, .et th { border: ${media ? 1.5 : 2}px solid #000; padding: 0 ${(1.5 * K).toFixed(2)}mm; overflow: hidden; }
@@ -234,8 +248,8 @@ export default function EtiquetaKardexModal({ product, onClose }: Props) {
         .et th.lab.chica { font-size: ${Math.round(15 * KL)}px; }
         .et td.val { text-align: center; font-weight: bold; font-size: ${Math.round(46 * K)}px; white-space: nowrap; }
         .et td.uni { font-weight: bold; font-size: ${Math.round(18 * K)}px; text-align: left; padding-left: 1mm; white-space: nowrap; }
-        tr.rA { height: ${(58 * K).toFixed(1)}mm; }  tr.rB { height: ${(9 * K).toFixed(1)}mm; }  tr.rC { height: ${(65 * K).toFixed(1)}mm; }
-        tr.rD { height: ${(13 * K).toFixed(1)}mm; }  tr.rE { height: ${(15 * K).toFixed(1)}mm; } tr.rF { height: ${(30 * K).toFixed(1)}mm; }
+        tr.rA { height: ${(58 * HK).toFixed(1)}mm; }  tr.rB { height: ${(11 * HK).toFixed(1)}mm; }  tr.rC { height: ${(63 * HK).toFixed(1)}mm; }
+        tr.rD { height: ${(13 * HK).toFixed(1)}mm; }  tr.rE { height: ${(15 * HK).toFixed(1)}mm; } tr.rF { height: ${(30 * HK).toFixed(1)}mm; }
         td.qrc { text-align: center; vertical-align: middle; padding: 1mm; }
         img.qr { width: ${(52 * K).toFixed(1)}mm; height: ${(52 * K).toFixed(1)}mm; display: block; margin: 0 auto; }
         td.idc { text-align: center; vertical-align: middle; }
@@ -349,7 +363,7 @@ export default function EtiquetaKardexModal({ product, onClose }: Props) {
           </div>
           <p className="text-[11px] text-gigante-muted">
             {tamano === "completa"
-              ? "Una etiqueta por hoja carta, en horizontal. En la ventana de impresión deja la orientación en “Horizontal”."
+              ? "Una etiqueta por hoja carta que llena toda la hoja. Si el papel está en vertical en la ventana de impresión, la etiqueta se gira sola; si lo pones en horizontal, sale derecha."
               : "Se imprimen de dos en dos en una hoja carta vertical; córtala por la mitad y cada mitad queda como etiqueta horizontal de media hoja."}
           </p>
           <label className="flex items-center gap-2 text-xs text-gigante-navy">
