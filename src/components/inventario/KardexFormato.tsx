@@ -495,7 +495,7 @@ export default function KardexFormato({ product, onChanged }: Props) {
         <p className="text-xs text-gigante-muted mt-3">Solo consulta: tu usuario no puede anotar renglones en el Kardex.</p>
       )}
 
-      {etiquetaAbierta && <EtiquetaKardexModal product={product} onClose={() => setEtiquetaAbierta(false)} />}
+      {etiquetaAbierta && <EtiquetaKardexModal product={product} onClose={() => setEtiquetaAbierta(false)} onGuardado={onChanged} />}
 
       {conteoAbierto && (
         <ConteoFisicoModal

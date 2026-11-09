@@ -317,6 +317,12 @@ export async function updateProductComercial(
   return { error: error?.message ?? null };
 }
 
+/** Guarda (o borra, con null) los datos llenados de la etiqueta amarilla del Kardex de un producto. */
+export async function guardarEtiquetaKardex(productId: string, datos: Record<string, unknown> | null) {
+  const { error } = await supabase.rpc("guardar_etiqueta_kardex", { p_product_id: productId, p_datos: datos });
+  return { error: error?.message ?? null };
+}
+
 /** Actualiza únicamente el % de descuento de un producto (Gerencia y Ventas). */
 export async function updateProductDescuento(productId: string, descuento: number) {
   const { error } = await supabase.rpc("update_product_descuento", {

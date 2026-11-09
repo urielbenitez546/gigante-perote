@@ -251,6 +251,14 @@ export interface Product {
   medida_caja: string | null;
   /** Tamaño de etiqueta fijado a mano; null = automático por tipo de producto. */
   tamano_etiqueta?: "carta" | "media" | "cuarto" | "octavo" | null;
+  /** Datos de la etiqueta amarilla del Kardex ya llenados (se guardan una vez por producto). */
+  etiqueta_kardex?: {
+    tipo?: string;
+    filas?: { label: string; valor: string; unidad?: string }[];
+    tamano?: "completa" | "media";
+    fondo?: boolean;
+  } | null;
+  etiqueta_kardex_at?: string | null;
   /** Foto del producto (bucket "productos-fotos"), para comprobar que el material coincide. */
   foto_path?: string | null;
   external_id: string | null;

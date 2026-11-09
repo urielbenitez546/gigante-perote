@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
-import { X, Printer } from "lucide-react";
+import { X, Printer, Save } from "lucide-react";
 import { ROTACION_LABELS, productoId, type Product } from "../../types";
+import { guardarEtiquetaKardex } from "../../hooks/useInventory";
 
 interface Props {
   product: Product;
   onClose: () => void;
+  /** Se llama después de guardar los datos, para que el producto se refresque con lo guardado. */
+  onGuardado?: () => void;
 }
 
 const esc = (s: string) =>
@@ -100,13 +103,54 @@ function filasPara(tipo: TipoEtiqueta, p: Product): Fila[] {
  * cama" y "m² por pieza" se escriben a mano porque el sistema no los guarda.
  * Los renglones de abajo cambian según el tipo de producto.
  */
-export default function EtiquetaKardexModal({ product, onClose }: Props) {
+export default function EtiquetaKardexModal({ product, onClose, onGuardado }: Props) {
   const [qr, setQr] = useState<string | null>(null);
-  const [tipoEt, setTipoEt] = useState<TipoEtiqueta>(() => tipoSugerido(product));
-  const [filas, setFilas] = useState<Fila[]>(() => filasPara(tipoSugerido(product), product));
+  // Si el producto ya tiene su etiqueta guardada, se abre ya llena.
+  const guardada = product.etiqueta_kardex && Array.isArray(product.etiqueta_kardex.filas) && product.etiqueta_kardex.filas.length === 5
+    ? product.etiqueta_kardex
+    : null;
+  const [tipoEt, setTipoEt] = useState<TipoEtiqueta>(() =>
+    guardada?.tipo && guardada.tipo in TIPOS ? (guardada.tipo as TipoEtiqueta) : tipoSugerido(product)
+  );
+  const [filas, setFilas] = useState<Fila[]>(() =>
+    guardada ? guardada.filas!.map((f) => ({ ...f })) : filasPara(tipoSugerido(product), product)
+  );
   const [copias, setCopias] = useState(1);
-  const [tamano, setTamano] = useState<"completa" | "media">("completa");
-  const [fondo, setFondo] = useState(false);
+  const [tamano, setTamano] = useState<"completa" | "media">(guardada?.tamano === "media" ? "media" : "completa");
+  const [fondo, setFondo] = useState(!!guardada?.fondo);
+  const [guardadoOk, setGuardadoOk] = useState(!!guardada);
+  const [guardando, setGuardando] = useState(false);
+  const [aviso, setAviso] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null);
+
+  async function guardarDatos(silencioso = false) {
+    setGuardando(true);
+    const { error } = await guardarEtiquetaKardex(product.id, { tipo: tipoEt, filas, tamano, fondo });
+    setGuardando(false);
+    if (error) {
+      if (!silencioso) setAviso({ tipo: "error", texto: `No se pudo guardar: ${error}` });
+      return false;
+    }
+    setGuardadoOk(true);
+    if (!silencioso) setAviso({ tipo: "ok", texto: "Guardado. La próxima vez esta etiqueta ya aparece llena." });
+    onGuardado?.();
+    return true;
+  }
+
+  async function restablecer() {
+    if (!window.confirm("¿Borrar lo guardado y volver a los datos del producto? Los renglones que escribiste a mano se pierden.")) return;
+    setGuardando(true);
+    const { error } = await guardarEtiquetaKardex(product.id, null);
+    setGuardando(false);
+    if (error) return setAviso({ tipo: "error", texto: `No se pudo restablecer: ${error}` });
+    const t = tipoSugerido(product);
+    setTipoEt(t);
+    setFilas(filasPara(t, product));
+    setTamano("completa");
+    setFondo(false);
+    setGuardadoOk(false);
+    setAviso({ tipo: "ok", texto: "Restablecido a los datos del producto." });
+    onGuardado?.();
+  }
 
   const url = `${window.location.origin}/producto/${product.id}`;
 
@@ -119,14 +163,18 @@ export default function EtiquetaKardexModal({ product, onClose }: Props) {
   function cambiarTipo(t: TipoEtiqueta) {
     setTipoEt(t);
     setFilas(filasPara(t, product));
+    setGuardadoOk(false);
   }
   function editarFila(i: number, campo: "label" | "valor" | "unidad", valor: string) {
+    setGuardadoOk(false);
     setFilas((fs) => fs.map((f, j) => (j === i ? { ...f, [campo]: valor } : f)));
   }
   const tipo = ROTACION_LABELS[product.rotacion].toUpperCase();
 
   function imprimir() {
     if (!qr) return;
+    // Al imprimir también se guarda, para no volver a capturar lo mismo.
+    if (!guardadoOk) void guardarDatos(true);
     const n = Math.max(1, Math.min(50, Math.floor(copias) || 1));
     const num = (t: string) => {
       const v = Number(t.replace(",", ".").trim());
@@ -348,7 +396,7 @@ export default function EtiquetaKardexModal({ product, onClose }: Props) {
           <div className="grid grid-cols-2 gap-3">
             <label className="block text-xs font-medium text-gigante-navy">
               Tamaño
-              <select value={tamano} onChange={(e) => setTamano(e.target.value as "completa" | "media")} className={campo}>
+              <select value={tamano} onChange={(e) => { setTamano(e.target.value as "completa" | "media"); setGuardadoOk(false); }} className={campo}>
                 <option value="completa">Hoja completa (carta horizontal)</option>
                 <option value="media">Media hoja (2 horizontales por hoja carta)</option>
               </select>
@@ -371,12 +419,31 @@ export default function EtiquetaKardexModal({ product, onClose }: Props) {
               : "Se imprimen de dos en dos en una hoja carta vertical; córtala por la mitad y cada mitad queda como etiqueta horizontal de media hoja."}
           </p>
           <label className="flex items-center gap-2 text-xs text-gigante-navy">
-            <input type="checkbox" checked={fondo} onChange={(e) => setFondo(e.target.checked)} />
+            <input type="checkbox" checked={fondo} onChange={(e) => { setFondo(e.target.checked); setGuardadoOk(false); }} />
             Imprimir fondo amarillo (déjalo apagado si metes la hoja amarilla)
           </label>
         </div>
 
-        <div className="flex gap-3 pt-5">
+        <div className="mt-4 flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => guardarDatos()}
+            disabled={guardando}
+            className="flex items-center gap-1.5 border border-gigante-navy text-gigante-navy text-xs font-semibold rounded-lg px-3 py-2 hover:bg-gigante-bg disabled:opacity-60"
+          >
+            <Save size={14} /> {guardando ? "Guardando..." : "Guardar datos"}
+          </button>
+          {product.etiqueta_kardex || guardadoOk ? (
+            <button onClick={restablecer} disabled={guardando} className="text-[11px] text-gigante-red underline disabled:opacity-60">
+              Borrar lo guardado
+            </button>
+          ) : null}
+          <span className={`text-[11px] ${guardadoOk ? "text-emerald-700" : "text-gigante-muted"}`}>
+            {guardadoOk ? "✓ Datos guardados en este producto" : "Sin guardar (se guarda solo al imprimir)"}
+          </span>
+        </div>
+        {aviso && <p className={`mt-1 text-xs ${aviso.tipo === "ok" ? "text-emerald-700" : "text-gigante-red"}`}>{aviso.texto}</p>}
+
+        <div className="flex gap-3 pt-4">
           <button
             onClick={onClose}
             className="flex-1 border border-gigante-border text-gigante-navy rounded-lg py-2.5 text-sm font-medium"
